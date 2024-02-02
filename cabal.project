@@ -1,0 +1,3 @@
+packages:
+    ./kosem-core
+    ./kosem-postgresql

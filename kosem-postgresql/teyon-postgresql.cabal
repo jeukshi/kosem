@@ -1,0 +1,103 @@
+cabal-version:   3.8
+name:            kosem-postgresql
+version:         0.1.0.0
+license:         MIT
+license-file:    LICENSE
+author:          Daniel Orłowski
+maintainer:      orlowd@gmail.com
+category:        Other
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
+
+common runtime-opts
+    ghc-options: -threaded -with-rtsopts=-N
+
+executable proglet
+  main-is: Main.hs
+  -- other-modules:
+  -- other-extensions:
+  build-depends:
+      base >=4.14 && <5
+    , postgresql-libpq
+    , postgresql-binary
+    , kosem-postgresql
+    , vector
+    , text
+    , bytestring
+  hs-source-dirs: main
+  default-language: GHC2021
+
+library
+  import:
+      runtime-opts
+  exposed-modules:
+    , Database.Kosem.PostgreSQL.Internal
+    , Database.Kosem.PostgreSQL.Internal.Connection
+    , Database.Kosem.PostgreSQL.Internal.Parser
+    , Database.Kosem.PostgreSQL.Internal.Env
+    , Database.Kosem.PostgreSQL.Internal.Ast
+    , Database.Kosem.PostgreSQL.Internal.Type
+    , Database.Kosem.PostgreSQL.Internal.Row
+    , Database.Kosem.PostgreSQL.Internal.TH
+    , Database.Kosem.PostgreSQL.Internal.FromField
+    , Database.Kosem.PostgreSQL.Internal.Query
+  build-depends:
+      base
+    , megaparsec
+    , parser-combinators
+    , text
+    , bytestring
+    , vector
+    , mtl
+    , template-haskell
+    , th-lift
+    , postgresql-binary
+    , postgresql-libpq
+    -- debug:
+    , pretty-simple
+  default-extensions:
+      BlockArguments
+    , LambdaCase
+    , ImportQualifiedPost
+    , OverloadedStrings
+    , DerivingVia
+  hs-source-dirs:
+      src
+  default-language:
+      GHC2021
+
+test-suite spec
+  type:
+      exitcode-stdio-1.0
+  main-is:
+      test.hs
+  default-language:
+      GHC2021
+  other-modules:
+    , Test.Database.Kosem.PostgreSQL.Internal.Parser
+    , Test.TH
+    , Test.Utils
+  hs-source-dirs:
+      test
+  default-extensions:
+      LambdaCase
+    , BlockArguments
+    , OverloadedStrings
+    , ImportQualifiedPost
+    , InstanceSigs
+    , LambdaCase
+    , DataKinds
+    , TypeOperators
+    , TypeApplications
+    , OverloadedRecordDot
+  build-depends:
+      base >=4.14 && <5
+    , kosem-postgresql
+    , hspec
+    , hspec-contrib
+    , hspec-megaparsec
+    , megaparsec
+    , text
+    , vector
+    , neat-interpolation
+    , template-haskell

@@ -1,0 +1,2 @@
+Kosem dev shell.
+To start type: just

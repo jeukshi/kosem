@@ -1,0 +1,5 @@
+indentation: 4
+column-limit: 100
+function-arrows: leading
+comma-style: leading
+import-export-style: diff-friendly

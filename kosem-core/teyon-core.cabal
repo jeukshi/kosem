@@ -1,0 +1,31 @@
+cabal-version:   3.8
+name:            kosem-core
+version:         0.1.0.0
+license:         MIT
+license-file:    LICENSE
+author:          Daniel Orłowski
+maintainer:      orlowd@gmail.com
+category:        Other
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
+
+common runtime-opts
+    ghc-options: -threaded -with-rtsopts=-N
+
+library
+  import:            runtime-opts
+  exposed-modules:
+    ,  Database.Kosem.Record
+    ,  Database.Kosem.Record2
+  build-depends:    base
+  hs-source-dirs:   src
+  default-extensions:
+      BlockArguments
+    , LambdaCase
+    , ImportQualifiedPost
+    , OverloadedStrings
+    , OverloadedRecordDot
+    , DataKinds
+    , TypeOperators
+    , StandaloneKindSignatures
+  default-language: GHC2021
