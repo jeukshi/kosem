@@ -13,6 +13,10 @@ import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import GHC.Exts (Any)
 import Data.ByteString (ByteString)
 import Unsafe.Coerce (unsafeCoerce)
+import qualified Text.Megaparsec as Megaparsec
+import Database.Kosem.PostgreSQL.Internal.Parser (selectCore)
+import qualified Data.Text as T
+import Database.Kosem.PostgreSQL.Internal.Ast (STerm)
 
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
@@ -22,6 +26,7 @@ data Query result
   , columns :: Int
   , rowProto :: result
   , rowParser :: [Maybe ByteString -> Any]
+  , astS :: String
   }
 
 {-genR :: String -> Q Exp
@@ -36,10 +41,16 @@ fffunc = undefined
 
 genQ :: String -> Q Exp
 genQ s = do
+  let parserResult = Megaparsec.parse selectCore "" (T.pack s)
+  let ast = case parserResult of
+        Left e -> error (Megaparsec.errorBundlePretty e)
+        Right ast -> ast
+  let x = show ast
   c <- [e|Query { statement = s
                 , columns = 2
                 , rowProto = Row [] :: $(genRowT ["field1", "field2"])
                 , rowParser = $(genRowParser 2)
+                , astS = x
                 }
          |]
   return c

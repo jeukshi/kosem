@@ -98,10 +98,11 @@ selectCore = do
     _ <- skipMany spaceChar
     select
     resultColumn <- resultColumnP
-    from
-    fromItems <- fromItemP
+    from <- optional do
+        from
+        From <$> fromItemP
     eof
-    return $ Select resultColumn (From fromItems)
+    return $ Select resultColumn from
 
 fromItemP :: Parser (FromItem ())
 fromItemP = lexeme do
@@ -161,8 +162,8 @@ aliasedExprP = lexeme do
                     if lookAheadAlias `elem` reserved
                         then return $ WithoutAlias expr
                         else do
-                           alias <- labelP
-                           return $ WithAlias expr alias Nothing
+                            alias <- labelP
+                            return $ WithAlias expr alias Nothing
         Just _ -> do
             alias <- labelP
             return $ WithAlias expr alias maybeAs
@@ -176,7 +177,11 @@ exprP = lexeme do
 
 exprLitP :: Parser (Expr ())
 exprLitP = lexeme do
-    lit <- choice [boolLiteralP]
+    lit <-
+        choice
+            [ boolLiteralP
+            , textLiteralP
+            ]
     return $ ELit lit ()
 
 exprColP :: Parser (Expr ())
@@ -187,6 +192,12 @@ boolLiteralP :: Parser LiteralValue
 boolLiteralP = lexeme do
     s <- C.string "true" <|> C.string "false"
     return $ BoolLiteral s
+
+textLiteralP :: Parser LiteralValue
+textLiteralP = lexeme do
+    -- FIXME only alphaNum literals
+    s <- between (symbol "'") (symbol "'") (many C.alphaNumChar)
+    return $ TextLiteral (T.pack s)
 
 resultColumnP :: Parser (NonEmpty (AliasedExpr ()))
 resultColumnP = lexeme do

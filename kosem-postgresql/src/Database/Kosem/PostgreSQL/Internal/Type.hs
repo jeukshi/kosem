@@ -40,10 +40,14 @@ rr = runProgram s (typecheck ast)
 
 typecheck :: STerm () -> Tc (STerm SqlType)
 typecheck = \cases
-    (Select res (From fromItem)) -> do
+    (Select res (Just (From fromItem))) -> do
         tyFromItem <- tcFromItem fromItem
         tcRes <- tcSelectExpr res
-        return $ Select tcRes (From tyFromItem)
+        return $ Select tcRes (Just (From tyFromItem))
+    (Select res Nothing) -> do
+        tcRes <- tcSelectExpr res
+        return $ Select tcRes Nothing
+
 
 tcSelectExpr
     :: NonEmpty (AliasedExpr ())
@@ -82,7 +86,7 @@ tcExpr :: Expr () -> Tc (Expr SqlType)
 tcExpr = \cases
     (ELit litVal _) -> case litVal of
         NumericLiteral -> return $ ELit litVal (Scalar "numeric")
-        TextLiteral -> return $ ELit litVal (Scalar "text")
+        TextLiteral _ -> return $ ELit litVal (Scalar "text")
         (BoolLiteral _) -> return $ ELit litVal (Scalar "boolean")
     (ECol colName _) -> do
         envCol <- columnByName colName

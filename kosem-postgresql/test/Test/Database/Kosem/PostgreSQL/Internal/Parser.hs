@@ -93,3 +93,7 @@ spec = parallel do
             select id as x
                  , id2 xx
               from tab1 join tab2 on true join tab3 on true join tab4 on true |]
+    it "" do
+      parseOnly selectCore
+        `shouldSucceedOn` [sql|
+            select 'abc' , 'xyz' |]

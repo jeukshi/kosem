@@ -5,7 +5,7 @@ import Data.Text (Text)
 
 -- TODO make t TypeData
 data STerm t
-  = Select (NonEmpty (AliasedExpr t)) (From t)
+  = Select (NonEmpty (AliasedExpr t)) (Maybe (From t))
   deriving (Show)
 
 data FromItem t
@@ -61,7 +61,7 @@ data Expr t
 
 data LiteralValue
   = NumericLiteral
-  | TextLiteral
+  | TextLiteral Text
   | BoolLiteral Text
   deriving (Show)
 

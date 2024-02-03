@@ -23,9 +23,9 @@ spec = around withDB $ do
             row.field1 `shouldBe` "abc"
             row.field2 `shouldBe` "xyz"
         it "" $ \conn -> do
-            rows <-
-                execute
-                    conn
-                    [sql|select 'abc', 'xyz'|]
+            --rows <-
+                --execute
+                    --conn
+                    --[sql|select 'abc', 'xyz'|]
             -- (rows V.!? 2) `shouldBe` Nothing
             pendingWith "no instance show for Row"
