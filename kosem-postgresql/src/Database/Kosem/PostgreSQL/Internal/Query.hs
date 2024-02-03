@@ -1,27 +1,26 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Database.Kosem.PostgreSQL.Internal.Query where
 
-import Database.Kosem.PostgreSQL.Internal.FromField
-import Language.Haskell.TH
-import Data.Text (Text)
-import Database.Kosem.PostgreSQL.Internal.TH
-import Database.Kosem.PostgreSQL.Internal.Row
-import Language.Haskell.TH.Quote (QuasiQuoter (..))
-import GHC.Exts (Any)
 import Data.ByteString (ByteString)
-import Unsafe.Coerce (unsafeCoerce)
-import qualified Text.Megaparsec as Megaparsec
+import Data.Text (Text)
+import Data.Text qualified as T
+import Database.Kosem.PostgreSQL.Internal.Ast (STerm (Select))
+import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Parser (selectCore)
-import qualified Data.Text as T
-import Database.Kosem.PostgreSQL.Internal.Ast (STerm)
+import Database.Kosem.PostgreSQL.Internal.Row
+import Database.Kosem.PostgreSQL.Internal.TH
+import GHC.Exts (Any)
+import Language.Haskell.TH
+import Language.Haskell.TH.Quote (QuasiQuoter (..))
+import Text.Megaparsec qualified as Megaparsec
+import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
-data Query result
-  = Query
+data Query result = Query
   { statement :: ByteString
   , columns :: Int
   , rowProto :: result
@@ -45,21 +44,25 @@ genQ s = do
   let ast = case parserResult of
         Left e -> error (Megaparsec.errorBundlePretty e)
         Right ast -> ast
+  let numberOfColumns = case ast of
+        Select resultColumns _ -> length resultColumns
+
   let x = show ast
-  c <- [e|Query { statement = s
-                , columns = 2
-                , rowProto = Row [] :: $(genRowT ["field1", "field2"])
-                , rowParser = $(genRowParser 2)
-                , astS = x
-                }
-         |]
-  return c
+  [e|
+      Query
+        { statement = s
+        , columns = numberOfColumns
+        , rowProto = Row [] :: $(genRowT ["field1", "field2"])
+        , rowParser = $(genRowParser 2)
+        , astS = x
+        }
+      |]
 
 sql :: QuasiQuoter
 sql =
-    QuasiQuoter
-        { quotePat = error "quasiquoter used in pattern context"
-        , quoteType = error "quasiquoter used in type context"
-        , quoteDec = error "quasiquoter used in declaration context"
-        , quoteExp = genQ
-        }
+  QuasiQuoter
+    { quotePat = error "quasiquoter used in pattern context"
+    , quoteType = error "quasiquoter used in type context"
+    , quoteDec = error "quasiquoter used in declaration context"
+    , quoteExp = genQ
+    }
