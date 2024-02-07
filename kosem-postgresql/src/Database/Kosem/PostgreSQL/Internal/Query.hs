@@ -5,18 +5,24 @@
 module Database.Kosem.PostgreSQL.Internal.Query where
 
 import Data.ByteString (ByteString)
+import Data.List.NonEmpty (toList)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Database.Kosem.PostgreSQL.Internal.Ast (STerm (Select))
+import Database.Kosem.PostgreSQL.Internal.Ast (AliasedExpr (..), Expr (..), STerm (Select))
+import Database.Kosem.PostgreSQL.Internal.Ast qualified as Ast
+import Database.Kosem.PostgreSQL.Internal.Env (runProgram)
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Parser (selectCore)
+import Database.Kosem.PostgreSQL.Internal.Query.Internal (schema)
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.TH
+import Database.Kosem.PostgreSQL.Internal.Type (typecheck)
 import GHC.Exts (Any)
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import Text.Megaparsec qualified as Megaparsec
 import Unsafe.Coerce (unsafeCoerce)
+import Data.Either (partitionEithers)
 
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
@@ -35,8 +41,20 @@ genR s = do
   return c
 -}
 
-fffunc :: Text -> IO [Any]
-fffunc = undefined
+resultFromAst :: STerm Ast.SqlType -> Either String [Text]
+resultFromAst (Select resultColumns _) = do
+  let (errors, columns) = partitionEithers $ map columnName (toList resultColumns)
+  case errors of
+    [] -> Right columns
+    (x:xs) -> Left x
+
+ where
+  columnName :: AliasedExpr Ast.SqlType -> Either String Text
+  columnName = \cases
+    (WithAlias _ alias _) -> Right alias
+    (WithoutAlias (ECol columnname _)) -> Right columnname
+    -- FIXME error msg
+    (WithoutAlias _) -> Left "every result should have an alias"
 
 genQ :: String -> Q Exp
 genQ s = do
@@ -46,17 +64,22 @@ genQ s = do
         Right ast -> ast
   let numberOfColumns = case ast of
         Select resultColumns _ -> length resultColumns
-
+  let typedAst = case runProgram schema (typecheck ast) of
+        Left e -> error (show e)
+        Right ast -> ast
+  let resultColumns = case resultFromAst typedAst of
+        Left e -> error (show e)
+        Right resultColumns -> map T.unpack resultColumns
   let x = show ast
   [e|
-      Query
-        { statement = s
-        , columns = numberOfColumns
-        , rowProto = Row [] :: $(genRowT ["field1", "field2"])
-        , rowParser = $(genRowParser 2)
-        , astS = x
-        }
-      |]
+    Query
+      { statement = s
+      , columns = numberOfColumns
+      , rowProto = Row [] :: $(genRowT resultColumns)
+      , rowParser = $(genRowParser 2)
+      , astS = x
+      }
+    |]
 
 sql :: QuasiQuoter
 sql =

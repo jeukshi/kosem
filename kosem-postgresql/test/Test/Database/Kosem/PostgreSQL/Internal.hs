@@ -18,7 +18,7 @@ spec = around withDB $ do
             rows <-
                 execute
                     conn
-                    [sql|select 'abc', 'xyz'|]
+                    [sql|select 'abc' field1, 'xyz' field2|]
             let row = V.head rows
             row.field1 `shouldBe` "abc"
             row.field2 `shouldBe` "xyz"

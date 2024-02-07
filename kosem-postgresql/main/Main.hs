@@ -33,7 +33,7 @@ example1 = do
   rows <-
     execute
       connection
-      [sql|select 'abc', 'xyz'|]
+      [sql|select 'abc' field1, 'xyz' field2|]
   V.forM_ rows $ \row -> do
     print row.field1
     print row.field2

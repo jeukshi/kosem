@@ -15,7 +15,7 @@ import Text.Megaparsec (parseMaybe, parseTest)
 -- typecheck = \cases
 -- (Select cols table) -> undefined
 
-s =
+schema =
     Schema
         { tables =
             [ Table
@@ -36,7 +36,7 @@ s =
 -- ast = fromMaybe $ parseMaybe selectCore "select a2 from tab1 join tab2 on true"
 ast = fromJust $ parseMaybe selectCore "select a, b as xx from tab1 join tab2 on true"
 
-rr = runProgram s (typecheck ast)
+rr = runProgram schema (typecheck ast)
 
 typecheck :: STerm () -> Tc (STerm SqlType)
 typecheck = \cases

@@ -41,6 +41,7 @@ library
     , Database.Kosem.PostgreSQL.Internal.TH
     , Database.Kosem.PostgreSQL.Internal.FromField
     , Database.Kosem.PostgreSQL.Internal.Query
+    , Database.Kosem.PostgreSQL.Internal.Query.Internal
   build-depends:
       base
     , megaparsec
@@ -75,6 +76,7 @@ test-suite spec
       GHC2021
   other-modules:
     , Test.Database.Kosem.PostgreSQL.Internal.Parser
+    , Test.Database.Kosem.PostgreSQL.Internal
     , Test.TH
     , Test.Utils
   hs-source-dirs:
