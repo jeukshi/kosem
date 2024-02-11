@@ -34,6 +34,7 @@ library
     , Database.Kosem.PostgreSQL.Internal
     , Database.Kosem.PostgreSQL.Internal.Connection
     , Database.Kosem.PostgreSQL.Internal.Parser
+    , Database.Kosem.PostgreSQL.Internal.ParserUtils
     , Database.Kosem.PostgreSQL.Internal.Env
     , Database.Kosem.PostgreSQL.Internal.Ast
     , Database.Kosem.PostgreSQL.Internal.Type
@@ -42,6 +43,8 @@ library
     , Database.Kosem.PostgreSQL.Internal.FromField
     , Database.Kosem.PostgreSQL.Internal.Query
     , Database.Kosem.PostgreSQL.Internal.Query.Internal
+    , Database.Kosem.PostgreSQL.Schema.Internal.Parser
+    , Database.Kosem.PostgreSQL.Schema.Internal
   build-depends:
       base
     , megaparsec
@@ -76,6 +79,7 @@ test-suite spec
       GHC2021
   other-modules:
     , Test.Database.Kosem.PostgreSQL.Internal.Parser
+    , Test.Database.Kosem.PostgreSQL.Schema.Internal.Parser
     , Test.Database.Kosem.PostgreSQL.Internal
     , Test.TH
     , Test.Utils

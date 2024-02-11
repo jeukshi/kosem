@@ -3,40 +3,13 @@
 
 module Test.Database.Kosem.PostgreSQL.Internal.Parser where
 
-import Test.Hspec.Megaparsec
-
 import Data.Text (Text)
-import Data.Void (Void)
 import Database.Kosem.PostgreSQL.Internal.Parser
+import Database.Kosem.PostgreSQL.Internal.ParserUtils
 import Test.Hspec
+import Test.Hspec.Megaparsec
 import Test.TH
-import Text.Megaparsec
-import Text.Megaparsec.Char qualified as C
-
--- | Helper for parsing without file name.
-parseOnly
-  :: Parser a
-  -> Text
-  -> Either (ParseErrorBundle Text Void) a
-parseOnly p = parse p ""
-
-{- | Helper for parsing without file name.
-Consumes all input.
--}
-parseAll
-  :: Parser a
-  -> Text
-  -> Either (ParseErrorBundle Text Void) a
-parseAll p = parse (p <* eof) ""
-
-{- | Helper for incremental parsing.
-Used by `succeedsLeaving` etc.
--}
-parseInc
-  :: Parsec Void s a
-  -> s
-  -> (State s Void, Either (ParseErrorBundle s Void) a)
-parseInc p s = runParser' p (initialState s)
+import Test.Utils
 
 spec :: SpecWith ()
 spec = parallel do
@@ -77,23 +50,23 @@ spec = parallel do
         `shouldSucceedOn` "select id, name, col123_ from tab1"
     it "" do
       parseOnly selectCore
-        `shouldSucceedOn` [sql|
+        `shouldSucceedOn` [text|
             select id, name as name, col123_ as col from tab1 join tab2 on true|]
     it "" do
       parseOnly selectCore
-        `shouldSucceedOn` [sql|
+        `shouldSucceedOn` [text|
             select id from tab1 join tab2 on true join tab3 on true|]
     it "" do
       parseOnly selectCore
-        `shouldSucceedOn` [sql|
+        `shouldSucceedOn` [text|
             select id from tab1 join tab2 on true join tab3 on true join tab4 on true |]
     it "" do
       parseOnly selectCore
-        `shouldSucceedOn` [sql|
+        `shouldSucceedOn` [text|
             select id as x
                  , id2 xx
               from tab1 join tab2 on true join tab3 on true join tab4 on true |]
     it "" do
       parseOnly selectCore
-        `shouldSucceedOn` [sql|
+        `shouldSucceedOn` [text|
             select 'abc' , 'xyz' |]

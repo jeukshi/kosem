@@ -11,38 +11,21 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Void (Void)
 import Database.Kosem.PostgreSQL.Internal.Ast
+import Database.Kosem.PostgreSQL.Internal.ParserUtils
 import Text.Megaparsec
-import Text.Megaparsec.Char (spaceChar)
 import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Debug (dbg)
 import Text.Pretty.Simple
 import Prelude hiding (takeWhile)
 
-type Parser = Parsec Void Text
-
 data Token = Token SourcePos (STerm ())
-
-skipWhitespace :: Parser ()
-skipWhitespace =
-    L.space
-        (void C.space1)
-        (L.skipLineComment "--")
-        (L.skipBlockComment "/*" "*/")
-
-lexeme :: Parser a -> Parser a
-lexeme = L.lexeme skipWhitespace
 
 symbol :: Text -> Parser Text
 symbol = L.symbol' skipWhitespace
 
 comma :: Parser Text
 comma = symbol ","
-
-pKeyword :: Text -> Parser ()
-pKeyword keyword = lexeme do
-    void $ C.string' keyword
-    notFollowedBy C.alphaNumChar
 
 select :: Parser ()
 select = pKeyword "select"
@@ -66,36 +49,15 @@ as = pKeyword "as"
 -- equalExpression =
 -- makeOperator (do "=="; notFollowedBy "="; return Equal) notEqualExpression
 
-isAlpha :: Char -> Bool
-isAlpha c = charInRange '\x41' '\x5A' c || charInRange '\x61' '\x7A' c
-
-charInRange :: Char -> Char -> Char -> Bool
-charInRange low high c = low <= c && c <= high
-
-isDigit :: Char -> Bool
-isDigit = charInRange '\x30' '\x39'
-
-isUnderscore :: Char -> Bool
-isUnderscore = ('_' ==)
-
-takeWhile :: (Char -> Bool) -> Parser Text
-takeWhile = takeWhileP Nothing
-
-takeWhile1 :: (Char -> Bool) -> Parser Text
-takeWhile1 = takeWhile1P Nothing
-
 allPred :: [a -> Bool] -> a -> Bool
 allPred ps a = all (\p -> p a) ps
-
-anyPred :: [a -> Bool] -> a -> Bool
-anyPred ps a = any (\p -> p a) ps
 
 newline :: Parser ()
 newline = void C.newline
 
 selectCore :: Parser (STerm ())
 selectCore = do
-    _ <- skipMany spaceChar
+    _ <- skipMany C.spaceChar
     select
     resultColumn <- resultColumnP
     from <- optional do
@@ -202,16 +164,6 @@ textLiteralP = lexeme do
 resultColumnP :: Parser (NonEmpty (AliasedExpr ()))
 resultColumnP = lexeme do
     aliasedExprP `Combinators.NonEmpty.sepBy1` comma -- NonEmpty.map ECol cols
-
-labelP :: Parser ColumnName
-labelP = lexeme do
-    first <- satisfy isAlpha
-
-    rest <- takeWhile do
-        anyPred [isAlpha, isDigit, isUnderscore]
-
-    let r = T.cons first rest
-    return r
 
 -- case r of
 -- "from" -> fail "labelP fail"

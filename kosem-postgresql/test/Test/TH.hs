@@ -7,8 +7,8 @@ import Data.Text qualified as T
 import Language.Haskell.TH (Exp, Q, appE, stringE)
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
 
-sql :: QuasiQuoter
-sql =
+text :: QuasiQuoter
+text =
     QuasiQuoter
         { quotePat = error "quasiquoter used in pattern context"
         , quoteType = error "quasiquoter used in type context"
