@@ -31,3 +31,30 @@ table abc
                         [ TableColumn "col1" "text"
                         , TableColumn "col2" "text"
                         ]
+    describe "schemaP" do
+        it "does its job" do
+            parseOnly
+                schemaP
+                [text|
+database MyDatabase
+table abc
+    col1 text
+    col2 text
+table abc2
+    col1 text
+    col2 text
+|]
+                `shouldBe` Right do
+                    Schema
+                        "MyDatabase"
+                        [ Table
+                            "abc"
+                            [ TableColumn "col1" "text"
+                            , TableColumn "col2" "text"
+                            ]
+                        , Table
+                            "abc2"
+                            [ TableColumn "col1" "text"
+                            , TableColumn "col2" "text"
+                            ]
+                        ]

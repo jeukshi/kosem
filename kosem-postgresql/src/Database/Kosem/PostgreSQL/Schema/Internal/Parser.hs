@@ -1,3 +1,5 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+
 module Database.Kosem.PostgreSQL.Schema.Internal.Parser where
 
 import Control.Monad (void)
@@ -25,6 +27,13 @@ tableNameP = do
     tableName <- labelS
     return tableName
 
+
+schemaNameP :: Parser Text
+schemaNameP = do
+    databaseK
+    schemaName <- labelP
+    return schemaName
+
 data TableItem
     = TableColumn ColumnName PgType
     | TableConstraint
@@ -46,6 +55,12 @@ data Table = Table
     }
     deriving (Show, Eq)
 
+data Schema = Schema
+  { name :: Text
+  , tables :: [Table]
+  }
+  deriving (Show, Eq)
+
 tableP :: Parser Table -- header and list items
 tableP = L.nonIndented spaceNewlineP (L.indentBlock spaceNewlineP p)
   where
@@ -59,3 +74,10 @@ tableItemP = lexemeS do
     columnName <- ColumnName <$> labelS <?> "column name or table constraint"
     pgType <- PgType <$> labelS <?> "column data type"
     return $ TableColumn columnName pgType
+
+schemaP :: Parser Schema
+schemaP = lexeme do
+  _ <- skipMany C.spaceChar
+  schemaName <- schemaNameP
+  tables <- some tableP
+  return $ Schema schemaName tables
