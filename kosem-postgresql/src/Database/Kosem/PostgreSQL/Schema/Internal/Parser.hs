@@ -11,6 +11,7 @@ import Text.Megaparsec
 import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
 import Data.String (IsString)
+import Language.Haskell.TH.Lift (Lift)
 
 labelS :: Parser Text
 labelS = lexemeS dbLabel
@@ -28,38 +29,40 @@ tableNameP = do
     return tableName
 
 
-schemaNameP :: Parser Text
-schemaNameP = do
+databaseNameP :: Parser Text
+databaseNameP = do
     databaseK
-    schemaName <- labelP
-    return schemaName
+    databaseName <- labelP
+    return databaseName
 
 data TableItem
     = TableColumn ColumnName PgType
     | TableConstraint
-    deriving (Show, Eq)
+    deriving (Show, Eq, Lift)
 
 newtype ColumnName = ColumnName Text
    deriving Show via Text
    deriving Eq via Text
    deriving IsString via Text
+   deriving (Lift)
 
 newtype PgType = PgType Text
    deriving Show via Text
    deriving Eq via Text
    deriving IsString via Text
+   deriving (Lift)
 
 data Table = Table
     { name :: Text
     , tableItem :: [TableItem]
     }
-    deriving (Show, Eq)
+    deriving (Show, Eq, Lift)
 
-data Schema = Schema
+data Database = Database
   { name :: Text
   , tables :: [Table]
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Lift)
 
 tableP :: Parser Table -- header and list items
 tableP = L.nonIndented spaceNewlineP (L.indentBlock spaceNewlineP p)
@@ -75,9 +78,9 @@ tableItemP = lexemeS do
     pgType <- PgType <$> labelS <?> "column data type"
     return $ TableColumn columnName pgType
 
-schemaP :: Parser Schema
+schemaP :: Parser Database
 schemaP = lexeme do
   _ <- skipMany C.spaceChar
-  schemaName <- schemaNameP
+  databaseName <- databaseNameP
   tables <- some tableP
-  return $ Schema schemaName tables
+  return $ Database databaseName tables

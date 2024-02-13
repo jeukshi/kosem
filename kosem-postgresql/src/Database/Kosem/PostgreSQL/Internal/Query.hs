@@ -23,6 +23,7 @@ import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import Text.Megaparsec qualified as Megaparsec
 import Unsafe.Coerce (unsafeCoerce)
 import Data.Either (partitionEithers)
+import Database.Kosem.PostgreSQL.Schema.Internal.Parser (Database(..))
 
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
@@ -56,9 +57,9 @@ resultFromAst (Select resultColumns _) = do
     -- FIXME error msg
     (WithoutAlias _) -> Left "every result should have an alias"
 
-genQ :: String -> Q Exp
-genQ s = do
-  let parserResult = Megaparsec.parse selectCore "" (T.pack s)
+unsafeSql :: Database -> String -> Q Exp
+unsafeSql database userInput = do
+  let parserResult = Megaparsec.parse selectCore "" (T.pack userInput)
   let ast = case parserResult of
         Left e -> error (Megaparsec.errorBundlePretty e)
         Right ast -> ast
@@ -73,7 +74,7 @@ genQ s = do
   let x = show ast
   [e|
     Query
-      { statement = s
+      { statement = userInput
       , columns = numberOfColumns
       , rowProto = Row [] :: $(genRowT resultColumns)
       , rowParser = $(genRowParser 2)
@@ -81,11 +82,17 @@ genQ s = do
       }
     |]
 
+db = Database "" []
+
+unsafeSql' :: String -> Q Exp
+unsafeSql' = unsafeSql db
+
+
 sql :: QuasiQuoter
 sql =
   QuasiQuoter
     { quotePat = error "quasiquoter used in pattern context"
     , quoteType = error "quasiquoter used in type context"
     , quoteDec = error "quasiquoter used in declaration context"
-    , quoteExp = genQ
+    , quoteExp = unsafeSql'
     }

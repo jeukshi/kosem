@@ -14,6 +14,7 @@ import Database.Kosem.PostgreSQL.Internal.Query
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.PostgreSQL.LibPQ qualified as LibPQ
 import GHC.Exts (Any)
+import Database.Kosem.PostgreSQL.Schema.Internal.TH
 
 execute :: forall t. Connection -> Query (Row t) -> IO (Vector (Row t))
 execute connection query = do

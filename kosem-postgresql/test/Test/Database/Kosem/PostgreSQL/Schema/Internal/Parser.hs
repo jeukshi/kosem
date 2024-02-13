@@ -45,7 +45,7 @@ table abc2
     col2 text
 |]
                 `shouldBe` Right do
-                    Schema
+                    Database
                         "MyDatabase"
                         [ Table
                             "abc"

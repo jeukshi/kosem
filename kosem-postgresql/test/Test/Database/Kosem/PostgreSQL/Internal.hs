@@ -8,6 +8,7 @@ import Database.Kosem.PostgreSQL.Internal.Connection (close, connectConnString)
 import Database.Kosem.PostgreSQL.Internal.Query (sql)
 import Test.Hspec
 import Test.Utils
+import Test.Db qualified as Tdb
 
 -- import Test.Utils
 
@@ -18,7 +19,7 @@ spec = around withDB $ do
             rows <-
                 execute
                     conn
-                    [sql|select 'abc' field1, 'xyz' field2|]
+                    [Tdb.sql|select 'abc' field1, 'xyz' field2|]
             let row = V.head rows
             row.field1 `shouldBe` "abc"
             row.field2 `shouldBe` "xyz"

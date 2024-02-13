@@ -45,6 +45,7 @@ library
     , Database.Kosem.PostgreSQL.Internal.Query.Internal
     , Database.Kosem.PostgreSQL.Schema.Internal.Parser
     , Database.Kosem.PostgreSQL.Schema.Internal
+    , Database.Kosem.PostgreSQL.Schema.Internal.TH
   build-depends:
       base
     , megaparsec
@@ -83,6 +84,7 @@ test-suite spec
     , Test.Database.Kosem.PostgreSQL.Internal
     , Test.TH
     , Test.Utils
+    , Test.Db
   hs-source-dirs:
       test
   default-extensions:
