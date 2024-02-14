@@ -1,4 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Database.Kosem.PostgreSQL.Schema.Internal.Parser where
 
@@ -35,6 +36,7 @@ databaseNameP = do
     databaseName <- labelP
     return databaseName
 
+-- TODO only for parser
 data TableItem
     = TableColumn ColumnName PgType
     | TableConstraint
@@ -52,17 +54,23 @@ newtype PgType = PgType Text
    deriving IsString via Text
    deriving (Lift)
 
-data Table = Table
-    { name :: Text
-    , tableItem :: [TableItem]
-    }
-    deriving (Show, Eq, Lift)
-
 data Database = Database
   { name :: Text
   , tables :: [Table]
   }
   deriving (Show, Eq, Lift)
+
+data Table = Table
+    { name :: Text
+    , columns :: [Column]
+    }
+    deriving (Show, Eq, Lift)
+
+data Column = Column
+    { name :: ColumnName
+    , typeName :: PgType
+    }
+    deriving (Show, Eq, Lift)
 
 tableP :: Parser Table -- header and list items
 tableP = L.nonIndented spaceNewlineP (L.indentBlock spaceNewlineP p)
@@ -72,11 +80,11 @@ tableP = L.nonIndented spaceNewlineP (L.indentBlock spaceNewlineP p)
 
         return (L.IndentSome Nothing (return . Table tableName) tableItemP)
 
-tableItemP :: Parser TableItem
+tableItemP :: Parser Column
 tableItemP = lexemeS do
-    columnName <- ColumnName <$> labelS <?> "column name or table constraint"
+    columnName <- ColumnName <$> labelS <?> "column name"
     pgType <- PgType <$> labelS <?> "column data type"
-    return $ TableColumn columnName pgType
+    return $ Column columnName pgType
 
 schemaP :: Parser Database
 schemaP = lexeme do

@@ -13,7 +13,6 @@ import Database.Kosem.PostgreSQL.Internal.Ast qualified as Ast
 import Database.Kosem.PostgreSQL.Internal.Env (runProgram)
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Parser (selectCore)
-import Database.Kosem.PostgreSQL.Internal.Query.Internal (schema)
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.TH
 import Database.Kosem.PostgreSQL.Internal.Type (typecheck)
@@ -24,6 +23,7 @@ import Text.Megaparsec qualified as Megaparsec
 import Unsafe.Coerce (unsafeCoerce)
 import Data.Either (partitionEithers)
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser (Database(..))
+import qualified Database.Kosem.PostgreSQL.Internal.Row as on
 
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
@@ -65,7 +65,7 @@ unsafeSql database userInput = do
         Right ast -> ast
   let numberOfColumns = case ast of
         Select resultColumns _ -> length resultColumns
-  let typedAst = case runProgram schema (typecheck ast) of
+  let typedAst = case runProgram database (typecheck ast) of
         Left e -> error (show e)
         Right ast -> ast
   let resultColumns = case resultFromAst typedAst of
@@ -82,12 +82,12 @@ unsafeSql database userInput = do
       }
     |]
 
-db = Database "" []
 
+-- | FIXME remove later on.
+-- Leave it be for now, as an example of how to build QQ.
+db = Database "" []
 unsafeSql' :: String -> Q Exp
 unsafeSql' = unsafeSql db
-
-
 sql :: QuasiQuoter
 sql =
   QuasiQuoter

@@ -10,33 +10,16 @@ import Database.Kosem.PostgreSQL.Internal.Ast
 import Database.Kosem.PostgreSQL.Internal.Env
 import Database.Kosem.PostgreSQL.Internal.Parser
 import Text.Megaparsec (parseMaybe, parseTest)
+import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 
 -- typecheck :: STerm -> TTerm
 -- typecheck = \cases
 -- (Select cols table) -> undefined
 
-schema =
-    Schema
-        { tables =
-            [ Table
-                { name = "tab1"
-                , columns = [Column "a" "text", Column "b" "text"]
-                }
-            , Table
-                { name = "tab2"
-                , columns = [Column "a2" "text", Column "b2" "text"]
-                }
-            , Table
-                { name = "tab3"
-                , columns = [Column "a3" "text", Column "b3" "text"]
-                }
-            ]
-        }
-
 -- ast = fromMaybe $ parseMaybe selectCore "select a2 from tab1 join tab2 on true"
 ast = fromJust $ parseMaybe selectCore "select a, b as xx from tab1 join tab2 on true"
 
-rr = runProgram schema (typecheck ast)
+-- rr = runProgram schema (typecheck ast)
 
 typecheck :: STerm () -> Tc (STerm SqlType)
 typecheck = \cases

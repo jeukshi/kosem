@@ -2,6 +2,7 @@ module Database.Kosem.PostgreSQL.Internal.Ast where
 
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Text (Text)
+import Database.Kosem.PostgreSQL.Schema.Internal.Parser (PgType(..))
 
 -- TODO make t TypeData
 data STerm t
@@ -48,7 +49,7 @@ data AliasedExpr t
   deriving (Show)
 
 data SqlType
-  = Scalar Text
+  = Scalar PgType
   deriving (Show)
 -- data TExpr
   -- = Typed Expr DbType

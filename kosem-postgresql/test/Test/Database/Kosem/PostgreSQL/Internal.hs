@@ -5,10 +5,9 @@ module Test.Database.Kosem.PostgreSQL.Internal where
 import Data.Vector qualified as V
 import Database.Kosem.PostgreSQL.Internal
 import Database.Kosem.PostgreSQL.Internal.Connection (close, connectConnString)
-import Database.Kosem.PostgreSQL.Internal.Query (sql)
+import Test.Db qualified as Tdb
 import Test.Hspec
 import Test.Utils
-import Test.Db qualified as Tdb
 
 -- import Test.Utils
 
@@ -23,10 +22,16 @@ spec = around withDB $ do
             let row = V.head rows
             row.field1 `shouldBe` "abc"
             row.field2 `shouldBe` "xyz"
-        it "" $ \conn -> do
-            --rows <-
-                --execute
-                    --conn
-                    --[sql|select 'abc', 'xyz'|]
-            -- (rows V.!? 2) `shouldBe` Nothing
-            pendingWith "no instance show for Row"
+        it "simple select" $ \conn -> do
+            let _ = [Tdb.sql|select abc, abc2 from tab1|]
+            "it compiles" `shouldBe` "it compiles"
+        it "simple join" $ \conn -> do
+            let _ =
+                    [Tdb.sql|
+                            select abc
+                                 , col2
+                              from tab1
+                              left join tab2
+                                on true
+                                |]
+            "it compiles" `shouldBe` "it compiles"

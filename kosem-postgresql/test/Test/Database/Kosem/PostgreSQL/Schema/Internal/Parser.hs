@@ -15,7 +15,7 @@ spec = parallel do
     describe "tableItemP" do
         it "does its job" do
             parseOnly tableItemP "sElEcT abc"
-                `shouldBe` Right (TableColumn "sElEcT" "abc")
+                `shouldBe` Right (Column "sElEcT" "abc")
 
     describe "tableP" do
         it "does its job" do
@@ -28,8 +28,8 @@ table abc
                 `shouldBe` Right do
                     Table
                         "abc"
-                        [ TableColumn "col1" "text"
-                        , TableColumn "col2" "text"
+                        [ Column "col1" "text"
+                        , Column "col2" "text"
                         ]
     describe "schemaP" do
         it "does its job" do
@@ -49,12 +49,12 @@ table abc2
                         "MyDatabase"
                         [ Table
                             "abc"
-                            [ TableColumn "col1" "text"
-                            , TableColumn "col2" "text"
+                            [ Column "col1" "text"
+                            , Column "col2" "text"
                             ]
                         , Table
                             "abc2"
-                            [ TableColumn "col1" "text"
-                            , TableColumn "col2" "text"
+                            [ Column "col1" "text"
+                            , Column "col2" "text"
                             ]
                         ]

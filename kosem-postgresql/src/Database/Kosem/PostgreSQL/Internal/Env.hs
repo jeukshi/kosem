@@ -10,6 +10,7 @@ import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT), asks)
 import Control.Monad.State.Strict (MonadState (get, put), StateT (runStateT), evalStateT)
 import Control.Monad.Trans (MonadTrans, lift)
 import Data.Text (Text)
+import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 
 data IntroType
     = Subquery
@@ -18,8 +19,8 @@ data IntroType
 
 data EnvElem = EnvElem
     { alias :: Text
-    , label :: Text
-    , typeName :: Text
+    , label :: ColumnName
+    , typeName :: PgType
     }
     deriving (Show)
 
@@ -28,22 +29,8 @@ type Env = [EnvElem]
 emptyEnv :: Env
 emptyEnv = []
 
-data Schema = Schema
-    { tables :: [Table]
-    }
-    deriving (Show)
 
-data Table = Table
-    { name :: Text
-    , columns :: [Column]
-    }
-    deriving (Show)
 
-data Column = Column
-    { name :: Text
-    , typeName :: Text
-    }
-    deriving (Show)
 
 data TcError
     = NotInScope Text
@@ -51,14 +38,14 @@ data TcError
     | Err Text
     deriving (Show)
 
-type TcM = ReaderT Schema (StateT Env (ExceptT TcError Identity))
+type TcM = ReaderT Database (StateT Env (ExceptT TcError Identity))
 
 newtype Tc a = Tc
     { runTc :: TcM a
     }
     deriving (Monad, Functor, Applicative, MonadTc)
 
-runProgram :: Schema -> Tc a -> Either TcError a
+runProgram :: Database -> Tc a -> Either TcError a
 runProgram schema prog =
     runIdentity
         . runExceptT
@@ -96,7 +83,7 @@ instance MonadTc TcM where
 
     getColumnByName :: Text -> TcM [EnvElem]
     getColumnByName name =
-        filter (\e -> e.label == name) <$> get
+        filter (\e -> e.label == ColumnName name) <$> get
 
     throwError :: TcError -> TcM a
     throwError = Control.Monad.Except.throwError

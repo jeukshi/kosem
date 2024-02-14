@@ -9,7 +9,12 @@ import Language.Haskell.TH.Quote (QuasiQuoter (..))
 database testDb
 table tab1
     abc text
-    abc text
+    abc2 text
+
+table tab2
+    col text
+    col2 text
+
 |]
 
 -- TODO gen from TH, somehow?
