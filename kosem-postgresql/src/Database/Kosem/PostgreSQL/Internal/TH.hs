@@ -155,7 +155,7 @@ genRowParser size =
         $ ListE
         $ replicate
             size
-            -- | `unsafeCoerce .parseField @Text`
+            -- | `unsafeCoerce . parseField @Text`
             (InfixE (Just (VarE 'unsafeCoerce)) (VarE '(.)) (Just (AppTypeE (VarE 'parseField) (ConT ''Text))))
 
 {-
