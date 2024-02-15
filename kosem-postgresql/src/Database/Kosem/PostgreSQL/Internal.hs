@@ -12,9 +12,9 @@ import Data.Vector.Mutable qualified as VM
 import Database.Kosem.PostgreSQL.Internal.Connection
 import Database.Kosem.PostgreSQL.Internal.Query
 import Database.Kosem.PostgreSQL.Internal.Row
+import Database.Kosem.PostgreSQL.Schema.Internal.TH
 import Database.PostgreSQL.LibPQ qualified as LibPQ
 import GHC.Exts (Any)
-import Database.Kosem.PostgreSQL.Schema.Internal.TH
 
 execute :: forall t. Connection -> Query (Row t) -> IO (Vector (Row t))
 execute connection query = do
@@ -28,12 +28,12 @@ execute connection query = do
                 -- TODO oops
                 Nothing -> error "ops"
                 Just execResult -> do
-                    let (cols :: [LibPQ.Column]) = [0 .. 2 - 1]
+                    let columnIndexes = map toEnum [0 .. length query.rowParser]
                     numberOfTuples <- LibPQ.ntuples execResult
                     resultVector <-
                         VM.generateM
                             (fromEnum numberOfTuples)
-                            (readRow execResult cols)
+                            (readRow execResult columnIndexes)
                     V.unsafeFreeze resultVector
   where
     readRow :: LibPQ.Result -> [LibPQ.Column] -> Int -> IO (Row t)

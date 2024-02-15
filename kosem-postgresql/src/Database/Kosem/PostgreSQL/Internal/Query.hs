@@ -77,7 +77,7 @@ unsafeSql database userInput = do
       { statement = userInput
       , columns = numberOfColumns
       , rowProto = Row [] :: $(genRowT resultColumns)
-      , rowParser = $(genRowParser 2)
+      , rowParser = $(genRowParser numberOfColumns)
       , astS = x
       }
     |]

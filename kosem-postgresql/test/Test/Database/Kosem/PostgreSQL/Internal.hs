@@ -18,10 +18,11 @@ spec = around withDB $ do
             rows <-
                 execute
                     conn
-                    [Tdb.sql|select 'abc' field1, 'xyz' field2|]
+                    [Tdb.sql|select 'abc' field1, 'xyz' field2, 'cbd' field3|]
             let row = V.head rows
             row.field1 `shouldBe` "abc"
             row.field2 `shouldBe` "xyz"
+            row.field3 `shouldBe` "cbd"
         it "simple select" $ \conn -> do
             let _ = [Tdb.sql|select abc, abc2 from tab1|]
             "it compiles" `shouldBe` "it compiles"
