@@ -23,7 +23,7 @@ import Text.Megaparsec qualified as Megaparsec
 import Unsafe.Coerce (unsafeCoerce)
 import Data.Either (partitionEithers)
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser (Database(..))
-import qualified Database.Kosem.PostgreSQL.Internal.Row as on
+import qualified Database.Kosem.PostgreSQL.Internal.Row
 
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
