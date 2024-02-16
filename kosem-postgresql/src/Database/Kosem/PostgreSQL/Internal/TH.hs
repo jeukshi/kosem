@@ -130,15 +130,16 @@ genRowT' = do
             )
     return x
 
-genRowT :: [String] ->  Q Type
-genRowT labels =  return $ AppT (ConT ''Row) (go labels)
+genRowT :: [(String, Name)] ->  Q Type
+genRowT columns =  return $ AppT (ConT ''Row) (go columns)
   where
     go = \cases
-      (label:labels) -> AppT (makeTuple label) (go labels)
+      (column:columns) -> AppT (makeTuple column) (go columns)
       [] -> PromotedNilT
 
     -- | `label := type`
-    makeTuple label = AppT PromotedConsT (AppT (AppT (ConT ''(:=)) (LitT (StrTyLit label))) (ConT ''Text))
+    makeTuple (label, ty) =
+        AppT PromotedConsT (AppT (AppT (ConT ''(:=)) (LitT (StrTyLit label))) (ConT ty))
 
 {-rowType :: QuasiQuoter
 rowType =
@@ -149,14 +150,16 @@ rowType =
         , quoteExp = error ""
         }-}
 
-genRowParser :: Int -> Q Exp
-genRowParser size =
+genRowParser :: [Name] -> Q Exp
+genRowParser names =
     return
         $ ListE
-        $ replicate
-            size
-            -- | `unsafeCoerce . parseField @Text`
-            (InfixE (Just (VarE 'unsafeCoerce)) (VarE '(.)) (Just (AppTypeE (VarE 'parseField) (ConT ''Text))))
+        $ map
+            (\name ->
+            -- | `unsafeCoerce . parseField @`name``
+            InfixE (Just (VarE 'unsafeCoerce))
+             (VarE '(.)) (Just (AppTypeE (VarE 'parseField) (ConT name)))
+            ) names
 
 {-
   let x =

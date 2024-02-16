@@ -47,6 +47,7 @@ table abc2
                 `shouldBe` Right do
                     Database
                         "MyDatabase"
+                        []
                         [ Table
                             "abc"
                             [ Column "col1" "text"

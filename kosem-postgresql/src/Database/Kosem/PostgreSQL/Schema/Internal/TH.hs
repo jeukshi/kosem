@@ -2,13 +2,14 @@
 
 module Database.Kosem.PostgreSQL.Schema.Internal.TH where
 
+import Data.Text (Text)
+import Data.Text qualified as T
 import Database.Kosem.PostgreSQL.Internal.Query
+import Database.Kosem.PostgreSQL.Schema.Internal.Parser (Database, schemaP, typesMap)
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote
-import qualified Text.Megaparsec as Megaparsec
-import Database.Kosem.PostgreSQL.Schema.Internal.Parser (schemaP, Database)
-import qualified Data.Text as T
-import Language.Haskell.TH.Syntax (NameSpace(VarName))
+import Language.Haskell.TH.Syntax (NameSpace (VarName))
+import Text.Megaparsec qualified as Megaparsec
 
 database :: QuasiQuoter
 database =
@@ -21,15 +22,24 @@ database =
 
 database' :: String -> Q [Dec]
 database' userInput = do
-  let parserResult = Megaparsec.parse schemaP "" (T.pack userInput)
-  let db = case parserResult of
-        Left e -> error (Megaparsec.errorBundlePretty e)
-        Right db -> db
-  dbExp <- [e| db |]
-  let sql = mkName "sql"
-  let dbSql = mkName "dbSql"
-  let myDb = applyDatabaseToUnsafeSql dbSql dbExp
-  return $ myDb -- ++ xxx sql dbSql
+    let parserResult = Megaparsec.parse schemaP "" (T.pack userInput)
+    let db = case parserResult of
+            Left e -> error (Megaparsec.errorBundlePretty e)
+            Right db -> db
+    let dbWithTypes =
+            db
+                { typesMap =
+                    [ ("text", ''Text)
+                    , ("integer", ''Int)
+                    , ("bigint", ''Int)
+                    , ("boolean", ''Bool)
+                    ]
+                }
+    dbExp <- [e|dbWithTypes|]
+    let sql = mkName "sql"
+    let dbSql = mkName "dbSql"
+    let myDb = applyDatabaseToUnsafeSql dbSql dbExp
+    return $ myDb -- ++ xxx sql dbSql
 
 -- db :: Name -> Database -> Q Dec
 -- db n dd = [|| n = dd ||]

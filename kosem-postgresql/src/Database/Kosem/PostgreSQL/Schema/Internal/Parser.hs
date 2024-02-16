@@ -13,6 +13,7 @@ import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
 import Data.String (IsString)
 import Language.Haskell.TH.Lift (Lift)
+import Language.Haskell.TH (Name)
 
 labelS :: Parser Text
 labelS = lexemeS dbLabel
@@ -48,7 +49,7 @@ newtype ColumnName = ColumnName Text
    deriving IsString via Text
    deriving (Lift)
 
-newtype PgType = PgType Text
+newtype PgType = PgType { unPgType :: Text }
    deriving Show via Text
    deriving Eq via Text
    deriving IsString via Text
@@ -56,6 +57,7 @@ newtype PgType = PgType Text
 
 data Database = Database
   { name :: Text
+  , typesMap :: [(PgType, Name)]
   , tables :: [Table]
   }
   deriving (Show, Eq, Lift)
@@ -91,4 +93,4 @@ schemaP = lexeme do
   _ <- skipMany C.spaceChar
   databaseName <- databaseNameP
   tables <- some tableP
-  return $ Database databaseName tables
+  return $ Database databaseName [] tables

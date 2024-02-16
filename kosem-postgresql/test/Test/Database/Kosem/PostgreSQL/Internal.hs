@@ -13,16 +13,19 @@ import Test.Utils
 
 spec :: SpecWith ()
 spec = around withDB $ do
-    describe "" $ do
-        it "" $ \conn -> do
+    describe "selects" $ do
+        it "select constants" $ \conn -> do
             rows <-
                 execute
                     conn
-                    [Tdb.sql|select 'abc' field1, 'xyz' field2, 'cbd' field3|]
+                    [Tdb.sql| select false field1
+                                   , true field2
+                                   , 'xyz' field3
+                                   |]
             let row = V.head rows
-            row.field1 `shouldBe` "abc"
-            row.field2 `shouldBe` "xyz"
-            row.field3 `shouldBe` "cbd"
+            row.field1 `shouldBe` False
+            row.field2 `shouldBe` True
+            row.field3 `shouldBe` "xyz"
         it "simple select" $ \conn -> do
             let _ = [Tdb.sql|select abc, abc2 from tab1|]
             "it compiles" `shouldBe` "it compiles"

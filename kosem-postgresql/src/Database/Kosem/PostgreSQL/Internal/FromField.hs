@@ -25,6 +25,20 @@ instance SqlType Text where
         Left e -> error "parse error"
         Right t -> t
 
+instance SqlType Bool where
+    parseField = \cases
+      Nothing -> error "nothing"
+      (Just bs) -> case valueParser bool bs of
+        Left e -> error "parse error"
+        Right t -> t
+
+instance SqlType Int where
+    parseField = \cases
+      Nothing -> error "nothing"
+      (Just bs) -> case valueParser int bs of
+        Left e -> error "parse error"
+        Right t -> t
+
 instance SqlType a => SqlType (Maybe a) where
     parseField = \cases
       Nothing -> Nothing

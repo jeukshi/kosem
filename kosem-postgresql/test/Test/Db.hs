@@ -13,7 +13,7 @@ table tab1
 
 table tab2
     col text
-    col2 text
+    col2 integer
 
 |]
 
