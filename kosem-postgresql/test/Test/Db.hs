@@ -15,6 +15,11 @@ table tab2
     col text
     col2 integer
 
+table data_types
+    type_text text
+    type_integer integer
+    type_bigint bigint
+    type_boolean boolean
 |]
 
 -- TODO gen from TH, somehow?

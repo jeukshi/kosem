@@ -14,9 +14,16 @@ import Database.Kosem.PostgreSQL.Internal.Query
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Schema.Internal.TH
 import Database.PostgreSQL.LibPQ qualified as LibPQ
+import Database.PostgreSQL.LibPQ qualified as LibPq
 import GHC.Exts (Any)
+import GHC.Stack.Types (HasCallStack)
 
-execute :: forall t. Connection -> Query (Row t) -> IO (Vector (Row t))
+execute
+    :: forall t
+     . (HasCallStack)
+    => Connection
+    -> Query (Row t)
+    -> IO (Vector (Row t))
 execute connection query = do
     withMVar (connectionHandle connection) $ \rawConnection -> do
         LibPQ.execParams
@@ -48,3 +55,28 @@ execute connection query = do
 
     unsafeSwap :: [Any] -> Row a -> Row a
     unsafeSwap as _ = Row as
+
+-- TODO fixme
+unsafeExecute_
+    :: (HasCallStack)
+    => Connection
+    -> ByteString
+    -> IO ()
+unsafeExecute_ connection statement = do
+    withMVar (connectionHandle connection) $ \rawConnection -> do
+        LibPQ.execParams
+            rawConnection
+            statement
+            []
+            LibPQ.Binary
+            >>= \case
+                -- TODO oops
+                Nothing -> do
+                    error "ops"
+                Just result -> do
+                    mbError <- LibPQ.errorMessage rawConnection
+                    case mbError of
+                        Just err -> case err of
+                            "" -> pure ()
+                            _ -> error $ show err
+                        Nothing -> pure ()
