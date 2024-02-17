@@ -32,6 +32,14 @@ instance HasField l (Row (_0 : _1 : (l := t) : e)) t where
     getField (Row xs) = unsafeCoerce $ xs !! 2
     {-# INLINE getField #-}
 
+instance HasField l (Row (_0 : _1 : _2 : (l := t) : e)) t where
+    getField (Row xs) = unsafeCoerce $ xs !! 3
+    {-# INLINE getField #-}
+
+instance HasField l (Row (_0 : _1 : _2 : _3 : (l := t) : e)) t where
+    getField (Row xs) = unsafeCoerce $ xs !! 4
+    {-# INLINE getField #-}
+
 class FromRow a where
   fromRow :: Result -> Int -> a
 
