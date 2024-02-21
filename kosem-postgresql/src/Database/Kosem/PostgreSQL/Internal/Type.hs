@@ -23,14 +23,18 @@ ast = fromJust $ parseMaybe selectCore "select a, b as xx from tab1 join tab2 on
 
 typecheck :: STerm () -> Tc (STerm SqlType)
 typecheck = \cases
-    (Select res (Just (From fromItem))) -> do
+    (Select res (Just (From fromItem)) whereClause) -> do
         tyFromItem <- tcFromItem fromItem
         tcRes <- tcSelectExpr res
-        return $ Select tcRes (Just (From tyFromItem))
-    (Select res Nothing) -> do
+        return $ Select tcRes (Just (From tyFromItem)) (tcWhereClause whereClause)
+    (Select res Nothing whereClause ) -> do
         tcRes <- tcSelectExpr res
-        return $ Select tcRes Nothing
+        return $ Select tcRes Nothing (tcWhereClause whereClause)
 
+tcWhereClause :: Maybe (Where ()) -> Maybe (Where SqlType)
+tcWhereClause = \cases
+  Nothing -> Nothing
+  (Just (Where expr)) -> undefined
 
 tcSelectExpr
     :: NonEmpty (AliasedExpr ())

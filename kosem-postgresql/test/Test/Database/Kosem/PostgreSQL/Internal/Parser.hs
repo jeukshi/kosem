@@ -79,3 +79,16 @@ spec = parallel do
               from tab1
               join tab2 on true and not true or false
               join tab3 on false and not false or true|]
+    it "" do
+      parseOnly selectCore
+        `shouldSucceedOn` [text|
+            select true
+             where true and false
+              |]
+    it "" do
+      parseOnly selectCore
+        `shouldSucceedOn` [text|
+            select true
+              from tab1
+             where true and false
+              |]

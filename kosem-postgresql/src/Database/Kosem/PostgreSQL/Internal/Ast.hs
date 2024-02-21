@@ -6,7 +6,7 @@ import Database.Kosem.PostgreSQL.Schema.Internal.Parser (PgType(..))
 
 -- TODO make t TypeData
 data STerm t
-  = Select (NonEmpty (AliasedExpr t)) (Maybe (From t))
+  = Select (NonEmpty (AliasedExpr t)) (Maybe (From t)) (Maybe (Where t))
   deriving (Show)
 
 data FromItem t
@@ -15,6 +15,9 @@ data FromItem t
   deriving (Show)
 
 data From t = From (FromItem t)
+  deriving (Show)
+
+data Where t = Where (Expr t)
   deriving (Show)
 
 data JoinCondition t

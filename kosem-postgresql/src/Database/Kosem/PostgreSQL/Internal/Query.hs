@@ -45,7 +45,7 @@ genR s = do
 -}
 
 resultFromAst :: STerm Ast.SqlType -> Either String [(Text, PgType)]
-resultFromAst (Select resultColumns _) = do
+resultFromAst (Select resultColumns _ _) = do
   let (errors, columns) = partitionEithers $ map columnName (toList resultColumns)
   case errors of
     [] -> Right columns
@@ -77,7 +77,7 @@ unsafeSql database userInput = do
         Left e -> error (Megaparsec.errorBundlePretty e)
         Right ast -> ast
   let numberOfColumns = case ast of
-        Select resultColumns _ -> length resultColumns
+        Select resultColumns _ _ -> length resultColumns
   let typedAst = case runProgram database (typecheck ast) of
         Left e -> error (show e)
         Right ast -> ast

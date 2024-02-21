@@ -39,6 +39,9 @@ left = pKeyword "left"
 from :: Parser ()
 from = pKeyword "from"
 
+whereK :: Parser ()
+whereK = pKeyword "where"
+
 on :: Parser ()
 on = pKeyword "on"
 
@@ -71,8 +74,11 @@ selectCore = do
     from <- optional do
         from
         From <$> fromItemP
+    whereClause <- optional do
+        whereK
+        Where <$> exprP
     eof
-    return $ Select resultColumn from
+    return $ Select resultColumn from whereClause
 
 fromItemP :: Parser (FromItem ())
 fromItemP = lexeme do
