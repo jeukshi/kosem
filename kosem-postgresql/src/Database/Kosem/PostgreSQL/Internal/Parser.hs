@@ -45,6 +45,14 @@ on = pKeyword "on"
 as :: Parser ()
 as = pKeyword "as"
 
+andK :: Parser And
+andK = And <$ pKeyword "and"
+
+orK :: Parser Or
+orK = Or <$ pKeyword "or"
+
+notK :: Parser ()
+notK = pKeyword "not"
 -- equalExpression :: Parser Expression
 -- equalExpression =
 -- makeOperator (do "=="; notFollowedBy "="; return Equal) notEqualExpression
@@ -110,7 +118,7 @@ tableNameP = lexeme do
 
     return $ TableName (T.cons first rest)
 
-reserved = ["from"]
+reserved = ["from", "where", "and", "not", "or"]
 
 aliasedExprP :: Parser (AliasedExpr ())
 aliasedExprP = lexeme do
@@ -132,10 +140,19 @@ aliasedExprP = lexeme do
 
 exprP :: Parser (Expr ())
 exprP = lexeme do
-    choice
+    mbNot <- optional $ try notK
+    expr <- choice
         [ exprLitP
         , exprColP
         ]
+    let lhsExpr = case mbNot of
+          Nothing -> expr
+          Just _ -> ENot Not expr
+    mbAnd <- optional . try $ eitherP andK orK
+    case mbAnd of
+      Nothing -> return expr
+      Just (Left and) -> EAnd lhsExpr and <$> exprP
+      Just (Right or) -> EOr lhsExpr or <$> exprP
 
 exprLitP :: Parser (Expr ())
 exprLitP = lexeme do
@@ -149,6 +166,12 @@ exprLitP = lexeme do
 exprColP :: Parser (Expr ())
 exprColP = lexeme do
     flip ECol () <$> labelP
+
+exprAndP :: Parser (Expr ())
+exprAndP = do
+    leftExpr <- exprP
+    andK
+    EAnd leftExpr And <$> exprP
 
 boolLiteralP :: Parser LiteralValue
 boolLiteralP = lexeme do

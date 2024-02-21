@@ -70,3 +70,12 @@ spec = parallel do
       parseOnly selectCore
         `shouldSucceedOn` [text|
             select 'abc' , 'xyz' |]
+    it "" do
+      parseOnly selectCore
+        `shouldSucceedOn` [text|
+            select false and true alias_works
+                 , not false and not true as as_alias_works
+                 , not false or not true and false or true
+              from tab1
+              join tab2 on true and not true or false
+              join tab3 on false and not false or true|]

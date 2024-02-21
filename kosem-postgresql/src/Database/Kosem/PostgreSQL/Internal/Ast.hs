@@ -43,6 +43,15 @@ type ColumnAlias = Text
 data As = As
   deriving(Show)
 
+data And = And
+  deriving(Show)
+
+data Not = Not
+  deriving(Show)
+
+data Or = Or
+  deriving(Show)
+
 data AliasedExpr t
   = WithAlias (Expr t) ColumnAlias (Maybe As)
   | WithoutAlias (Expr t)
@@ -54,10 +63,12 @@ data SqlType
 -- data TExpr
   -- = Typed Expr DbType
 
-
 data Expr t
   = ELit LiteralValue t
-  | ECol ColumnName t
+  | ECol ColumnName t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
+  | EAnd (Expr t) And (Expr t)
+  | EOr (Expr t) Or (Expr t)
+  | ENot Not (Expr t)
   deriving (Show)
 
 data LiteralValue
