@@ -92,3 +92,22 @@ spec = parallel do
               from tab1
              where true and false
               |]
+    it "" do
+      parseOnly selectCore
+        `shouldSucceedOn` [text|
+            select true > false
+                 , true < false
+                 , true = false
+                 , true != false
+                 , true <> false
+                 , true <= false
+                 , true >= false
+             where a = b and c <> d
+              |]
+
+    -- it "" do
+        -- FIXME doesn't work
+      -- parseOnly selectCore
+        -- `shouldSucceedOn` [text|
+            -- select true between false and true
+              -- |]

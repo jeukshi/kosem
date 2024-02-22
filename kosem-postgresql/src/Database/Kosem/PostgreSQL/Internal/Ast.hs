@@ -2,7 +2,7 @@ module Database.Kosem.PostgreSQL.Internal.Ast where
 
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Text (Text)
-import Database.Kosem.PostgreSQL.Schema.Internal.Parser (PgType(..))
+import Database.Kosem.PostgreSQL.Schema.Internal.Parser (PgType (..))
 
 -- TODO make t TypeData
 data STerm t
@@ -36,24 +36,33 @@ data Outer = Outer
   deriving (Show)
 
 -- data ResultColumn
-  -- = RCExpr Expr
-  -- deriving (Show)
+-- = RCExpr Expr
+-- deriving (Show)
 
 -- | https://www.postgresql.org/docs/current/sql-expressions.html
 type ColumnName = Text
+
 type ColumnAlias = Text
 
 data As = As
-  deriving(Show)
+  deriving (Show)
 
 data And = And
-  deriving(Show)
-
-data Not = Not
-  deriving(Show)
+  deriving (Show)
 
 data Or = Or
-  deriving(Show)
+  deriving (Show)
+
+data Not = Not
+  deriving (Show)
+
+data Between = Between
+  deriving (Show)
+
+data NotEqualStyle
+  = NotEqualStandardStyle -- !=
+  | NotEqualNonStandardStyle -- <>
+  deriving (Show)
 
 data AliasedExpr t
   = WithAlias (Expr t) ColumnAlias (Maybe As)
@@ -63,15 +72,26 @@ data AliasedExpr t
 data SqlType
   = Scalar PgType
   deriving (Show)
+
 -- data TExpr
-  -- = Typed Expr DbType
+-- = Typed Expr DbType
 
 data Expr t
   = ELit LiteralValue t
   | ECol ColumnName t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
+  | ENot Not (Expr t)
   | EAnd (Expr t) And (Expr t)
   | EOr (Expr t) Or (Expr t)
-  | ENot Not (Expr t)
+  -- Comparsion operators
+  | ELessThan (Expr t) (Expr t)
+  | EGreaterThan (Expr t) (Expr t)
+  | ELessThanOrEqualTo (Expr t) (Expr t)
+  | EGreaterThanOrEqualTo (Expr t) (Expr t)
+  | EEqual (Expr t) (Expr t)
+  | ENotEqual (Expr t) NotEqualStyle (Expr t)
+  -- Comparsion predicates
+  | EBetween (Expr t) Between (Expr t) And (Expr t)
+  | ENotBetween (Expr t) Not Between (Expr t) And (Expr t)
   deriving (Show)
 
 data LiteralValue

@@ -9,8 +9,8 @@ import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.Ast
 import Database.Kosem.PostgreSQL.Internal.Env
 import Database.Kosem.PostgreSQL.Internal.Parser
-import Text.Megaparsec (parseMaybe, parseTest)
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
+import Text.Megaparsec (parseMaybe, parseTest)
 
 -- typecheck :: STerm -> TTerm
 -- typecheck = \cases
@@ -27,14 +27,14 @@ typecheck = \cases
         tyFromItem <- tcFromItem fromItem
         tcRes <- tcSelectExpr res
         return $ Select tcRes (Just (From tyFromItem)) (tcWhereClause whereClause)
-    (Select res Nothing whereClause ) -> do
+    (Select res Nothing whereClause) -> do
         tcRes <- tcSelectExpr res
         return $ Select tcRes Nothing (tcWhereClause whereClause)
 
 tcWhereClause :: Maybe (Where ()) -> Maybe (Where SqlType)
 tcWhereClause = \cases
-  Nothing -> Nothing
-  (Just (Where expr)) -> undefined
+    Nothing -> Nothing
+    (Just (Where expr)) -> undefined
 
 tcSelectExpr
     :: NonEmpty (AliasedExpr ())
@@ -78,6 +78,40 @@ tcExpr = \cases
     (ECol colName _) -> do
         envCol <- columnByName colName
         return $ ECol colName (Scalar envCol.typeName)
+    (ENot not expr) ->
+        ENot not <$> tcExpr expr
+    (EAnd lhs and rhs) ->
+        EAnd <$> tcExpr lhs <*> pure and <*> tcExpr rhs
+    (EOr lhs or rhs) ->
+        EOr <$> tcExpr lhs <*> pure or <*> tcExpr rhs
+    (ELessThan lhs rhs) ->
+        ELessThan <$> tcExpr lhs <*> tcExpr rhs
+    (EGreaterThan lhs rhs) ->
+        EGreaterThan <$> tcExpr lhs <*> tcExpr rhs
+    (ELessThanOrEqualTo lhs rhs) ->
+        ELessThanOrEqualTo <$> tcExpr lhs <*> tcExpr rhs
+    (EGreaterThanOrEqualTo lhs rhs) ->
+        EGreaterThanOrEqualTo <$> tcExpr lhs <*> tcExpr rhs
+    (EEqual lhs rhs) ->
+        EEqual <$> tcExpr lhs <*> tcExpr rhs
+    (ENotEqual lhs style rhs) ->
+        ENotEqual <$> tcExpr lhs <*> pure style <*> tcExpr rhs
+    (EBetween lhs between rhs1 and rhs2) ->
+        EBetween
+            <$> tcExpr lhs
+            <*> pure between
+            <*> tcExpr rhs1
+            <*> pure and
+            <*> tcExpr rhs2
+    (ENotBetween lhs not between rhs1 and rhs2) ->
+        ENotBetween
+            <$> tcExpr lhs
+            <*> pure not
+            <*> pure between
+            <*> tcExpr rhs1
+            <*> pure and
+            <*> tcExpr rhs2
+
 
 columnByName :: Text -> Tc EnvElem
 columnByName name =

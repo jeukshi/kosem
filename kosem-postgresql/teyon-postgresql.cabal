@@ -12,6 +12,9 @@ extra-doc-files: CHANGELOG.md
 common runtime-opts
     ghc-options: -threaded -with-rtsopts=-N
 
+common warning-opts
+    ghc-options: -fwarn-incomplete-patterns
+
 executable proglet
   main-is: Main.hs
   -- other-modules:
@@ -30,6 +33,7 @@ executable proglet
 library
   import:
       runtime-opts
+    , warning-opts
   exposed-modules:
     , Database.Kosem.PostgreSQL.Internal
     , Database.Kosem.PostgreSQL.Internal.Connection

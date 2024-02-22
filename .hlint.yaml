@@ -1,3 +1,4 @@
 - ignore: {name: "Use newtype instead of data"}
 - ignore: {name: "Redundant return"}
 - ignore: {name: "Redundant pure"}
+- ignore: {name: "Use camelCase"}

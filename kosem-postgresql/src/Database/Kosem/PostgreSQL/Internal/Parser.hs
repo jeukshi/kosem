@@ -54,8 +54,18 @@ andK = And <$ pKeyword "and"
 orK :: Parser Or
 orK = Or <$ pKeyword "or"
 
-notK :: Parser ()
-notK = pKeyword "not"
+notK :: Parser Not
+notK = Not <$ pKeyword "not"
+
+-- TODO `between symmetric`
+betweenK :: Parser Between
+betweenK = Between <$ pKeyword "between"
+
+notBetweenOpP :: Parser Operator
+notBetweenOpP = lexeme do
+    not <- notK
+    Op_NotBetween not <$> betweenK
+
 -- equalExpression :: Parser Expression
 -- equalExpression =
 -- makeOperator (do "=="; notFollowedBy "="; return Equal) notEqualExpression
@@ -144,21 +154,66 @@ aliasedExprP = lexeme do
             alias <- labelP
             return $ WithAlias expr alias maybeAs
 
+data Operator
+    = Op_And And
+    | Op_Or Or
+    | Op_LessThan
+    | Op_GreaterThan
+    | Op_LessThanOrEqualTo
+    | Op_GreaterThanOrEqualTo
+    | Op_Equal
+    | Op_NotEqual NotEqualStyle
+    | Op_Between Between
+    | Op_NotBetween Not Between
+
+operatorP :: Parser Operator
+operatorP = lexeme do
+    choice
+        [ Op_And <$> andK
+        , Op_Or <$> orK
+        , Op_NotEqual NotEqualNonStandardStyle <$ try "<>"
+        , Op_NotEqual NotEqualStandardStyle <$ try "!="
+        , Op_LessThanOrEqualTo <$ try "<="
+        , Op_LessThan <$ "<"
+        , Op_GreaterThanOrEqualTo <$ try ">="
+        , Op_GreaterThan <$ ">"
+        , Op_Equal <$ "="
+        -- FIXME between has problems with `and`
+        -- , Op_Between <$> betweenK
+        -- , try notBetweenOpP
+        ]
+
+-- \| Op_NotBetween
+
 exprP :: Parser (Expr ())
 exprP = lexeme do
     mbNot <- optional $ try notK
-    expr <- choice
-        [ exprLitP
-        , exprColP
-        ]
+    expr <-
+        choice
+            [ exprLitP
+            , exprColP
+            ]
     let lhsExpr = case mbNot of
-          Nothing -> expr
-          Just _ -> ENot Not expr
-    mbAnd <- optional . try $ eitherP andK orK
-    case mbAnd of
-      Nothing -> return expr
-      Just (Left and) -> EAnd lhsExpr and <$> exprP
-      Just (Right or) -> EOr lhsExpr or <$> exprP
+            Nothing -> expr
+            Just _ -> ENot Not expr
+    (optional . try $ operatorP) >>= \case
+        Nothing -> return expr
+        Just operator -> combine lhsExpr operator
+  where
+    combine :: Expr () -> Operator -> Parser (Expr ())
+    combine lhs = \cases
+        (Op_And and) -> EAnd lhs and <$> exprP
+        (Op_Or or) -> EOr lhs or <$> exprP
+        Op_LessThan -> ELessThan lhs <$> exprP
+        Op_GreaterThan -> EGreaterThan lhs <$> exprP
+        Op_LessThanOrEqualTo -> ELessThanOrEqualTo lhs <$> exprP
+        Op_GreaterThanOrEqualTo -> EGreaterThanOrEqualTo lhs <$> exprP
+        Op_Equal -> EEqual lhs <$> exprP
+        (Op_NotEqual style) -> ENotEqual lhs style <$> exprP
+        (Op_Between between) ->
+            EBetween lhs between <$> exprP <*> andK <*> exprP
+        (Op_NotBetween not between) ->
+            ENotBetween lhs not between <$> exprP <*> andK <*> exprP
 
 exprLitP :: Parser (Expr ())
 exprLitP = lexeme do
