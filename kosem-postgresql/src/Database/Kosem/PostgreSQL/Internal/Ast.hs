@@ -91,6 +91,7 @@ data Expr t
   | ENotEqual (Expr t) NotEqualStyle (Expr t)
   -- Comparsion predicates
   | EBetween (Expr t) Between (Expr t) And (Expr t)
+  | EBetweenn (Expr t) (Expr t) (Expr t)
   | ENotBetween (Expr t) Not Between (Expr t) And (Expr t)
   deriving (Show)
 

@@ -38,7 +38,7 @@ spec = around withDB $ do
                                  , col2
                               from tab1
                               left join tab2
-                                on abc = col2
+                                on abc = false
                                 |]
             "it compiles" `shouldBe` "it compiles"
 

@@ -1,6 +1,7 @@
 module Database.Kosem.PostgreSQL.Internal.Parser where
 
 import Control.Monad (void)
+import Control.Monad.Combinators.Expr
 import Control.Monad.Combinators.NonEmpty qualified as Combinators.NonEmpty
 import Control.Monad.Cont (MonadPlus (mzero))
 import Data.Char (isNumber)
@@ -60,15 +61,6 @@ notK = Not <$ pKeyword "not"
 -- TODO `between symmetric`
 betweenK :: Parser Between
 betweenK = Between <$ pKeyword "between"
-
-notBetweenOpP :: Parser Operator
-notBetweenOpP = lexeme do
-    not <- notK
-    Op_NotBetween not <$> betweenK
-
--- equalExpression :: Parser Expression
--- equalExpression =
--- makeOperator (do "=="; notFollowedBy "="; return Equal) notEqualExpression
 
 allPred :: [a -> Bool] -> a -> Bool
 allPred ps a = all (\p -> p a) ps
@@ -154,66 +146,51 @@ aliasedExprP = lexeme do
             alias <- labelP
             return $ WithAlias expr alias maybeAs
 
-data Operator
-    = Op_And And
-    | Op_Or Or
-    | Op_LessThan
-    | Op_GreaterThan
-    | Op_LessThanOrEqualTo
-    | Op_GreaterThanOrEqualTo
-    | Op_Equal
-    | Op_NotEqual NotEqualStyle
-    | Op_Between Between
-    | Op_NotBetween Not Between
+parens :: Parser a -> Parser a
+parens p = lexeme do
+    between (symbol "(") (symbol ")") p
 
-operatorP :: Parser Operator
-operatorP = lexeme do
+termP :: Parser (Expr ())
+termP = lexeme do
     choice
-        [ Op_And <$> andK
-        , Op_Or <$> orK
-        , Op_NotEqual NotEqualNonStandardStyle <$ try "<>"
-        , Op_NotEqual NotEqualStandardStyle <$ try "!="
-        , Op_LessThanOrEqualTo <$ try "<="
-        , Op_LessThan <$ "<"
-        , Op_GreaterThanOrEqualTo <$ try ">="
-        , Op_GreaterThan <$ ">"
-        , Op_Equal <$ "="
-        -- FIXME between has problems with `and`
-        -- , Op_Between <$> betweenK
-        -- , try notBetweenOpP
+        [ parens exprP
+        , exprLitP
+        , exprColP
         ]
 
--- \| Op_NotBetween
-
 exprP :: Parser (Expr ())
-exprP = lexeme do
-    mbNot <- optional $ try notK
-    expr <-
-        choice
-            [ exprLitP
-            , exprColP
-            ]
-    let lhsExpr = case mbNot of
-            Nothing -> expr
-            Just _ -> ENot Not expr
-    (optional . try $ operatorP) >>= \case
-        Nothing -> return expr
-        Just operator -> combine lhsExpr operator
+exprP = makeExprParser termP operatorsTable
   where
-    combine :: Expr () -> Operator -> Parser (Expr ())
-    combine lhs = \cases
-        (Op_And and) -> EAnd lhs and <$> exprP
-        (Op_Or or) -> EOr lhs or <$> exprP
-        Op_LessThan -> ELessThan lhs <$> exprP
-        Op_GreaterThan -> EGreaterThan lhs <$> exprP
-        Op_LessThanOrEqualTo -> ELessThanOrEqualTo lhs <$> exprP
-        Op_GreaterThanOrEqualTo -> EGreaterThanOrEqualTo lhs <$> exprP
-        Op_Equal -> EEqual lhs <$> exprP
-        (Op_NotEqual style) -> ENotEqual lhs style <$> exprP
-        (Op_Between between) ->
-            EBetween lhs between <$> exprP <*> andK <*> exprP
-        (Op_NotBetween not between) ->
-            ENotBetween lhs not between <$> exprP <*> andK <*> exprP
+    operatorsTable :: [[Operator Parser (Expr ())]]
+    operatorsTable =
+        -- TODO precedence:
+        -- https://www.postgresql.org/docs/7.2/sql-precedence.html
+        [ [Prefix do ENot <$> notK]
+        ,
+            [ InfixL do flip ENotEqual NotEqualNonStandardStyle <$ lexeme "<>"
+            , InfixL do flip ENotEqual NotEqualStandardStyle <$ lexeme "!="
+            , InfixL do ELessThanOrEqualTo <$ lexeme "<="
+            , InfixL do ELessThan <$ lexeme "<"
+            , InfixL do EGreaterThanOrEqualTo <$ lexeme ">="
+            , InfixL do EGreaterThan <$ lexeme ">"
+            , InfixL do EEqual <$ lexeme "="
+            ]
+        ,
+            [ Postfix do
+                mkBetween <$> betweenK <*> termP <*> andK <*> termP
+            , Postfix do
+                mkNotBetween <$> notK <*> betweenK <*> termP <*> andK <*> termP
+            ]
+        ,
+            [ InfixL do flip EAnd <$> andK
+            , InfixL do flip EOr <$> orK
+            ]
+        ]
+    mkBetween between rhs1 and rhs2 lhs =
+        EBetween lhs between rhs1 and rhs2
+
+    mkNotBetween not between rhs1 and rhs2 lhs =
+        ENotBetween lhs not between rhs1 and rhs2
 
 exprLitP :: Parser (Expr ())
 exprLitP = lexeme do
@@ -248,28 +225,3 @@ textLiteralP = lexeme do
 resultColumnP :: Parser (NonEmpty (AliasedExpr ()))
 resultColumnP = lexeme do
     aliasedExprP `Combinators.NonEmpty.sepBy1` comma -- NonEmpty.map ECol cols
-
--- case r of
--- "from" -> fail "labelP fail"
--- _ -> return r
-
--- takeWhileP
-{-
-simpleLabelFirstChar :: Char -> Bool
-simpleLabelFirstChar c = C.alpha c || c == '_'
-
-simpleLabelNextChar :: Char -> Bool
-simpleLabelNextChar c = C.alphaNum c || c `elem` [ '-', '/', '_' ]
-
-simpleLabel :: Parser Text
-simpleLabel = try do
-    first <- satisfy simpleLabelFirstChar
-
-    rest  <- takeWhile simpleLabelNextChar
-
-    let l = Text.cons first rest
-
-    guard (l `notElem` reservedKeywords)
-
-    return l
--}

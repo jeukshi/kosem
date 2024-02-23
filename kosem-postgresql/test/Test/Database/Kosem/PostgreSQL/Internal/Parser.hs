@@ -105,9 +105,10 @@ spec = parallel do
              where a = b and c <> d
               |]
 
-    -- it "" do
-        -- FIXME doesn't work
-      -- parseOnly selectCore
-        -- `shouldSucceedOn` [text|
-            -- select true between false and true
-              -- |]
+    it "" do
+      parseOnly selectCore
+         `shouldSucceedOn` [text|
+             select 'abc'
+              where true and true between false and true and true
+                 or true and true not between false and true and true
+               |]
