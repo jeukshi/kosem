@@ -39,7 +39,7 @@ database' userInput = do
     let sql = mkName "sql"
     let dbSql = mkName "dbSql"
     let myDb = applyDatabaseToUnsafeSql dbSql dbExp
-    return $ myDb -- ++ xxx sql dbSql
+    return $ myDb ++ genQuasiQuote sql dbSql
 
 -- db :: Name -> Database -> Q Dec
 -- db n dd = [|| n = dd ||]
@@ -63,8 +63,6 @@ applyDatabaseToUnsafeSql name db =
         []
     ]
 
--- this doesn't work
--- Type constructor ‘Language.Haskell.TH.Quote.QuasiQuoter’ used as a constructor-like thing
 genQuasiQuote :: Name -> Name -> [Dec]
 genQuasiQuote sql dbSql =
     [ SigD sql (ConT ''QuasiQuoter)
@@ -72,7 +70,7 @@ genQuasiQuote sql dbSql =
         (VarP sql)
         ( NormalB
             ( RecConE
-                ''QuasiQuoter
+                'QuasiQuoter
                 [
                     ( 'quotePat
                     , AppE (VarE 'error) (LitE (StringL "quasiquoter used in pattern context"))
