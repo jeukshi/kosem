@@ -79,6 +79,7 @@ data SqlType
 data Expr t
   = ELit LiteralValue t
   | ECol ColumnName t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
+  | EPgCast (Expr t) Text -- | expression::type
   | ENot Not (Expr t)
   | EAnd (Expr t) And (Expr t)
   | EOr (Expr t) Or (Expr t)

@@ -112,3 +112,11 @@ spec = parallel do
               where true and true between false and true and true
                  or true and true not between false and true and true
                |]
+    it "ppostgresql-style cast" do
+      parseOnly selectCore
+         `shouldSucceedOn` [text|
+             select 'abc' ::text
+              where 'abc':: text = 'abc'   ::    text
+                and true :: boolean = false
+                ::boolean
+               |]

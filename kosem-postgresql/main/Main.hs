@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Main where
 
@@ -20,20 +21,24 @@ import Foreign.C (CInt)
 import GHC.Exts (Any)
 import PostgreSQL.Binary.Decoding
 import Unsafe.Coerce (unsafeCoerce)
+import Language.Haskell.TH
+import Language.Haskell.TH.Quote
+import TH
 
+
+y :: Int
+y = 10
+
+data D = D
+
+
+-- Example usage
 main :: IO ()
 main = do
-  example1
-  pure ()
+    let x = 10 :: Int
+    let y = "abc" :: String
 
-example1 :: IO ()
-example1 = do
-  connection <-
-    connectConnString "postgres://kosem:kosem@127.0.0.1:5432/kosem"
-  rows <-
-    execute
-      connection
-      [sql|select 'abc' field1, 'xyz' field2|]
-  V.forM_ rows $ \row -> do
-    print row.field1
-    print row.field2
+    print $ toSql @Int x
+
+    -- putStrLn $ [tc|z|]
+    -- putStrLn $ $(checkType "x")

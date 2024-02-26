@@ -158,14 +158,19 @@ termP = lexeme do
         , exprColP
         ]
 
+pgCastP :: Parser Text
+pgCastP = lexeme do
+    symbol "::"
+    labelP
+
 exprP :: Parser (Expr ())
 exprP = makeExprParser termP operatorsTable
   where
     operatorsTable :: [[Operator Parser (Expr ())]]
     operatorsTable =
         -- TODO precedence:
-        -- https://www.postgresql.org/docs/7.2/sql-precedence.html
-        [ [Prefix do ENot <$> notK]
+        -- https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE
+        [ [Postfix do flip EPgCast <$> pgCastP]
         ,
             [ InfixL do flip ENotEqual NotEqualNonStandardStyle <$ lexeme "<>"
             , InfixL do flip ENotEqual NotEqualStandardStyle <$ lexeme "!="
@@ -181,10 +186,9 @@ exprP = makeExprParser termP operatorsTable
             , Postfix do
                 mkNotBetween <$> notK <*> betweenK <*> termP <*> andK <*> termP
             ]
-        ,
-            [ InfixL do flip EAnd <$> andK
-            , InfixL do flip EOr <$> orK
-            ]
+        , [Prefix do ENot <$> notK]
+        , [InfixL do flip EAnd <$> andK]
+        , [InfixL do flip EOr <$> orK]
         ]
     mkBetween between rhs1 and rhs2 lhs =
         EBetween lhs between rhs1 and rhs2
