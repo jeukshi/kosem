@@ -153,7 +153,7 @@ parens p = lexeme do
 termP :: Parser (Expr ())
 termP = lexeme do
     choice
-        [ parens exprP
+        [ EParens <$> parens exprP
         , exprLitP
         , exprColP
         ]
@@ -172,7 +172,7 @@ exprP = makeExprParser termP operatorsTable
         -- https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE
         [ [Postfix do flip EPgCast <$> pgCastP]
         ,
-            [ InfixL do flip ENotEqual NotEqualNonStandardStyle <$ lexeme "<>"
+            [ InfixL do flip ENotEqual NotEqualPostgresStyle <$ lexeme "<>"
             , InfixL do flip ENotEqual NotEqualStandardStyle <$ lexeme "!="
             , InfixL do ELessThanOrEqualTo <$ lexeme "<="
             , InfixL do ELessThan <$ lexeme "<"

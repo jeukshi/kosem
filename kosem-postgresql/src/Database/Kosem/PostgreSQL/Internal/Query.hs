@@ -86,10 +86,11 @@ unsafeSql database userInput = do
         Right resultColumns -> resultColumns
   let hsTypes = lookupTypes resultColumns (typesMap database)
   let hsNames = map snd hsTypes
+  let queryToRun = Ast.astToRawSql typedAst
   let x = show ast
   [e|
     Query
-      { statement = userInput
+      { statement = queryToRun
       , columns = numberOfColumns
       , rowProto = Row [] :: $(genRowT hsTypes)
       , rowParser = $(genRowParser hsNames)
