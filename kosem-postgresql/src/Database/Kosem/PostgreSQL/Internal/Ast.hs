@@ -174,6 +174,7 @@ instance ToRawSql SqlType where
 
 data Expr t
   = EParens (Expr t)
+  | EVariable Text t
   | ELit LiteralValue t
   | ECol ColumnName t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
   | EPgCast (Expr t) Text

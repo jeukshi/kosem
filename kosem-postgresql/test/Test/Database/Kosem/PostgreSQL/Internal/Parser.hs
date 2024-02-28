@@ -120,3 +120,9 @@ spec = parallel do
                 and true :: boolean = false
                 ::boolean
                |]
+    it "simple variable" do
+      parseOnly selectCore
+         `shouldSucceedOn` [text|
+             select :abc
+              where :cba and :xyz or :zyx
+               |]
