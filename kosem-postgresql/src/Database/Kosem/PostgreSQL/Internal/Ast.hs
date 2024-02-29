@@ -165,19 +165,23 @@ instance ToRawSql (AliasedExpr SqlType) where
     (WithAlias expr alias (Just as)) ->
       toRawSql expr <-> toRawSql as <-> textToBuilder alias
 
+pgBool :: SqlType
+pgBool = Scalar "boolean"
+
 data SqlType
   = Scalar PgType
-  deriving (Show)
+  | UnknownParam
+  deriving (Show, Eq)
 
 instance ToRawSql SqlType where
   toRawSql _ = ""
 
 data Expr t
-  = EParens (Expr t)
+  = EParens (Expr t) t
   | EVariable Text t
   | ELit LiteralValue t
   | ECol ColumnName t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
-  | EPgCast (Expr t) Text
+  | EPgCast (Expr t) Text t
   | -- | expression::type
     ENot Not (Expr t)
   | EAnd (Expr t) And (Expr t)
@@ -197,10 +201,10 @@ data Expr t
 instance ToRawSql (Expr SqlType) where
   toRawSql :: Expr SqlType -> Builder
   toRawSql = \cases
-    (EParens expr) -> "(" <> toRawSql expr <> ")"
+    (EParens expr _) -> "(" <> toRawSql expr <> ")"
     (ELit lit _) -> toRawSql lit
     (ECol columnName _) -> textToBuilder columnName
-    (EPgCast lhs ty) -> toRawSql lhs <> "::" <> textToBuilder ty
+    (EPgCast lhs ty _) -> toRawSql lhs <> "::" <> textToBuilder ty
     (ENot not rhs) -> toRawSql not <-> toRawSql rhs
     (EAnd lhs and rhs) -> toRawSql lhs <-> toRawSql and <-> toRawSql rhs
     (EOr lhs or rhs) -> toRawSql lhs <-> toRawSql or <-> toRawSql rhs

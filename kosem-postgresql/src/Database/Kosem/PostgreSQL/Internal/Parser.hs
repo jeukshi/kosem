@@ -153,7 +153,7 @@ parens p = lexeme do
 termP :: Parser (Expr ())
 termP = lexeme do
     choice
-        [ EParens <$> parens exprP
+        [ flip EParens () <$> parens exprP
         , exprLitP
         , exprColP
         , variableP
@@ -176,7 +176,7 @@ exprP = makeExprParser termP operatorsTable
     operatorsTable =
         -- TODO precedence:
         -- https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE
-        [ [Postfix do flip EPgCast <$> pgCastP]
+        [ [Postfix do mkCast <$> pgCastP <*> pure ()]
         ,
             [ InfixL do flip ENotEqual NotEqualPostgresStyle <$ lexeme "<>"
             , InfixL do flip ENotEqual NotEqualStandardStyle <$ lexeme "!="
@@ -196,6 +196,7 @@ exprP = makeExprParser termP operatorsTable
         , [InfixL do flip EAnd <$> andK]
         , [InfixL do flip EOr <$> orK]
         ]
+    mkCast text ty expr = EPgCast expr text ty
     mkBetween between rhs1 and rhs2 lhs =
         EBetween lhs between rhs1 and rhs2
 

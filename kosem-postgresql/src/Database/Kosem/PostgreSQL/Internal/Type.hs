@@ -3,6 +3,7 @@
 
 module Database.Kosem.PostgreSQL.Internal.Type where
 
+import Control.Monad (when)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
@@ -69,34 +70,77 @@ tcJoinCondition = \cases
         tyExpr <- tcExpr expr
         return $ JcOn tyExpr
 
+exprType :: Expr SqlType -> SqlType
+exprType = \cases
+    (EPgCast _ _ ty) -> ty
+    (EParens _ ty) -> ty
+    (EVariable _ ty) -> ty
+    (ELit _ ty) -> ty
+    (ECol _ ty) -> ty
+    (ENot{}) -> pgBool
+    (EAnd{}) -> pgBool
+    (EOr{}) -> pgBool
+    (ELessThan{}) -> pgBool
+    (EGreaterThan{}) -> pgBool
+    (ELessThanOrEqualTo{}) -> pgBool
+    (EGreaterThanOrEqualTo{}) -> pgBool
+    (EEqual{}) -> pgBool
+    (ENotEqual{}) -> pgBool
+    (EBetween{}) -> pgBool
+    (ENotBetween{}) -> pgBool
+
 tcExpr :: Expr () -> Tc (Expr SqlType)
 tcExpr = \cases
+    (EPgCast expr text ()) -> do
+        tyExpr <- tcExpr expr
+        -- FIXME check text, check if can be casted
+        return $ EPgCast tyExpr text (Scalar (PgType text))
+    (EParens expr ()) -> do
+        tyExpr <- tcExpr expr
+        let innerTy = exprType tyExpr
+        return $ EParens tyExpr innerTy
+    (EVariable text ()) -> return $ EVariable text UnknownParam
     (ELit litVal _) -> case litVal of
         NumericLiteral -> return $ ELit litVal (Scalar "numeric")
         TextLiteral _ -> return $ ELit litVal (Scalar "text")
-        (BoolLiteral _) -> return $ ELit litVal (Scalar "boolean")
+        (BoolLiteral _) -> return $ ELit litVal pgBool
     (ECol colName _) -> do
         envCol <- columnByName colName
         return $ ECol colName (Scalar envCol.typeName)
-    (ENot not expr) ->
-        ENot not <$> tcExpr expr
-    (EAnd lhs and rhs) ->
-        EAnd <$> tcExpr lhs <*> pure and <*> tcExpr rhs
-    (EOr lhs or rhs) ->
-        EOr <$> tcExpr lhs <*> pure or <*> tcExpr rhs
-    (ELessThan lhs rhs) ->
-        ELessThan <$> tcExpr lhs <*> tcExpr rhs
-    (EGreaterThan lhs rhs) ->
-        EGreaterThan <$> tcExpr lhs <*> tcExpr rhs
-    (ELessThanOrEqualTo lhs rhs) ->
-        ELessThanOrEqualTo <$> tcExpr lhs <*> tcExpr rhs
-    (EGreaterThanOrEqualTo lhs rhs) ->
-        EGreaterThanOrEqualTo <$> tcExpr lhs <*> tcExpr rhs
-    (EEqual lhs rhs) ->
-        EEqual <$> tcExpr lhs <*> tcExpr rhs
-    (ENotEqual lhs style rhs) ->
-        ENotEqual <$> tcExpr lhs <*> pure style <*> tcExpr rhs
-    (EBetween lhs between rhs1 and rhs2) ->
+    (ENot not expr) -> do
+        tyExpr <- tcExpr expr
+        let ty = exprType tyExpr
+        when (ty /= pgBool) do
+            throwError $ Err "argument of 'NOT' must be type 'boolean'"
+        return $ ENot not tyExpr
+    (EAnd lhs and rhs) -> do
+        (tyLhs, tyRhs) <- tyMustBeBoolean "AND" lhs rhs
+        return $ EAnd tyLhs and tyRhs
+    (EOr lhs or rhs) -> do
+        (tyLhs, tyRhs) <- tyMustBeBoolean "OR" lhs rhs
+        return $ EOr tyLhs or tyRhs
+    (ELessThan lhs rhs) -> do
+        (tyLhs, tyRhs) <- tyMustBeEqual "<" lhs rhs
+        return $ ELessThan tyLhs tyRhs
+    (EGreaterThan lhs rhs) -> do
+        (tyLhs, tyRhs) <- tyMustBeEqual ">" lhs rhs
+        return $ EGreaterThan tyLhs tyRhs
+    (ELessThanOrEqualTo lhs rhs) -> do
+        (tyLhs, tyRhs) <- tyMustBeEqual "<=" lhs rhs
+        return $ ELessThanOrEqualTo tyLhs tyRhs
+    (EGreaterThanOrEqualTo lhs rhs) -> do
+        (tyLhs, tyRhs) <- tyMustBeEqual ">=" lhs rhs
+        return $ EGreaterThanOrEqualTo tyLhs tyRhs
+    (EEqual lhs rhs) -> do
+        (tyLhs, tyRhs) <- tyMustBeEqual "=" lhs rhs
+        return $ EEqual tyLhs tyRhs
+    (ENotEqual lhs style rhs) -> do
+        (tyLhs, tyRhs) <- tyMustBeEqual "<>" lhs rhs
+        return $ ENotEqual tyLhs style tyRhs
+    (EBetween lhs between rhs1 and rhs2) -> do
+        tyLhs <- tcExpr lhs
+        tyRhs1 <- tcExpr rhs1
+        tyRhs2 <- tcExpr rhs2
         EBetween
             <$> tcExpr lhs
             <*> pure between
@@ -111,7 +155,24 @@ tcExpr = \cases
             <*> tcExpr rhs1
             <*> pure and
             <*> tcExpr rhs2
+  where
+    tyMustBeBoolean :: Text -> Expr () -> Expr () -> Tc (Expr SqlType, Expr SqlType)
+    tyMustBeBoolean func lhs rhs = do
+        tyLhs <- tcExpr lhs
+        tyRhs <- tcExpr rhs
+        when (exprType tyLhs /= pgBool) do
+            throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
+        when (exprType tyRhs /= pgBool) do
+            throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
+        return (tyLhs, tyRhs)
 
+    tyMustBeEqual :: Text -> Expr () -> Expr () -> Tc (Expr SqlType, Expr SqlType)
+    tyMustBeEqual func lhs rhs = do
+        tyLhs <- tcExpr lhs
+        tyRhs <- tcExpr rhs
+        when (exprType tyLhs /= exprType tyRhs) do
+            throwError $ Err $ "arguments of '" <> func <> "' must be of the same type"
+        return (tyLhs, tyRhs)
 
 columnByName :: Text -> Tc EnvElem
 columnByName name =
