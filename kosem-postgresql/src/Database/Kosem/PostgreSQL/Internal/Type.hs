@@ -13,29 +13,27 @@ import Database.Kosem.PostgreSQL.Internal.Parser
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Text.Megaparsec (parseMaybe, parseTest)
 
--- typecheck :: STerm -> TTerm
--- typecheck = \cases
--- (Select cols table) -> undefined
-
--- ast = fromMaybe $ parseMaybe selectCore "select a2 from tab1 join tab2 on true"
-ast = fromJust $ parseMaybe selectCore "select a, b as xx from tab1 join tab2 on true"
-
--- rr = runProgram schema (typecheck ast)
-
 typecheck :: STerm () -> Tc (STerm SqlType)
 typecheck = \cases
     (Select res (Just (From fromItem)) whereClause) -> do
         tyFromItem <- tcFromItem fromItem
         tcRes <- tcSelectExpr res
-        return $ Select tcRes (Just (From tyFromItem)) (tcWhereClause whereClause)
+        tyWhereClause <- tcWhereClause whereClause
+        return $ Select tcRes (Just (From tyFromItem)) tyWhereClause
     (Select res Nothing whereClause) -> do
         tcRes <- tcSelectExpr res
-        return $ Select tcRes Nothing (tcWhereClause whereClause)
+        tyWhereClause <- tcWhereClause whereClause
+        return $ Select tcRes Nothing tyWhereClause
 
-tcWhereClause :: Maybe (Where ()) -> Maybe (Where SqlType)
+tcWhereClause :: Maybe (Where ()) -> Tc (Maybe (Where SqlType))
 tcWhereClause = \cases
-    Nothing -> Nothing
-    (Just (Where expr)) -> undefined
+    Nothing -> return Nothing
+    (Just (Where expr)) -> do
+        tyExpr <- tcExpr expr
+        when (exprType tyExpr /= pgBool) do
+            throwError $ Err "argument of 'WHERE' must be type 'boolean'"
+        return $ Just $ Where tyExpr
+
 
 tcSelectExpr
     :: NonEmpty (AliasedExpr ())
@@ -68,6 +66,8 @@ tcJoinCondition = \cases
     JcUsing -> return JcUsing
     (JcOn expr) -> do
         tyExpr <- tcExpr expr
+        when (exprType tyExpr /= pgBool) do
+            throwError $ Err "argument of 'JOIN/ON' must be type 'boolean'"
         return $ JcOn tyExpr
 
 exprType :: Expr SqlType -> SqlType
@@ -138,6 +138,7 @@ tcExpr = \cases
         (tyLhs, tyRhs) <- tyMustBeEqual "<>" lhs rhs
         return $ ENotEqual tyLhs style tyRhs
     (EBetween lhs between rhs1 and rhs2) -> do
+      -- TODO typecheck `between` against <= >=
         tyLhs <- tcExpr lhs
         tyRhs1 <- tcExpr rhs1
         tyRhs2 <- tcExpr rhs2
