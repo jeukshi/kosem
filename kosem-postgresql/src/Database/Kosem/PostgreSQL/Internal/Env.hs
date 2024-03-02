@@ -17,20 +17,20 @@ data IntroType
     | Join
     deriving (Show)
 
-data EnvElem = EnvElem
+data Field = Field
     { alias :: Text
     , label :: ColumnName
     , typeName :: PgType
     }
     deriving (Show)
 
-type Env = [EnvElem]
+data Env = Env
+    { fields :: [Field]
+    , params :: [Text]
+    }
 
 emptyEnv :: Env
-emptyEnv = []
-
-
-
+emptyEnv = Env [] []
 
 data TcError
     = NotInScope Text
@@ -57,9 +57,10 @@ class (Monad m) => MonadTc m where
     getEnv :: m Env
     setEnv :: m Env
     getTableByName :: Text -> m [Table]
-    getColumnByName :: Text -> m [EnvElem]
-    xxx :: m Env
-    addToEnv :: Env -> m ()
+    getColumnByName :: Text -> m [Field]
+    addFieldsToEnv :: [Field] -> m ()
+    getParamNumber :: Text -> m (Maybe Int)
+    addParam :: Text -> m Int
 
     throwError :: TcError -> m a
 
@@ -69,21 +70,36 @@ instance MonadTc TcM where
         get
     setEnv :: TcM Env
     setEnv = undefined
-    xxx = undefined
 
-    addToEnv :: Env -> TcM ()
-    addToEnv new = do
-      curr <- get
-      put (curr ++ new)
-      return ()
+    addFieldsToEnv :: [Field] -> TcM ()
+    addFieldsToEnv newFields = do
+        currentEnv <- get
+        put (currentEnv{fields = currentEnv.fields ++ newFields})
+        return ()
 
     getTableByName :: Text -> TcM [Table]
     getTableByName tableName =
         asks (filter (\table -> table.name == tableName) . tables)
 
-    getColumnByName :: Text -> TcM [EnvElem]
+    getColumnByName :: Text -> TcM [Field]
     getColumnByName name =
-        filter (\e -> e.label == ColumnName name) <$> get
+        filter (\e -> e.label == ColumnName name)
+            <$> fmap (.fields) get
+
+    getParamNumber :: Text -> TcM (Maybe Int)
+    getParamNumber name = do
+        params <- fmap (.params) get
+        case filter (\ixElem -> snd ixElem == name) (zip [1 ..] params) of
+            [] -> return Nothing
+            [(ix, _)] -> return $ Just ix
+            _ -> error "oops" -- FIXME
+
+    addParam :: Text -> TcM Int
+    addParam name = do
+        currentEnv <- get
+        put (currentEnv{params = currentEnv.params ++ [name]})
+        -- | + 1 for new elemen we just added.
+        return $ length currentEnv.params + 1
 
     throwError :: TcError -> TcM a
     throwError = Control.Monad.Except.throwError

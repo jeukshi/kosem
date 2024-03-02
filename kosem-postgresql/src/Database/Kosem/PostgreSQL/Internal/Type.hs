@@ -34,7 +34,6 @@ tcWhereClause = \cases
             throwError $ Err "argument of 'WHERE' must be type 'boolean'"
         return $ Just $ Where tyExpr
 
-
 tcSelectExpr
     :: NonEmpty (AliasedExpr ())
     -> Tc (NonEmpty (AliasedExpr SqlType))
@@ -74,7 +73,7 @@ exprType :: Expr SqlType -> SqlType
 exprType = \cases
     (EPgCast _ _ ty) -> ty
     (EParens _ ty) -> ty
-    (EVariable _ ty) -> ty
+    (EVariable _ _ ty) -> ty
     (ELit _ ty) -> ty
     (ECol _ ty) -> ty
     (ENot{}) -> pgBool
@@ -91,6 +90,13 @@ exprType = \cases
 
 tcExpr :: Expr () -> Tc (Expr SqlType)
 tcExpr = \cases
+    (EPgCast var@(EVariable{}) text ()) -> do
+        tyVar <-
+            tcExpr var >>= \case
+                (EVariable no name _) ->
+                    return $ EVariable no name (Scalar (PgType text))
+                _ -> throwError $ Err "impossible!"
+        return $ EPgCast tyVar text (Scalar (PgType text))
     (EPgCast expr text ()) -> do
         tyExpr <- tcExpr expr
         -- FIXME check text, check if can be casted
@@ -99,7 +105,12 @@ tcExpr = \cases
         tyExpr <- tcExpr expr
         let innerTy = exprType tyExpr
         return $ EParens tyExpr innerTy
-    (EVariable text ()) -> return $ EVariable text UnknownParam
+    (EVariable _ name ()) -> do
+        paramNumber <-
+            getParamNumber name >>= \case
+                Just ix -> return ix
+                Nothing -> addParam name
+        return $ EVariable paramNumber name UnknownParam
     (ELit litVal _) -> case litVal of
         NumericLiteral -> return $ ELit litVal (Scalar "numeric")
         TextLiteral _ -> return $ ELit litVal (Scalar "text")
@@ -138,7 +149,7 @@ tcExpr = \cases
         (tyLhs, tyRhs) <- tyMustBeEqual "<>" lhs rhs
         return $ ENotEqual tyLhs style tyRhs
     (EBetween lhs between rhs1 and rhs2) -> do
-      -- TODO typecheck `between` against <= >=
+        -- TODO typecheck `between` against <= >=
         tyLhs <- tcExpr lhs
         tyRhs1 <- tcExpr rhs1
         tyRhs2 <- tcExpr rhs2
@@ -175,7 +186,7 @@ tcExpr = \cases
             throwError $ Err $ "arguments of '" <> func <> "' must be of the same type"
         return (tyLhs, tyRhs)
 
-columnByName :: Text -> Tc EnvElem
+columnByName :: Text -> Tc Field
 columnByName name =
     getColumnByName name >>= \case
         [] -> throwError $ Err ("column does not exist: " <> name)
@@ -191,11 +202,11 @@ tableByName name =
 
 addTableToEnv :: Table -> Tc ()
 addTableToEnv table =
-    addToEnv . map (toEnvElem table.name) . columns $ table
+    addFieldsToEnv . map (toEnvElem table.name) . columns $ table
   where
-    toEnvElem :: Text -> Column -> EnvElem
+    toEnvElem :: Text -> Column -> Field
     toEnvElem alias column =
-        EnvElem
+        Field
             { alias = alias
             , label = column.name
             , typeName = column.typeName

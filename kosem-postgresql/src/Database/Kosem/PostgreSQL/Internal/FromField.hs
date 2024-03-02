@@ -1,4 +1,3 @@
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Database.Kosem.PostgreSQL.Internal.FromField where
@@ -9,16 +8,11 @@ import PostgreSQL.Binary.Decoding
 import GHC.Exts (Any)
 import Unsafe.Coerce (unsafeCoerce)
 
-class FromField a where
-    fromField :: Text -> a
-
 class SqlType a where
     parseField :: Maybe ByteString -> a
 
-    unsafeAny :: a -> Any
-    unsafeAny = unsafeCoerce
-
 instance SqlType Text where
+    parseField :: Maybe ByteString -> Text
     parseField = \cases
       Nothing -> error "nothing"
       (Just bs) -> case valueParser text_strict bs of
@@ -26,6 +20,7 @@ instance SqlType Text where
         Right t -> t
 
 instance SqlType Bool where
+    parseField :: Maybe ByteString -> Bool
     parseField = \cases
       Nothing -> error "nothing"
       (Just bs) -> case valueParser bool bs of
@@ -33,6 +28,7 @@ instance SqlType Bool where
         Right t -> t
 
 instance SqlType Int where
+    parseField :: Maybe ByteString -> Int
     parseField = \cases
       Nothing -> error "nothing"
       (Just bs) -> case valueParser int bs of
@@ -40,18 +36,7 @@ instance SqlType Int where
         Right t -> t
 
 instance SqlType a => SqlType (Maybe a) where
+    parseField :: SqlType a => Maybe ByteString -> Maybe a
     parseField = \cases
       Nothing -> Nothing
       justBs -> parseField justBs
-        -- Left e -> error "parse error"
-        -- Right t -> Just t
-
-
-
-class SqlType sql => FromSql sql haskell | haskell -> sql where
-   fromSql :: sql -> haskell
-
-instance FromSql sql a => FromSql sql (Maybe a) where
-
-instance FromSql Text Text where
-  fromSql = id

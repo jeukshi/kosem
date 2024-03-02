@@ -46,6 +46,7 @@ library
     , Database.Kosem.PostgreSQL.Internal.Row
     , Database.Kosem.PostgreSQL.Internal.TH
     , Database.Kosem.PostgreSQL.Internal.FromField
+    , Database.Kosem.PostgreSQL.Internal.ToField
     , Database.Kosem.PostgreSQL.Internal.Query
     , Database.Kosem.PostgreSQL.Internal.Query.Internal
     , Database.Kosem.PostgreSQL.Schema.Internal.Parser

@@ -29,7 +29,7 @@ execute connection query = do
         LibPQ.execParams
             rawConnection
             query.statement
-            []
+            (map toPgParam query.params)
             LibPQ.Binary
             >>= \case
                 -- TODO oops
@@ -57,6 +57,11 @@ execute connection query = do
 
     getCols :: LibPQ.Result -> LibPQ.Row -> [LibPQ.Column] -> [IO (Maybe ByteString)]
     getCols result rowNumber = map (LibPQ.getvalue' result rowNumber)
+
+    toPgParam :: ByteString -> Maybe (LibPQ.Oid, ByteString, LibPQ.Format)
+    -- | We can use `invalidOid` because we apply type cast
+    -- to every parameter ($1::text), so PostgreSQL doesn't neet it.
+    toPgParam val = Just (LibPQ.invalidOid, val, LibPQ.Binary)
 
     unsafeSwap :: [Any] -> Row a -> Row a
     unsafeSwap as _ = Row as

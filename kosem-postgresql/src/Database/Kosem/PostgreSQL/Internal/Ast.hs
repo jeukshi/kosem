@@ -1,14 +1,14 @@
 module Database.Kosem.PostgreSQL.Internal.Ast where
 
+import Data.ByteString (ByteString)
 import Data.ByteString.Builder
+import Data.ByteString.Lazy (toStrict)
 import Data.Foldable (foldl')
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.List.NonEmpty qualified as NE
 import Data.Text (Text)
 import Data.Text qualified as T
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser (PgType (..))
-import Data.ByteString (ByteString)
-import Data.ByteString.Lazy (toStrict)
 
 astToRawSql :: STerm SqlType -> ByteString
 astToRawSql = toStrict . toLazyByteString . toRawSql
@@ -29,6 +29,9 @@ textToBuilder = stringUtf8 . T.unpack
 data STerm t
   = Select (NonEmpty (AliasedExpr t)) (Maybe (From t)) (Maybe (Where t))
   deriving (Show)
+
+_where :: STerm SqlType -> Maybe (Where SqlType)
+_where (Select _ _ whereClause) = whereClause
 
 instance ToRawSql (STerm SqlType) where
   toRawSql = \cases
@@ -178,7 +181,7 @@ instance ToRawSql SqlType where
 
 data Expr t
   = EParens (Expr t) t
-  | EVariable Text t
+  | EVariable Int Text t
   | ELit LiteralValue t
   | ECol ColumnName t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
   | EPgCast (Expr t) Text t
@@ -198,9 +201,34 @@ data Expr t
   | ENotBetween (Expr t) Not Between (Expr t) And (Expr t)
   deriving (Show)
 
+collectVariables :: Expr SqlType -> [(Int, Text, SqlType)]
+collectVariables expr = go expr []
+ where
+  go :: Expr SqlType -> [(Int, Text, SqlType)] -> [(Int, Text, SqlType)]
+  go expr acc = case expr of
+    (EVariable n t ty) -> acc ++ [(n, t, ty)]
+    (EParens expr _) -> go expr acc
+    (ELit lit _) -> []
+    (ECol columnName _) -> []
+    (EPgCast expr ty _) -> go expr acc
+    (ENot not expr) -> go expr acc
+    (EAnd lhs and rhs) -> go rhs (go lhs acc)
+    (EOr lhs or rhs) -> go rhs (go lhs acc)
+    (ELessThan lhs rhs) -> go rhs (go lhs acc)
+    (EGreaterThan lhs rhs) -> go rhs (go lhs acc)
+    (ELessThanOrEqualTo lhs rhs) -> go rhs (go lhs acc)
+    (EGreaterThanOrEqualTo lhs rhs) -> go rhs (go lhs acc)
+    (EEqual lhs rhs) -> go rhs (go lhs acc)
+    (ENotEqual lhs style rhs) -> go rhs (go lhs acc)
+    (EBetween lhs between rhs1 and rhs2) ->
+      go rhs1 (go rhs2 (go lhs acc))
+    (ENotBetween lhs not between rhs1 and rhs2) ->
+      go rhs1 (go rhs2 (go lhs acc))
+
 instance ToRawSql (Expr SqlType) where
   toRawSql :: Expr SqlType -> Builder
   toRawSql = \cases
+    (EVariable n _ _) -> textToBuilder (T.pack $ "$" <> show n)
     (EParens expr _) -> "(" <> toRawSql expr <> ")"
     (ELit lit _) -> toRawSql lit
     (ECol columnName _) -> textToBuilder columnName

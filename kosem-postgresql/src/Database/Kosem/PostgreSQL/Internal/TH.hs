@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUGAE LambdaCase #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -9,6 +8,7 @@ module Database.Kosem.PostgreSQL.Internal.TH where
 import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Row
+import Database.Kosem.PostgreSQL.Internal.ToField (ToField (toField))
 import GHC.Records
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
@@ -36,8 +36,8 @@ f = do
     print row.xyz
 
     case (row.abc, row.xyz) of
-      ("abc", "yxz") -> print "das"
-      _ -> print "no"
+        ("abc", "yxz") -> print "das"
+        _ -> print "no"
     -- let zzz = mk zz
 
     -- print zzz.abc
@@ -130,14 +130,14 @@ genRowT' = do
             )
     return x
 
-genRowT :: [(String, Name)] ->  Q Type
-genRowT columns =  return $ AppT (ConT ''Row) (go columns)
+genRowT :: [(String, Name)] -> Q Type
+genRowT columns = return $ AppT (ConT ''Row) (go columns)
   where
     go = \cases
-      (column:columns) -> AppT (makeTuple column) (go columns)
-      [] -> PromotedNilT
+        (column : columns) -> AppT (makeTuple column) (go columns)
+        [] -> PromotedNilT
 
-    -- | `label := type`
+    -- \| `label := type`
     makeTuple (label, ty) =
         AppT PromotedConsT (AppT (AppT (ConT ''(:=)) (LitT (StrTyLit label))) (ConT ty))
 
@@ -152,14 +152,30 @@ rowType =
 
 genRowParser :: [Name] -> Q Exp
 genRowParser names =
-    return
-        $ ListE
-        $ map
-            (\name ->
-            -- | `unsafeCoerce . parseField @`name``
-            InfixE (Just (VarE 'unsafeCoerce))
-             (VarE '(.)) (Just (AppTypeE (VarE 'parseField) (ConT name)))
-            ) names
+    return $
+        ListE $
+            map
+                ( \name ->
+                    -- \| `unsafeCoerce . parseField @Text`
+                    InfixE
+                        (Just (VarE 'unsafeCoerce))
+                        (VarE '(.))
+                        (Just (AppTypeE (VarE 'parseField) (ConT name)))
+                )
+                names
+
+genParams :: [(String, Name)] -> Q Exp
+genParams  = \cases
+    [] -> return $ ConE '[]
+    names -> return $
+        ListE $
+            map toParam names
+  where
+    toParam :: (String, Name) -> Exp
+    toParam (name, ty) = do
+        let hsName = mkName name
+        -- \| toField @Type variable
+        AppE (AppTypeE (VarE 'toField) (ConT ty)) (VarE hsName)
 
 {-
   let x =

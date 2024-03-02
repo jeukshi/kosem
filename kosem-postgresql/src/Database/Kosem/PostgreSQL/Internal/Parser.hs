@@ -162,7 +162,7 @@ termP = lexeme do
 variableP :: Parser (Expr ())
 variableP = lexeme do
   symbol ":"
-  flip EVariable () <$> labelP
+  (EVariable 0 <$> labelP) <*> pure ()
 
 pgCastP :: Parser Text
 pgCastP = lexeme do

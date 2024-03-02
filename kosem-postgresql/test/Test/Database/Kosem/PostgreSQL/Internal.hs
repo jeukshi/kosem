@@ -32,6 +32,8 @@ spec = around withDB $ do
             let _ = [Tdb.sql|select abc, abc2 from tab1|]
             "it compiles" `shouldBe` "it compiles"
         it "simple join" $ \conn -> do
+            let hello = True
+                ello = False
             let _ =
                     [Tdb.sql|
                             select abc
@@ -40,6 +42,8 @@ spec = around withDB $ do
                               left join tab2
                                 on abc = col
                              where col = abc2
+                               and :hello::boolean
+                               and :ello::boolean
                                 |]
             "it compiles" `shouldBe` "it compiles"
 
@@ -52,6 +56,7 @@ spec = around withDB $ do
                        into data_types
                      values ('some text', 9000, 9001, True)
                     |]
+            let param = True
             rows <-
                 execute
                     conn
@@ -60,6 +65,7 @@ spec = around withDB $ do
                                    , type_bigint
                                    , type_boolean
                                 from data_types
+                               where :param::boolean
                                    |]
             unsafeExecute_ conn do
                 T.encodeUtf8

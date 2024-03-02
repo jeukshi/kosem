@@ -7,10 +7,16 @@ module Database.Kosem.PostgreSQL.Internal.Query where
 import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import Data.Either (partitionEithers)
+import Data.List (sortOn)
 import Data.List.NonEmpty (toList)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Database.Kosem.PostgreSQL.Internal.Ast (AliasedExpr (..), Expr (..), STerm (Select), SqlType (..))
+import Database.Kosem.PostgreSQL.Internal.Ast (
+  AliasedExpr (..),
+  Expr (..),
+  STerm (Select),
+  SqlType (..),
+ )
 import Database.Kosem.PostgreSQL.Internal.Ast qualified as Ast
 import Database.Kosem.PostgreSQL.Internal.Env (runProgram)
 import Database.Kosem.PostgreSQL.Internal.FromField
@@ -19,13 +25,13 @@ import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
 import Database.Kosem.PostgreSQL.Internal.TH
 import Database.Kosem.PostgreSQL.Internal.Type (typecheck)
-import Database.Kosem.PostgreSQL.Schema.Internal.Parser (Database (..), unPgType, PgType)
+import Database.Kosem.PostgreSQL.Schema.Internal.Parser (Database (..), PgType, unPgType)
+import Database.Kosem.PostgreSQL.Schema.Internal.Parser qualified
 import GHC.Exts (Any)
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import Text.Megaparsec qualified as Megaparsec
 import Unsafe.Coerce (unsafeCoerce)
-import qualified Database.Kosem.PostgreSQL.Schema.Internal.Parser
 
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
@@ -34,6 +40,7 @@ data Query result = Query
   , columns :: Int
   , rowProto :: result
   , rowParser :: [Maybe ByteString -> Any]
+  , params :: [ByteString]
   , astS :: String
   }
 
@@ -44,31 +51,40 @@ genR s = do
   return c
 -}
 
-resultFromAst :: STerm Ast.SqlType -> Either String [(Text, PgType)]
+resultFromAst :: STerm Ast.SqlType -> Either String [(Text, Ast.SqlType)]
 resultFromAst (Select resultColumns _ _) = do
   let (errors, columns) = partitionEithers $ map columnName (toList resultColumns)
   case errors of
     [] -> Right columns
     (x : xs) -> Left x
  where
-  columnName :: AliasedExpr Ast.SqlType -> Either String (Text, PgType)
+  columnName :: AliasedExpr Ast.SqlType -> Either String (Text, Ast.SqlType)
   columnName = \cases
-    (WithAlias (ECol _ (Scalar ty)) alias _) -> Right (alias, ty)
-    (WithAlias (ELit _ (Scalar ty)) alias _) -> Right (alias, ty)
-    (WithoutAlias (ECol columnname (Scalar ty))) -> Right (columnname, ty)
+    (WithAlias (ECol _ ty) alias _) -> Right (alias, ty)
+    (WithAlias (ELit _ ty) alias _) -> Right (alias, ty)
+    (WithoutAlias (ECol columnname ty)) -> Right (columnname, ty)
     -- FIXME error msg
     (WithoutAlias _) -> Left "every result should have an alias"
 
-lookupTypes :: [(Text, PgType)] -> [(PgType, Name)] -> [(String, Name)]
+lookupTypes :: [(Text, Ast.SqlType)] -> [(PgType, Name)] -> [(String, Name)]
 lookupTypes = \cases
   (x : xs) mappings -> fromMapping x mappings : lookupTypes xs mappings
   [] _ -> []
  where
-  fromMapping :: (Text, PgType) -> [(PgType, Name)] -> (String, Name)
-  fromMapping (label,ty)  mappings = case filter (\(n, _) -> n == ty) mappings of
-    [] -> error $ "no mapping for type: " <> T.unpack (unPgType ty)
-    [(pgType, name)] ->(T.unpack label, name)
-    (x : xs) -> error $ "too many mapping for type " <> T.unpack (unPgType ty)
+  fromMapping :: (Text, Ast.SqlType) -> [(PgType, Name)] -> (String, Name)
+  fromMapping (label, ty) mappings = case filter (isInMap ty) mappings of
+    [] -> error $ "no mapping for type: " <> T.unpack (unPgType $ toPgType ty)
+    [(pgType, name)] -> (T.unpack label, name)
+    (x : xs) ->
+      error $ "too many mapping for type: " <> T.unpack (unPgType $ toPgType ty)
+  isInMap :: Ast.SqlType -> (PgType, Name) -> Bool
+  isInMap sqlType (pgType, _) = case sqlType of
+    Scalar ty -> ty == pgType
+    UnknownParam -> error $ "unknown type: " <> show sqlType
+  toPgType :: Ast.SqlType -> PgType
+  toPgType = \cases
+    (Scalar ty) -> ty
+    UnknownParam -> error "unknown type"
 
 unsafeSql :: Database -> String -> Q Exp
 unsafeSql database userInput = do
@@ -87,6 +103,12 @@ unsafeSql database userInput = do
   let hsTypes = lookupTypes resultColumns (typesMap database)
   let hsNames = map snd hsTypes
   let queryToRun = Ast.astToRawSql typedAst
+  let params = map (\(_, l, t) -> (l, t))
+        . sortOn (\(n, _, _) -> n)
+        $ case Ast._where typedAst of
+          Nothing -> []
+          Just (Ast.Where expr) -> Ast.collectVariables expr
+  let hsParams = lookupTypes params (typesMap database)
   let x = show ast
   [e|
     Query
@@ -94,6 +116,7 @@ unsafeSql database userInput = do
       , columns = numberOfColumns
       , rowProto = Row [] :: $(genRowT hsTypes)
       , rowParser = $(genRowParser hsNames)
+      , params = $(genParams hsParams)
       , astS = x
       }
     |]
