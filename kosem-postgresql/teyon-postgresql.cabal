@@ -86,6 +86,7 @@ test-suite spec
       GHC2021
   other-modules:
     , Test.Database.Kosem.PostgreSQL.Internal.Parser
+    , Test.Database.Kosem.PostgreSQL.Internal.ToFromField
     , Test.Database.Kosem.PostgreSQL.Schema.Internal.Parser
     , Test.Database.Kosem.PostgreSQL.Internal
     , Test.TH
@@ -110,6 +111,8 @@ test-suite spec
     , hspec
     , hspec-contrib
     , hspec-megaparsec
+    , hspec-hedgehog
+    , hedgehog
     , megaparsec
     , text
     , vector
