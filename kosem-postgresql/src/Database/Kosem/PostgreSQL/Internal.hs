@@ -35,6 +35,11 @@ execute connection query = do
                 -- TODO oops
                 Nothing -> error "ops"
                 Just execResult -> do
+                    LibPQ.errorMessage rawConnection >>= \case
+                        Just err -> case err of
+                            "" -> pure ()
+                            _ -> error $ show err
+                        Nothing -> pure ()
                     let columnIndexes = map toEnum [0 .. length query.rowParser]
                     numberOfTuples <- LibPQ.ntuples execResult
                     resultVector <-
