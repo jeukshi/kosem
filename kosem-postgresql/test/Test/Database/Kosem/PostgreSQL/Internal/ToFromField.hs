@@ -35,6 +35,7 @@ spec = do
             let (text :: Text) = "\NUL"
             -- FIXME doesn't work:
             -- (parseField . Just . toField $ text) `shouldBe` text
+            -- SELECT E'\u0000' -- Invalid unicode in PG
             pendingWith "doesn't work"
 
     describe "'Int' instance" do
