@@ -40,7 +40,7 @@ execute connection query = do
                             "" -> pure ()
                             _ -> error $ show (err <> "\n\n" <> query.statement)
                         Nothing -> pure ()
-                    let columnIndexes = map toEnum [0 .. length query.rowParser]
+                    let columnIndexes = map toEnum [0 .. length query.rowParser - 1]
                     numberOfTuples <- LibPQ.ntuples execResult
                     resultVector <-
                         VM.generateM
