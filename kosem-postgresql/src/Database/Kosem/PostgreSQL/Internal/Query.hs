@@ -44,13 +44,6 @@ data Query result = Query
   , astS :: String
   }
 
-{-genR :: String -> Q Exp
-genR s = do
-  let rec :: $genRowT = Row []
-  c <- runQ [e|Row [] :: $genRowT|]
-  return c
--}
-
 resultFromAst :: STerm SqlType -> Either String [(Text, SqlType)]
 resultFromAst (Select resultColumns _ _) = do
   let (errors, columns) = partitionEithers $ map columnName (toList resultColumns)
@@ -116,26 +109,9 @@ unsafeSql database userInput = do
     Query
       { statement = queryToRun
       , columns = numberOfColumns
-      , rowProto = Row [] :: $(genRowT hsTypes)
+      , rowProto = Row [] :: $(genRowType hsTypes)
       , rowParser = $(genRowParser hsTypes)
-      , params = $(genParams hsParams)
+      , params = $(genParamsList hsParams)
       , astS = x
       }
     |]
-
-{- | FIXME remove later on.
-Leave it be for now, as an example of how to build QQ.
--}
-
-{- db = Database "" []
-unsafeSql' :: String -> Q Exp
-unsafeSql' = unsafeSql db
-sql :: QuasiQuoter
-sql =
-  QuasiQuoter
-    { quotePat = error "quasiquoter used in pattern context"
-    , quoteType = error "quasiquoter used in type context"
-    , quoteDec = error "quasiquoter used in declaration context"
-    , quoteExp = unsafeSql'
-    }
--}
