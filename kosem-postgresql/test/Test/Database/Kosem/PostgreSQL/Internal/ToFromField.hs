@@ -16,10 +16,11 @@ import Test.Hspec
 import Test.Hspec.Hedgehog (
     PropertyT,
     diff,
+    evalIO,
     forAll,
     hedgehog,
     (/==),
-    (===), evalIO,
+    (===),
  )
 import Test.Utils (withDB)
 
@@ -84,6 +85,18 @@ specIO = around withDB do
                             |]
             let row = V.head rows
             row.dbText === hsText
+
+        it "select 'Text' with '\\NUL' character" $ \conn -> do
+            let (hsNullText :: Text) = "\NUL"
+            rows <-
+                execute
+                    conn
+                    [Tdb.sql| select :hsNullText::text dbNullText
+                            |]
+            let row = V.head rows
+            -- row.dbNullText `shouldBe` hsNullText
+            pendingWith "doesn't work as well"
+
         it "select 'Int' as PG 'bigint'" $ \conn -> hedgehog do
             (hsInt :: Int) <- forAll do
                 Gen.integral (Range.linear (minBound @Int) (maxBound @Int))
@@ -96,4 +109,4 @@ specIO = around withDB do
             let row = V.head rows
             row.dbInt === hsInt
         it "select 'Int' as PG 'integer'" $ \conn -> do
-             pendingWith "handle out of range integers"
+            pendingWith "handle out of range integers"
