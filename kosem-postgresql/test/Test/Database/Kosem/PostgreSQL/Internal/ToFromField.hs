@@ -1,12 +1,17 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module Test.Database.Kosem.PostgreSQL.Internal.ToFromField where
 
 import Control.Concurrent (threadDelay)
 import Control.Monad.IO.Class (liftIO)
 import Data.Text (Text)
+import Data.Vector qualified as V
+import Database.Kosem.PostgreSQL.Internal
 import Database.Kosem.PostgreSQL.Internal.FromField (parseField)
 import Database.Kosem.PostgreSQL.Internal.ToField (ToField (toField))
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
+import Test.Db qualified as Tdb
 import Test.Hspec
 import Test.Hspec.Hedgehog (
     PropertyT,
@@ -16,6 +21,7 @@ import Test.Hspec.Hedgehog (
     (/==),
     (===),
  )
+import Test.Utils (withDB)
 
 spec :: SpecWith ()
 spec = do
@@ -53,3 +59,19 @@ spec = do
             let (nothing :: Maybe Bool) = Nothing
             -- (parseField . Just . toField $ nothing) `shouldBe` nothing
             pendingWith "this sadly loops forever"
+
+specIO :: SpecWith ()
+specIO = around withDB do
+    describe "'Bool' instances" do
+        it "select 'Bool'" $ \conn -> do
+            let hsFalse = False
+            let hsTrue = True
+            rows <-
+                execute
+                    conn
+                    [Tdb.sql| select :hsFalse::boolean dbFalse
+                                   , :hsTrue::boolean dbTrue
+                            |]
+            let row = V.head rows
+            row.dbFalse `shouldBe` hsFalse
+            row.dbTrue `shouldBe` hsTrue

@@ -17,3 +17,5 @@ spec = do
     Test.Database.Kosem.PostgreSQL.Schema.Internal.Parser.spec
   describe "Test.Database.Kosem.PostgreSQL.Internal.ToFromField" do
     Test.Database.Kosem.PostgreSQL.Internal.ToFromField.spec
+  describe "Test.Database.Kosem.PostgreSQL.Internal.ToFromField (IO)" do
+    Test.Database.Kosem.PostgreSQL.Internal.ToFromField.specIO

@@ -24,7 +24,7 @@ import Database.Kosem.PostgreSQL.Internal.Parser (selectCore)
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
 import Database.Kosem.PostgreSQL.Internal.TH
-import Database.Kosem.PostgreSQL.Internal.Type (typecheck)
+import Database.Kosem.PostgreSQL.Internal.Type (typecheck, exprType)
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser (Database (..), PgType, unPgType)
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser qualified
 import GHC.Exts (Any)
@@ -60,9 +60,9 @@ resultFromAst (Select resultColumns _ _) = do
  where
   columnName :: AliasedExpr Ast.SqlType -> Either String (Text, Ast.SqlType)
   columnName = \cases
-    (WithAlias (ECol _ ty) alias _) -> Right (alias, ty)
-    (WithAlias (ELit _ ty) alias _) -> Right (alias, ty)
+    (WithAlias expr alias _) -> Right (alias, exprType expr)
     (WithoutAlias (ECol columnname ty)) -> Right (columnname, ty)
+    (WithoutAlias (EPgCast (EVariable _ name _) _ ty)) -> Right (name, ty)
     -- FIXME error msg
     (WithoutAlias _) -> Left "every result should have an alias"
 
@@ -105,9 +105,10 @@ unsafeSql database userInput = do
   let queryToRun = Ast.astToRawSql typedAst
   let params = map (\(_, l, t) -> (l, t))
         . sortOn (\(n, _, _) -> n)
-        $ case Ast._where typedAst of
-          Nothing -> []
-          Just (Ast.Where expr) -> Ast.collectVariables expr
+        . Ast.collectAllVariables $ typedAst
+        -- $ case Ast._where typedAst of
+          -- Nothing -> []
+          -- Just (Ast.Where expr) -> Ast.collectVariables expr
   let hsParams = lookupTypes params (typesMap database)
   let x = show ast
   [e|

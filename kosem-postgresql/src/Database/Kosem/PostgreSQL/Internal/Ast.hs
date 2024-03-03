@@ -33,6 +33,37 @@ data STerm t
 _where :: STerm SqlType -> Maybe (Where SqlType)
 _where (Select _ _ whereClause) = whereClause
 
+collectExprs :: STerm SqlType -> [Expr SqlType]
+collectExprs = \cases
+  (Select output mbFrom mbWhere) ->
+    fromOutput output
+      ++ maybe [] fromFrom mbFrom
+      ++ maybe [] fromWhere mbWhere
+ where
+  fromOutput :: NonEmpty (AliasedExpr SqlType) -> [Expr SqlType]
+  fromOutput =
+    map
+      ( \case
+          WithoutAlias expr -> expr
+          WithAlias expr _ _ -> expr
+      )
+      . NE.toList
+  fromWhere :: Where SqlType -> [Expr SqlType]
+  fromWhere (Where expr) = [expr]
+  fromFrom :: From SqlType -> [Expr SqlType]
+  fromFrom (From fromItem) = fromFromItem fromItem
+  fromFromItem :: FromItem SqlType -> [Expr SqlType]
+  fromFromItem = \cases
+    (FiTableName _) -> []
+    (FiJoin lhs _ rhs joinCondition) ->
+      fromJoinCondition joinCondition
+        ++ fromFromItem lhs
+        ++ fromFromItem rhs
+  fromJoinCondition :: JoinCondition SqlType -> [Expr SqlType]
+  fromJoinCondition = \cases
+    JcUsing -> []
+    (JcOn expr) -> [expr]
+
 instance ToRawSql (STerm SqlType) where
   toRawSql = \cases
     (Select output from whereClause) ->
@@ -201,29 +232,32 @@ data Expr t
   | ENotBetween (Expr t) Not Between (Expr t) And (Expr t)
   deriving (Show)
 
-collectVariables :: Expr SqlType -> [(Int, Text, SqlType)]
-collectVariables expr = go expr []
+collectAllVariables :: STerm SqlType -> [(Int, Text, SqlType)]
+collectAllVariables = concatMap collectVariables . collectExprs
  where
-  go :: Expr SqlType -> [(Int, Text, SqlType)] -> [(Int, Text, SqlType)]
-  go expr acc = case expr of
-    (EVariable n t ty) -> acc ++ [(n, t, ty)]
-    (EParens expr _) -> go expr acc
-    (ELit lit _) -> []
-    (ECol columnName _) -> []
-    (EPgCast expr ty _) -> go expr acc
-    (ENot not expr) -> go expr acc
-    (EAnd lhs and rhs) -> go rhs (go lhs acc)
-    (EOr lhs or rhs) -> go rhs (go lhs acc)
-    (ELessThan lhs rhs) -> go rhs (go lhs acc)
-    (EGreaterThan lhs rhs) -> go rhs (go lhs acc)
-    (ELessThanOrEqualTo lhs rhs) -> go rhs (go lhs acc)
-    (EGreaterThanOrEqualTo lhs rhs) -> go rhs (go lhs acc)
-    (EEqual lhs rhs) -> go rhs (go lhs acc)
-    (ENotEqual lhs style rhs) -> go rhs (go lhs acc)
-    (EBetween lhs between rhs1 and rhs2) ->
-      go rhs1 (go rhs2 (go lhs acc))
-    (ENotBetween lhs not between rhs1 and rhs2) ->
-      go rhs1 (go rhs2 (go lhs acc))
+  collectVariables :: Expr SqlType -> [(Int, Text, SqlType)]
+  collectVariables expr = go expr []
+   where
+    go :: Expr SqlType -> [(Int, Text, SqlType)] -> [(Int, Text, SqlType)]
+    go expr acc = case expr of
+      (EVariable n t ty) -> acc ++ [(n, t, ty)]
+      (EParens expr _) -> go expr acc
+      (ELit lit _) -> []
+      (ECol columnName _) -> []
+      (EPgCast expr ty _) -> go expr acc
+      (ENot not expr) -> go expr acc
+      (EAnd lhs and rhs) -> go rhs (go lhs acc)
+      (EOr lhs or rhs) -> go rhs (go lhs acc)
+      (ELessThan lhs rhs) -> go rhs (go lhs acc)
+      (EGreaterThan lhs rhs) -> go rhs (go lhs acc)
+      (ELessThanOrEqualTo lhs rhs) -> go rhs (go lhs acc)
+      (EGreaterThanOrEqualTo lhs rhs) -> go rhs (go lhs acc)
+      (EEqual lhs rhs) -> go rhs (go lhs acc)
+      (ENotEqual lhs style rhs) -> go rhs (go lhs acc)
+      (EBetween lhs between rhs1 and rhs2) ->
+        go rhs1 (go rhs2 (go lhs acc))
+      (ENotBetween lhs not between rhs1 and rhs2) ->
+        go rhs1 (go rhs2 (go lhs acc))
 
 instance ToRawSql (Expr SqlType) where
   toRawSql :: Expr SqlType -> Builder

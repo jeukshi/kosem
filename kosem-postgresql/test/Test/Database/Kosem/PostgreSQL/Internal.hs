@@ -9,7 +9,7 @@ import Database.Kosem.PostgreSQL.Internal.Connection (close, connectConnString)
 import Test.Db qualified as Tdb
 import Test.Hspec
 import Test.TH (text)
-import Test.Utils
+import Test.Utils ( withDB )
 
 -- import Test.Utils
 
@@ -45,6 +45,19 @@ spec = around withDB $ do
                                and :hello::boolean
                                and :ello::boolean
                                 |]
+            "it compiles" `shouldBe` "it compiles"
+    describe "variables" do
+        it "in output don't need an alias" $ \conn -> do
+            let abc = True
+            let _ = [Tdb.sql| select :abc::boolean |]
+            "it compiles" `shouldBe` "it compiles"
+
+    describe "variables" do
+        it "in output can have an alias" $ \conn -> do
+            let abc = True
+                cba = "cba"
+            let _ = [Tdb.sql| select :abc::boolean abc
+                                   , :cba::text as cba|]
             "it compiles" `shouldBe` "it compiles"
 
     describe "selects for real" $ do
