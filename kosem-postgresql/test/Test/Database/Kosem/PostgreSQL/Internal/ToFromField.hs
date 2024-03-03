@@ -19,7 +19,7 @@ import Test.Hspec.Hedgehog (
     forAll,
     hedgehog,
     (/==),
-    (===),
+    (===), evalIO,
  )
 import Test.Utils (withDB)
 
@@ -75,3 +75,25 @@ specIO = around withDB do
             let row = V.head rows
             row.dbFalse `shouldBe` hsFalse
             row.dbTrue `shouldBe` hsTrue
+        it "select 'Text'" $ \conn -> hedgehog do
+            hsText <- forAll $ Gen.text (Range.constant 0 256) Gen.unicode
+            rows <- evalIO do
+                execute
+                    conn
+                    [Tdb.sql| select :hsText::text dbText
+                            |]
+            let row = V.head rows
+            row.dbText === hsText
+        it "select 'Int' as PG 'bigint'" $ \conn -> hedgehog do
+            (hsInt :: Int) <- forAll do
+                Gen.integral (Range.linear (minBound @Int) (maxBound @Int))
+
+            rows <- evalIO do
+                execute
+                    conn
+                    [Tdb.sql| select :hsInt::bigint dbInt
+                            |]
+            let row = V.head rows
+            row.dbInt === hsInt
+        it "select 'Int' as PG 'integer'" $ \conn -> do
+             pendingWith "handle out of range integers"
