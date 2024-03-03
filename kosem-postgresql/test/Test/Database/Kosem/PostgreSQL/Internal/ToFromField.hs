@@ -48,3 +48,8 @@ spec = do
         it "work for 'Just a'" do
             (parseField . Just . toField $ Just True) `shouldBe` True
             (parseField . Just . toField $ Just False) `shouldBe` False
+
+        it "work for 'Nothing'" do
+            let (nothing :: Maybe Bool) = Nothing
+            -- (parseField . Just . toField $ nothing) `shouldBe` nothing
+            pendingWith "this sadly loops forever"
