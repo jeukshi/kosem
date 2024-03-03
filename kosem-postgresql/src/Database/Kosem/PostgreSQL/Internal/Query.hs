@@ -51,14 +51,14 @@ genR s = do
   return c
 -}
 
-resultFromAst :: STerm Ast.SqlType -> Either String [(Text, Ast.SqlType)]
+resultFromAst :: STerm SqlType -> Either String [(Text, SqlType)]
 resultFromAst (Select resultColumns _ _) = do
   let (errors, columns) = partitionEithers $ map columnName (toList resultColumns)
   case errors of
     [] -> Right columns
     (x : xs) -> Left x
  where
-  columnName :: AliasedExpr Ast.SqlType -> Either String (Text, Ast.SqlType)
+  columnName :: AliasedExpr SqlType -> Either String (Text, SqlType)
   columnName = \cases
     (WithAlias expr alias _) -> Right (alias, exprType expr)
     (WithoutAlias (ECol columnname ty)) -> Right (columnname, ty)
@@ -66,22 +66,22 @@ resultFromAst (Select resultColumns _ _) = do
     -- FIXME error msg
     (WithoutAlias _) -> Left "every result should have an alias"
 
-lookupTypes :: [(Text, Ast.SqlType)] -> [(PgType, Name)] -> [(String, Name)]
+lookupTypes :: [(Text, SqlType)] -> [(PgType, Name)] -> [(String, Name)]
 lookupTypes = \cases
   (x : xs) mappings -> fromMapping x mappings : lookupTypes xs mappings
   [] _ -> []
  where
-  fromMapping :: (Text, Ast.SqlType) -> [(PgType, Name)] -> (String, Name)
+  fromMapping :: (Text, SqlType) -> [(PgType, Name)] -> (String, Name)
   fromMapping (label, ty) mappings = case filter (isInMap ty) mappings of
     [] -> error $ "no mapping for type: " <> T.unpack (unPgType $ toPgType ty)
     [(pgType, name)] -> (T.unpack label, name)
     (x : xs) ->
       error $ "too many mapping for type: " <> T.unpack (unPgType $ toPgType ty)
-  isInMap :: Ast.SqlType -> (PgType, Name) -> Bool
+  isInMap :: SqlType -> (PgType, Name) -> Bool
   isInMap sqlType (pgType, _) = case sqlType of
     Scalar ty -> ty == pgType
     UnknownParam -> error $ "unknown type: " <> show sqlType
-  toPgType :: Ast.SqlType -> PgType
+  toPgType :: SqlType -> PgType
   toPgType = \cases
     (Scalar ty) -> ty
     UnknownParam -> error "unknown type"
