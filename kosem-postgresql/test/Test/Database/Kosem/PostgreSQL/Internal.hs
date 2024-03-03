@@ -46,19 +46,25 @@ spec = around withDB $ do
                                and :ello::boolean
                                 |]
             "it compiles" `shouldBe` "it compiles"
-    describe "variables" do
+    describe "parameters" do
         it "in output don't need an alias" $ \conn -> do
             let abc = True
             let _ = [Tdb.sql| select :abc::boolean |]
             "it compiles" `shouldBe` "it compiles"
 
-    describe "variables" do
         it "in output can have an alias" $ \conn -> do
             let abc = True
                 cba = "cba"
             let _ = [Tdb.sql| select :abc::boolean abc
                                    , :cba::text as cba|]
             "it compiles" `shouldBe` "it compiles"
+        it "maybe parameters" $ \conn -> do
+            let abc = Just True
+                cba = Just "cba"
+            let _ = [Tdb.sql| select :?abc::boolean abc
+                                   , :?cba::text as cba|]
+            "it compiles" `shouldBe` "it compiles"
+
 
     describe "selects for real" $ do
         it "selects postgresql simple datatypes" $ \conn -> do

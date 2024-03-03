@@ -199,20 +199,37 @@ instance ToRawSql (AliasedExpr SqlType) where
     (WithAlias expr alias (Just as)) ->
       toRawSql expr <-> toRawSql as <-> textToBuilder alias
 
-pgBool :: SqlType
-pgBool = Scalar "boolean"
+pgBoolNullable :: SqlType
+pgBoolNullable = Scalar "boolean" Nullable
+
+data IsNullable
+  = NonNullable
+  | Nullable
+  deriving (Show, Eq)
+
+-- | Not equals, ignoring IsNullable
+(/~=) :: SqlType -> SqlType -> Bool
+(/~=) = \cases
+  (Scalar lhs _) (Scalar rhs _) -> lhs /= rhs
+  _ _ -> False
 
 data SqlType
-  = Scalar PgType
-  | UnknownParam
+  = Scalar PgType IsNullable
+  | UnknownParam IsNullable
   deriving (Show, Eq)
+
+isNullable :: SqlType -> IsNullable
+isNullable = \cases
+  (Scalar _ nullable) -> nullable
+  (UnknownParam nullable) -> nullable
 
 instance ToRawSql SqlType where
   toRawSql _ = ""
 
 data Expr t
   = EParens (Expr t) t
-  | EVariable Int Text t
+  | EParam Int Text t
+  | EParamMaybe Int Text t
   | ELit LiteralValue t
   | ECol ColumnName t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
   | EPgCast (Expr t) Text t
@@ -240,7 +257,8 @@ collectAllVariables = concatMap collectVariables . collectExprs
    where
     go :: Expr SqlType -> [(Int, Text, SqlType)] -> [(Int, Text, SqlType)]
     go expr acc = case expr of
-      (EVariable n t ty) -> acc ++ [(n, t, ty)]
+      (EParam n t ty) -> acc ++ [(n, t, ty)]
+      (EParamMaybe n t ty) -> acc ++ [(n, t, ty)]
       (EParens expr _) -> go expr acc
       (ELit lit _) -> []
       (ECol columnName _) -> []
@@ -262,7 +280,8 @@ collectAllVariables = concatMap collectVariables . collectExprs
 instance ToRawSql (Expr SqlType) where
   toRawSql :: Expr SqlType -> Builder
   toRawSql = \cases
-    (EVariable n _ _) -> textToBuilder (T.pack $ "$" <> show n)
+    (EParam n _ _) -> textToBuilder (T.pack $ "$" <> show n)
+    (EParamMaybe n _ _) -> textToBuilder (T.pack $ "$" <> show n)
     (EParens expr _) -> "(" <> toRawSql expr <> ")"
     (ELit lit _) -> toRawSql lit
     (ECol columnName _) -> textToBuilder columnName

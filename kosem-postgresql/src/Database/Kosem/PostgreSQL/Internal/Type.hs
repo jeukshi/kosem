@@ -30,7 +30,7 @@ tcWhereClause = \cases
     Nothing -> return Nothing
     (Just (Where expr)) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr /= pgBool) do
+        when (exprType tyExpr /~= pgBoolNullable) do
             throwError $ Err "argument of 'WHERE' must be type 'boolean'"
         return $ Just $ Where tyExpr
 
@@ -65,7 +65,7 @@ tcJoinCondition = \cases
     JcUsing -> return JcUsing
     (JcOn expr) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr /= pgBool) do
+        when (exprType tyExpr /~= pgBoolNullable) do
             throwError $ Err "argument of 'JOIN/ON' must be type 'boolean'"
         return $ JcOn tyExpr
 
@@ -73,55 +73,73 @@ exprType :: Expr SqlType -> SqlType
 exprType = \cases
     (EPgCast _ _ ty) -> ty
     (EParens _ ty) -> ty
-    (EVariable _ _ ty) -> ty
+    (EParam _ _ ty) -> ty
+    (EParamMaybe _ _ ty) -> ty
     (ELit _ ty) -> ty
     (ECol _ ty) -> ty
-    (ENot{}) -> pgBool
-    (EAnd{}) -> pgBool
-    (EOr{}) -> pgBool
-    (ELessThan{}) -> pgBool
-    (EGreaterThan{}) -> pgBool
-    (ELessThanOrEqualTo{}) -> pgBool
-    (EGreaterThanOrEqualTo{}) -> pgBool
-    (EEqual{}) -> pgBool
-    (ENotEqual{}) -> pgBool
-    (EBetween{}) -> pgBool
-    (ENotBetween{}) -> pgBool
+    (ENot{}) -> pgBoolNullable
+    (EAnd{}) -> pgBoolNullable
+    (EOr{}) -> pgBoolNullable
+    (ELessThan{}) -> pgBoolNullable
+    (EGreaterThan{}) -> pgBoolNullable
+    (ELessThanOrEqualTo{}) -> pgBoolNullable
+    (EGreaterThanOrEqualTo{}) -> pgBoolNullable
+    (EEqual{}) -> pgBoolNullable
+    (ENotEqual{}) -> pgBoolNullable
+    (EBetween{}) -> pgBoolNullable
+    (ENotBetween{}) -> pgBoolNullable
 
 tcExpr :: Expr () -> Tc (Expr SqlType)
 tcExpr = \cases
-    (EPgCast var@(EVariable{}) text ()) -> do
+    (EPgCast var@(EParam{}) ty ()) -> do
+        -- FIXME check text, check if can be casted
         tyVar <-
             tcExpr var >>= \case
-                (EVariable no name _) ->
-                    return $ EVariable no name (Scalar (PgType text))
+                (EParam no name _) ->
+                    return $ EParam no name (Scalar (PgType ty) NonNullable)
                 _ -> throwError $ Err "impossible!"
-        return $ EPgCast tyVar text (Scalar (PgType text))
+        return $ EPgCast tyVar ty (Scalar (PgType ty) NonNullable)
+    (EPgCast var@(EParamMaybe{}) ty ()) -> do
+        -- FIXME check text, check if can be casted
+        tyVar <-
+            tcExpr var >>= \case
+                (EParamMaybe no name _) ->
+                    return $ EParamMaybe no name (Scalar (PgType ty) Nullable)
+                _ -> throwError $ Err "impossible!"
+        return $ EPgCast tyVar ty (Scalar (PgType ty) Nullable)
     (EPgCast expr text ()) -> do
         tyExpr <- tcExpr expr
         -- FIXME check text, check if can be casted
-        return $ EPgCast tyExpr text (Scalar (PgType text))
+        -- FIXME preserve IsNullable from underlying type
+        return $ EPgCast tyExpr text (Scalar (PgType text) Nullable)
     (EParens expr ()) -> do
         tyExpr <- tcExpr expr
         let innerTy = exprType tyExpr
         return $ EParens tyExpr innerTy
-    (EVariable _ name ()) -> do
+    (EParam _ name ()) -> do
         paramNumber <-
             getParamNumber name >>= \case
                 Just ix -> return ix
                 Nothing -> addParam name
-        return $ EVariable paramNumber name UnknownParam
+        return $ EParam paramNumber name (UnknownParam NonNullable)
+    (EParamMaybe _ name ()) -> do
+        paramNumber <-
+            getParamNumber name >>= \case
+                Just ix -> return ix
+                Nothing -> addParam name
+        return $ EParamMaybe paramNumber name (UnknownParam Nullable)
     (ELit litVal _) -> case litVal of
-        NumericLiteral -> return $ ELit litVal (Scalar "numeric")
-        TextLiteral _ -> return $ ELit litVal (Scalar "text")
-        (BoolLiteral _) -> return $ ELit litVal pgBool
+        NumericLiteral -> return $ ELit litVal (Scalar "numeric" NonNullable)
+        TextLiteral _ -> return $ ELit litVal (Scalar "text" NonNullable)
+        (BoolLiteral _) -> return $ ELit litVal (Scalar "boolean" NonNullable)
     (ECol colName _) -> do
         envCol <- columnByName colName
-        return $ ECol colName (Scalar envCol.typeName)
+        -- FIXME NonNullable from colDef
+        return $ ECol colName (Scalar envCol.typeName NonNullable)
     (ENot not expr) -> do
         tyExpr <- tcExpr expr
         let ty = exprType tyExpr
-        when (ty /= pgBool) do
+        when (ty /~= pgBoolNullable) do
             throwError $ Err "argument of 'NOT' must be type 'boolean'"
         return $ ENot not tyExpr
     (EAnd lhs and rhs) -> do
@@ -172,9 +190,9 @@ tcExpr = \cases
     tyMustBeBoolean func lhs rhs = do
         tyLhs <- tcExpr lhs
         tyRhs <- tcExpr rhs
-        when (exprType tyLhs /= pgBool) do
+        when (exprType tyLhs /~= pgBoolNullable) do
             throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
-        when (exprType tyRhs /= pgBool) do
+        when (exprType tyRhs /~= pgBoolNullable) do
             throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
         return (tyLhs, tyRhs)
 
@@ -182,7 +200,7 @@ tcExpr = \cases
     tyMustBeEqual func lhs rhs = do
         tyLhs <- tcExpr lhs
         tyRhs <- tcExpr rhs
-        when (exprType tyLhs /= exprType tyRhs) do
+        when (exprType tyLhs /~= exprType tyRhs) do
             throwError $ Err $ "arguments of '" <> func <> "' must be of the same type"
         return (tyLhs, tyRhs)
 

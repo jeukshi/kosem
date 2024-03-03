@@ -11,20 +11,20 @@ import Data.List (sortOn)
 import Data.List.NonEmpty (toList)
 import Data.Text (Text)
 import Data.Text qualified as T
+import Database.Kosem.PostgreSQL.Internal.Ast
 import Database.Kosem.PostgreSQL.Internal.Ast (
   AliasedExpr (..),
   Expr (..),
   STerm (Select),
   SqlType (..),
  )
-import Database.Kosem.PostgreSQL.Internal.Ast qualified as Ast
 import Database.Kosem.PostgreSQL.Internal.Env (runProgram)
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Parser (selectCore)
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
 import Database.Kosem.PostgreSQL.Internal.TH
-import Database.Kosem.PostgreSQL.Internal.Type (typecheck, exprType)
+import Database.Kosem.PostgreSQL.Internal.Type (exprType, typecheck)
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser (Database (..), PgType, unPgType)
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser qualified
 import GHC.Exts (Any)
@@ -62,29 +62,29 @@ resultFromAst (Select resultColumns _ _) = do
   columnName = \cases
     (WithAlias expr alias _) -> Right (alias, exprType expr)
     (WithoutAlias (ECol columnname ty)) -> Right (columnname, ty)
-    (WithoutAlias (EPgCast (EVariable _ name _) _ ty)) -> Right (name, ty)
+    (WithoutAlias (EPgCast (EParam _ name _) _ ty)) -> Right (name, ty)
     -- FIXME error msg
     (WithoutAlias _) -> Left "every result should have an alias"
 
-lookupTypes :: [(Text, SqlType)] -> [(PgType, Name)] -> [(String, Name)]
+lookupTypes :: [(Text, SqlType)] -> [(PgType, Name)] -> [(String, Name, IsNullable)]
 lookupTypes = \cases
   (x : xs) mappings -> fromMapping x mappings : lookupTypes xs mappings
   [] _ -> []
  where
-  fromMapping :: (Text, SqlType) -> [(PgType, Name)] -> (String, Name)
+  fromMapping :: (Text, SqlType) -> [(PgType, Name)] -> (String, Name, IsNullable)
   fromMapping (label, ty) mappings = case filter (isInMap ty) mappings of
     [] -> error $ "no mapping for type: " <> T.unpack (unPgType $ toPgType ty)
-    [(pgType, name)] -> (T.unpack label, name)
+    [(pgType, name)] -> (T.unpack label, name, isNullable ty)
     (x : xs) ->
       error $ "too many mapping for type: " <> T.unpack (unPgType $ toPgType ty)
   isInMap :: SqlType -> (PgType, Name) -> Bool
   isInMap sqlType (pgType, _) = case sqlType of
-    Scalar ty -> ty == pgType
-    UnknownParam -> error $ "unknown type: " <> show sqlType
+    Scalar ty _ -> ty == pgType
+    (UnknownParam{}) -> error $ "unknown type: " <> show sqlType
   toPgType :: SqlType -> PgType
   toPgType = \cases
-    (Scalar ty) -> ty
-    UnknownParam -> error "unknown type"
+    (Scalar ty _) -> ty
+    (UnknownParam{}) -> error "unknown type"
 
 unsafeSql :: Database -> String -> Q Exp
 unsafeSql database userInput = do
@@ -101,14 +101,15 @@ unsafeSql database userInput = do
         Left e -> error (show e)
         Right resultColumns -> resultColumns
   let hsTypes = lookupTypes resultColumns (typesMap database)
-  let hsNames = map snd hsTypes
-  let queryToRun = Ast.astToRawSql typedAst
-  let params = map (\(_, l, t) -> (l, t))
-        . sortOn (\(n, _, _) -> n)
-        . Ast.collectAllVariables $ typedAst
-        -- $ case Ast._where typedAst of
-          -- Nothing -> []
-          -- Just (Ast.Where expr) -> Ast.collectVariables expr
+  let queryToRun = astToRawSql typedAst
+  let params =
+        map (\(_, l, t) -> (l, t))
+          . sortOn (\(n, _, _) -> n)
+          . collectAllVariables
+          $ typedAst
+  -- \$ case Ast._where typedAst of
+  -- Nothing -> []
+  -- Just (Ast.Where expr) -> Ast.collectVariables expr
   let hsParams = lookupTypes params (typesMap database)
   let x = show ast
   [e|
@@ -116,7 +117,7 @@ unsafeSql database userInput = do
       { statement = queryToRun
       , columns = numberOfColumns
       , rowProto = Row [] :: $(genRowT hsTypes)
-      , rowParser = $(genRowParser hsNames)
+      , rowParser = $(genRowParser hsTypes)
       , params = $(genParams hsParams)
       , astS = x
       }

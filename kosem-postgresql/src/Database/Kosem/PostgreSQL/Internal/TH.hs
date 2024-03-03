@@ -6,6 +6,7 @@
 module Database.Kosem.PostgreSQL.Internal.TH where
 
 import Data.Text (Text)
+import Database.Kosem.PostgreSQL.Internal.Ast (IsNullable (..))
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.ToField (ToField (toField))
@@ -111,26 +112,7 @@ genRowD = do
     let val = ValD (VarP reccc) (NormalB (AppE (ConE ''Row) (ConE ''[]))) []
     return [ty, val]
 
-genRowT' :: Q Type
-genRowT' = do
-    let x =
-            ( AppT
-                (ConT ''Row)
-                ( AppT
-                    (AppT PromotedConsT (AppT (AppT (ConT ''(:=)) (LitT (StrTyLit "abc"))) (ConT ''Text)))
-                    ( AppT
-                        (AppT PromotedConsT (AppT (AppT (ConT ''(:=)) (LitT (StrTyLit "xyz"))) (ConT ''Text)))
-                        ( AppT
-                            ( AppT PromotedConsT (AppT (AppT (ConT ''(:=)) (LitT (StrTyLit "cdy"))) (ConT ''Text))
-                            )
-                            PromotedNilT
-                        )
-                    )
-                )
-            )
-    return x
-
-genRowT :: [(String, Name)] -> Q Type
+genRowT :: [(String, Name, IsNullable)] -> Q Type
 genRowT columns = return $ AppT (ConT ''Row) (go columns)
   where
     go = \cases
@@ -138,44 +120,73 @@ genRowT columns = return $ AppT (ConT ''Row) (go columns)
         [] -> PromotedNilT
 
     -- \| `label := type`
-    makeTuple (label, ty) =
-        AppT PromotedConsT (AppT (AppT (ConT ''(:=)) (LitT (StrTyLit label))) (ConT ty))
-
-{-rowType :: QuasiQuoter
-rowType =
-    QuasiQuoter
-        { quotePat = error "quasiquoter used in pattern context"
-        , quoteType = genRowT
-        , quoteDec = error "quasiquoter used in declaration context"
-        , quoteExp = error ""
-        }-}
-
-genRowParser :: [Name] -> Q Exp
-genRowParser names =
-    return $
-        ListE $
-            map
-                ( \name ->
-                    -- \| `unsafeCoerce . parseField @Text`
-                    InfixE
-                        (Just (VarE 'unsafeCoerce))
-                        (VarE '(.))
-                        (Just (AppTypeE (VarE 'parseField) (ConT name)))
+    makeTuple = \cases
+        (label, ty, NonNullable) ->
+            AppT
+                PromotedConsT
+                ( AppT
+                    (AppT (ConT ''(:=)) (LitT (StrTyLit label)))
+                    (ConT ty)
                 )
-                names
+        (label, ty, Nullable) ->
+            AppT
+                PromotedConsT
+                ( AppT
+                    (AppT (ConT ''(:=)) (LitT (StrTyLit label)))
+                    (AppT (ConT ''Maybe) (ConT ty))
+                )
 
-genParams :: [(String, Name)] -> Q Exp
-genParams  = \cases
-    [] -> return $ ConE '[]
-    names -> return $
-        ListE $
-            map toParam names
+genRowParser :: [(String, Name, IsNullable)] -> Q Exp
+genRowParser names =
+    return
+        . ListE
+        $ map genParseField names
   where
-    toParam :: (String, Name) -> Exp
-    toParam (name, ty) = do
-        let hsName = mkName name
-        -- \| toField @Type variable
-        AppE (AppTypeE (VarE 'toField) (ConT ty)) (VarE hsName)
+    genParseField :: (String, Name, IsNullable) -> Exp
+    genParseField = \cases
+        (_, ty, NonNullable) ->
+            -- \| `unsafeCoerce . parseField @Text`
+            InfixE
+                (Just (VarE 'unsafeCoerce))
+                (VarE '(.))
+                (Just (AppTypeE (VarE 'parseField) (ConT ty)))
+        (_, ty, Nullable) ->
+            -- \| `unsafeCoerce . parseField @(Maybe Text)`
+            InfixE
+                (Just (VarE 'unsafeCoerce))
+                (VarE '(.))
+                ( Just
+                    ( AppTypeE
+                        (VarE 'parseField)
+                        (AppT (ConT ''Maybe) (ConT ty))
+                    )
+                )
+
+genParams :: [(String, Name, IsNullable)] -> Q Exp
+genParams = \cases
+    [] -> return $ ConE '[]
+    names ->
+        return $
+            ListE $
+                map genToField names
+  where
+    genToField :: (String, Name, IsNullable) -> Exp
+    genToField = \cases
+        (name, ty, NonNullable) -> do
+            let hsName = mkName name
+            -- \| toField @Type variable
+            AppE
+                (AppTypeE (VarE 'toField) (ConT ty))
+                (VarE hsName)
+        (name, ty, Nullable) -> do
+            let hsName = mkName name
+            -- \| toField @(Maybe Type) variable
+            AppE
+                ( AppTypeE
+                    (VarE 'toField)
+                    (AppT (ConT ''Maybe) (ConT ty))
+                )
+                (VarE hsName)
 
 {-
   let x =

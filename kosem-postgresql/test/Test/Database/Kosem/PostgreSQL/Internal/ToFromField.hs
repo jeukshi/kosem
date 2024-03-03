@@ -76,6 +76,8 @@ specIO = around withDB do
             let row = V.head rows
             row.dbFalse `shouldBe` hsFalse
             row.dbTrue `shouldBe` hsTrue
+
+    describe "'Text' instances" do
         it "select 'Text'" $ \conn -> hedgehog do
             hsText <- forAll $ Gen.text (Range.constant 0 256) Gen.unicode
             rows <- evalIO do
@@ -97,6 +99,7 @@ specIO = around withDB do
             -- row.dbNullText `shouldBe` hsNullText
             pendingWith "doesn't work as well"
 
+    describe "'Int' instances" do
         it "select 'Int' as PG 'bigint'" $ \conn -> hedgehog do
             (hsInt :: Int) <- forAll do
                 Gen.integral (Range.linear (minBound @Int) (maxBound @Int))
@@ -110,3 +113,18 @@ specIO = around withDB do
             row.dbInt === hsInt
         it "select 'Int' as PG 'integer'" $ \conn -> do
             pendingWith "handle out of range integers"
+
+    describe "'Maybe' instances" do
+        it "select 'Maybe Bool'" $ \conn -> do
+            let hsMbFalse = Just False
+            let hsMbTrue = Just True
+            rows <-
+                execute
+                    conn
+                    [Tdb.sql| select :?hsMbFalse::boolean dbMbFalse
+                                   , :?hsMbTrue::boolean dbMbTrue
+                            |]
+            let row = V.head rows
+            -- row.dbMbFalse `shouldBe` hsMbFalse
+            -- row.dbMbTrue `shouldBe` hsMbTrue
+            pendingWith "loops"

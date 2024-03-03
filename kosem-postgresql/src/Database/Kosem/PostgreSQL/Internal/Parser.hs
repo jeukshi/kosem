@@ -156,13 +156,19 @@ termP = lexeme do
         [ flip EParens () <$> parens exprP
         , exprLitP
         , exprColP
-        , variableP
+        , paramMaybeP
+        , paramP
         ]
 
-variableP :: Parser (Expr ())
-variableP = lexeme do
+paramP :: Parser (Expr ())
+paramP = lexeme do
   symbol ":"
-  (EVariable 0 <$> labelP) <*> pure ()
+  (EParam 0 <$> labelP) <*> pure ()
+
+paramMaybeP :: Parser (Expr ())
+paramMaybeP = lexeme do
+  symbol ":?"
+  (EParamMaybe 0 <$> labelP) <*> pure ()
 
 pgCastP :: Parser Text
 pgCastP = lexeme do
