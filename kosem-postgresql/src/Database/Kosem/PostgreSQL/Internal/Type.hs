@@ -30,7 +30,7 @@ tcWhereClause = \cases
     Nothing -> return Nothing
     (Just (Where expr)) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr /~= pgBoolNullable) do
+        when (exprType tyExpr ~/=~ pgBoolNullable) do
             throwError $ Err "argument of 'WHERE' must be type 'boolean'"
         return $ Just $ Where tyExpr
 
@@ -65,7 +65,7 @@ tcJoinCondition = \cases
     JcUsing -> return JcUsing
     (JcOn expr) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr /~= pgBoolNullable) do
+        when (exprType tyExpr ~/=~ pgBoolNullable) do
             throwError $ Err "argument of 'JOIN/ON' must be type 'boolean'"
         return $ JcOn tyExpr
 
@@ -139,7 +139,7 @@ tcExpr = \cases
     (ENot not expr) -> do
         tyExpr <- tcExpr expr
         let ty = exprType tyExpr
-        when (ty /~= pgBoolNullable) do
+        when (ty ~/=~ pgBoolNullable) do
             throwError $ Err "argument of 'NOT' must be type 'boolean'"
         return $ ENot not tyExpr
     (EAnd lhs and rhs) -> do
@@ -190,9 +190,9 @@ tcExpr = \cases
     tyMustBeBoolean func lhs rhs = do
         tyLhs <- tcExpr lhs
         tyRhs <- tcExpr rhs
-        when (exprType tyLhs /~= pgBoolNullable) do
+        when (exprType tyLhs ~/=~ pgBoolNullable) do
             throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
-        when (exprType tyRhs /~= pgBoolNullable) do
+        when (exprType tyRhs ~/=~ pgBoolNullable) do
             throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
         return (tyLhs, tyRhs)
 
@@ -200,7 +200,7 @@ tcExpr = \cases
     tyMustBeEqual func lhs rhs = do
         tyLhs <- tcExpr lhs
         tyRhs <- tcExpr rhs
-        when (exprType tyLhs /~= exprType tyRhs) do
+        when (exprType tyLhs ~/=~ exprType tyRhs) do
             throwError $ Err $ "arguments of '" <> func <> "' must be of the same type"
         return (tyLhs, tyRhs)
 

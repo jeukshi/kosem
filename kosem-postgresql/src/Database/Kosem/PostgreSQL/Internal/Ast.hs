@@ -207,9 +207,15 @@ data IsNullable
   | Nullable
   deriving (Show, Eq)
 
+-- | Equals, ignoring IsNullable
+(~==~) :: SqlType -> SqlType -> Bool
+(~==~) = \cases
+  (Scalar lhs _) (Scalar rhs _) -> lhs == rhs
+  _ _ -> False
+
 -- | Not equals, ignoring IsNullable
-(/~=) :: SqlType -> SqlType -> Bool
-(/~=) = \cases
+(~/=~) :: SqlType -> SqlType -> Bool
+(~/=~) = \cases
   (Scalar lhs _) (Scalar rhs _) -> lhs /= rhs
   _ _ -> False
 
