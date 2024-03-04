@@ -9,7 +9,7 @@ import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.Ast (IsNullable (..))
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Row
-import Database.Kosem.PostgreSQL.Internal.ToField (ToField (toField))
+import Database.Kosem.PostgreSQL.Internal.ToField (ToField (toField'Internal))
 import GHC.Records
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
@@ -48,19 +48,19 @@ genRowParser names =
     genParseField :: (String, Name, IsNullable) -> Exp
     genParseField = \cases
         (_, ty, NonNullable) ->
-            -- \| `unsafeCoerce . parseField @Text`
+            -- \| `unsafeCoerce . parseField'Internal @Text`
             InfixE
                 (Just (VarE 'unsafeCoerce))
                 (VarE '(.))
-                (Just (AppTypeE (VarE 'parseField) (ConT ty)))
+                (Just (AppTypeE (VarE 'parseField'Internal) (ConT ty)))
         (_, ty, Nullable) ->
-            -- \| `unsafeCoerce . parseField @(Maybe Text)`
+            -- \| `unsafeCoerce . parseField'Internal @(Maybe Text)`
             InfixE
                 (Just (VarE 'unsafeCoerce))
                 (VarE '(.))
                 ( Just
                     ( AppTypeE
-                        (VarE 'parseField)
+                        (VarE 'parseField'Internal)
                         (AppT (ConT ''Maybe) (ConT ty))
                     )
                 )
@@ -77,16 +77,16 @@ genParamsList = \cases
     genToField = \cases
         (name, ty, NonNullable) -> do
             let hsName = mkName name
-            -- \| toField @Type variable
+            -- \| toField'Internal @Type variable
             AppE
-                (AppTypeE (VarE 'toField) (ConT ty))
+                (AppTypeE (VarE 'toField'Internal) (ConT ty))
                 (VarE hsName)
         (name, ty, Nullable) -> do
             let hsName = mkName name
-            -- \| toField @(Maybe Type) variable
+            -- \| toField'Internal @(Maybe Type) variable
             AppE
                 ( AppTypeE
-                    (VarE 'toField)
+                    (VarE 'toField'Internal)
                     (AppT (ConT ''Maybe) (ConT ty))
                 )
                 (VarE hsName)

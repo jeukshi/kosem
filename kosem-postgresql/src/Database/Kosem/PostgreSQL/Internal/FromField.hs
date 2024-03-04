@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DefaultSignatures #-}
 
 module Database.Kosem.PostgreSQL.Internal.FromField where
 
@@ -9,34 +9,40 @@ import GHC.Exts (Any)
 import Unsafe.Coerce (unsafeCoerce)
 
 class FromField a where
-    parseField :: Maybe ByteString -> a
+    -- TODO We shoud prolly return Either
+    -- and allow users to signal failure that way. TBD
+    parseField :: ByteString -> a
+    {-# MINIMAL parseField #-}
+
+    parseField'Internal:: Maybe ByteString ->  a
+    default parseField'Internal :: Maybe ByteString -> a
+    parseField'Internal = \cases
+      Nothing -> error "unexpected null"
+      (Just val) -> parseField val
 
 instance FromField Text where
-    parseField :: Maybe ByteString -> Text
-    parseField = \cases
-      Nothing -> error "nothing"
-      (Just bs) -> case valueParser text_strict bs of
+    parseField :: ByteString -> Text
+    parseField bs = case valueParser text_strict bs of
         Left e -> error "parse error"
         Right t -> t
 
 instance FromField Bool where
-    parseField :: Maybe ByteString -> Bool
-    parseField = \cases
-      Nothing -> error "nothing"
-      (Just bs) -> case valueParser bool bs of
+    parseField :: ByteString -> Bool
+    parseField bs = case valueParser bool bs of
         Left e -> error "parse error"
         Right t -> t
 
 instance FromField Int where
-    parseField :: Maybe ByteString -> Int
-    parseField = \cases
-      Nothing -> error "nothing"
-      (Just bs) -> case valueParser int bs of
+    parseField :: ByteString -> Int
+    parseField bs = case valueParser int bs of
         Left e -> error "parse error"
         Right t -> t
 
 instance FromField a => FromField (Maybe a) where
-    parseField :: FromField a => Maybe ByteString -> Maybe a
-    parseField = \cases
+    parseField :: ByteString -> Maybe a
+    parseField = error "unexpected maybe"
+
+    parseField'Internal :: FromField a => Maybe ByteString -> Maybe a
+    parseField'Internal = \cases
       Nothing -> Nothing
-      justBs -> parseField justBs
+      (Just bs) -> Just $ parseField bs

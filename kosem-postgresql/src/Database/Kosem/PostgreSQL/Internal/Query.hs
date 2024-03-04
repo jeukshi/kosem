@@ -40,7 +40,7 @@ data Query result = Query
   , columns :: Int
   , rowProto :: result
   , rowParser :: [Maybe ByteString -> Any]
-  , params :: [ByteString]
+  , params :: [Maybe ByteString]
   , astS :: String
   }
 
