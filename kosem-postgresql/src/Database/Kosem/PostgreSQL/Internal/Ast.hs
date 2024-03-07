@@ -196,8 +196,8 @@ instance ToRawSql (AliasedExpr SqlType) where
     (WithAlias expr alias (Just as)) ->
       toRawSql expr <-> toRawSql as <-> textToBuilder alias
 
-pgBoolNullable :: SqlType
-pgBoolNullable = Scalar "boolean" Nullable
+pgBoolean :: IsNullable -> SqlType
+pgBoolean = Scalar "boolean"
 
 pgUnknown :: IsNullable -> SqlType
 pgUnknown = Scalar "unknown"

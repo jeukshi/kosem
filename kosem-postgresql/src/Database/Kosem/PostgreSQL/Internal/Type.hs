@@ -30,7 +30,7 @@ tcWhereClause = \cases
     Nothing -> return Nothing
     (Just (Where expr)) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr ~/=~ pgBoolNullable) do
+        when (exprType tyExpr ~/=~ pgBoolean Nullable) do
             throwError $ Err "argument of 'WHERE' must be type 'boolean'"
         return $ Just $ Where tyExpr
 
@@ -65,7 +65,7 @@ tcJoinCondition = \cases
     JcUsing -> return JcUsing
     (JcOn expr) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr ~/=~ pgBoolNullable) do
+        when (exprType tyExpr ~/=~ pgBoolean Nullable) do
             throwError $ Err "argument of 'JOIN/ON' must be type 'boolean'"
         return $ JcOn tyExpr
 
@@ -77,17 +77,17 @@ exprType = \cases
     (EParamMaybe _ _ ty) -> ty
     (ELit _ ty) -> ty
     (ECol _ ty) -> ty
-    (ENot{}) -> pgBoolNullable
-    (EAnd{}) -> pgBoolNullable
-    (EOr{}) -> pgBoolNullable
-    (ELessThan{}) -> pgBoolNullable
-    (EGreaterThan{}) -> pgBoolNullable
-    (ELessThanOrEqualTo{}) -> pgBoolNullable
-    (EGreaterThanOrEqualTo{}) -> pgBoolNullable
-    (EEqual{}) -> pgBoolNullable
-    (ENotEqual{}) -> pgBoolNullable
-    (EBetween{}) -> pgBoolNullable
-    (ENotBetween{}) -> pgBoolNullable
+    (ENot{}) -> pgBoolean Nullable
+    (EAnd{}) -> pgBoolean Nullable
+    (EOr{}) -> pgBoolean Nullable
+    (ELessThan{}) -> pgBoolean Nullable
+    (EGreaterThan{}) -> pgBoolean Nullable
+    (ELessThanOrEqualTo{}) -> pgBoolean Nullable
+    (EGreaterThanOrEqualTo{}) -> pgBoolean Nullable
+    (EEqual{}) -> pgBoolean Nullable
+    (ENotEqual{}) -> pgBoolean Nullable
+    (EBetween{}) -> pgBoolean Nullable
+    (ENotBetween{}) -> pgBoolean Nullable
 
 tcExpr :: Expr () -> Tc (Expr SqlType)
 tcExpr = \cases
@@ -139,7 +139,7 @@ tcExpr = \cases
     (ENot not expr) -> do
         tyExpr <- tcExpr expr
         let ty = exprType tyExpr
-        when (ty ~/=~ pgBoolNullable) do
+        when (ty ~/=~ pgBoolean Nullable) do
             throwError $ Err "argument of 'NOT' must be type 'boolean'"
         return $ ENot not tyExpr
     (EAnd lhs and rhs) -> do
@@ -190,9 +190,9 @@ tcExpr = \cases
     tyMustBeBoolean func lhs rhs = do
         tyLhs <- tcExpr lhs
         tyRhs <- tcExpr rhs
-        when (exprType tyLhs ~/=~ pgBoolNullable) do
+        when (exprType tyLhs ~/=~ pgBoolean Nullable) do
             throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
-        when (exprType tyRhs ~/=~ pgBoolNullable) do
+        when (exprType tyRhs ~/=~ pgBoolean Nullable) do
             throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
         return (tyLhs, tyRhs)
 
