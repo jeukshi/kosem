@@ -73,11 +73,9 @@ lookupTypes = \cases
   isInMap :: SqlType -> (PgType, Name) -> Bool
   isInMap sqlType (pgType, _) = case sqlType of
     Scalar ty _ -> ty == pgType
-    (UnknownParam{}) -> error $ "unknown type: " <> show sqlType
   toPgType :: SqlType -> PgType
   toPgType = \cases
     (Scalar ty _) -> ty
-    (UnknownParam{}) -> error "unknown type"
 
 unsafeSql :: Database -> String -> Q Exp
 unsafeSql database userInput = do

@@ -121,13 +121,13 @@ tcExpr = \cases
             getParamNumber name >>= \case
                 Just ix -> return ix
                 Nothing -> addParam name
-        return $ EParam paramNumber name (UnknownParam NonNullable)
+        return $ EParam paramNumber name (pgUnknown NonNullable)
     (EParamMaybe _ name ()) -> do
         paramNumber <-
             getParamNumber name >>= \case
                 Just ix -> return ix
                 Nothing -> addParam name
-        return $ EParamMaybe paramNumber name (UnknownParam Nullable)
+        return $ EParamMaybe paramNumber name (pgUnknown Nullable)
     (ELit litVal _) -> case litVal of
         NumericLiteral -> return $ ELit litVal (Scalar "numeric" NonNullable)
         TextLiteral _ -> return $ ELit litVal (Scalar "text" NonNullable)

@@ -199,6 +199,9 @@ instance ToRawSql (AliasedExpr SqlType) where
 pgBoolNullable :: SqlType
 pgBoolNullable = Scalar "boolean" Nullable
 
+pgUnknown :: IsNullable -> SqlType
+pgUnknown = Scalar "unknown"
+
 data IsNullable
   = NonNullable
   | Nullable
@@ -208,23 +211,19 @@ data IsNullable
 (~==~) :: SqlType -> SqlType -> Bool
 (~==~) = \cases
   (Scalar lhs _) (Scalar rhs _) -> lhs == rhs
-  _ _ -> False
 
 -- | Not equals, ignoring IsNullable
 (~/=~) :: SqlType -> SqlType -> Bool
 (~/=~) = \cases
   (Scalar lhs _) (Scalar rhs _) -> lhs /= rhs
-  _ _ -> False
 
 data SqlType
   = Scalar PgType IsNullable
-  | UnknownParam IsNullable
   deriving (Show, Eq)
 
 isNullable :: SqlType -> IsNullable
 isNullable = \cases
   (Scalar _ nullable) -> nullable
-  (UnknownParam nullable) -> nullable
 
 instance ToRawSql SqlType where
   toRawSql _ = ""
