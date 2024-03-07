@@ -30,7 +30,7 @@ tcWhereClause = \cases
     Nothing -> return Nothing
     (Just (Where expr)) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr ~/=~ pgBoolean Nullable) do
+        when (exprType tyExpr ~/=~ PgBoolean Nullable) do
             throwError $ Err "argument of 'WHERE' must be type 'boolean'"
         return $ Just $ Where tyExpr
 
@@ -65,7 +65,7 @@ tcJoinCondition = \cases
     JcUsing -> return JcUsing
     (JcOn expr) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr ~/=~ pgBoolean Nullable) do
+        when (exprType tyExpr ~/=~ PgBoolean Nullable) do
             throwError $ Err "argument of 'JOIN/ON' must be type 'boolean'"
         return $ JcOn tyExpr
 
@@ -77,17 +77,17 @@ exprType = \cases
     (EParamMaybe _ _ ty) -> ty
     (ELit _ ty) -> ty
     (ECol _ ty) -> ty
-    (ENot{}) -> pgBoolean Nullable
-    (EAnd{}) -> pgBoolean Nullable
-    (EOr{}) -> pgBoolean Nullable
-    (ELessThan{}) -> pgBoolean Nullable
-    (EGreaterThan{}) -> pgBoolean Nullable
-    (ELessThanOrEqualTo{}) -> pgBoolean Nullable
-    (EGreaterThanOrEqualTo{}) -> pgBoolean Nullable
-    (EEqual{}) -> pgBoolean Nullable
-    (ENotEqual{}) -> pgBoolean Nullable
-    (EBetween{}) -> pgBoolean Nullable
-    (ENotBetween{}) -> pgBoolean Nullable
+    (ENot{}) -> PgBoolean Nullable
+    (EAnd{}) -> PgBoolean Nullable
+    (EOr{}) -> PgBoolean Nullable
+    (ELessThan{}) -> PgBoolean Nullable
+    (EGreaterThan{}) -> PgBoolean Nullable
+    (ELessThanOrEqualTo{}) -> PgBoolean Nullable
+    (EGreaterThanOrEqualTo{}) -> PgBoolean Nullable
+    (EEqual{}) -> PgBoolean Nullable
+    (ENotEqual{}) -> PgBoolean Nullable
+    (EBetween{}) -> PgBoolean Nullable
+    (ENotBetween{}) -> PgBoolean Nullable
 
 tcExpr :: Expr () -> Tc (Expr SqlType)
 tcExpr = \cases
@@ -121,17 +121,17 @@ tcExpr = \cases
             getParamNumber name >>= \case
                 Just ix -> return ix
                 Nothing -> addParam name
-        return $ EParam paramNumber name (pgUnknown NonNullable)
+        return $ EParam paramNumber name (PgUnknown NonNullable)
     (EParamMaybe _ name ()) -> do
         paramNumber <-
             getParamNumber name >>= \case
                 Just ix -> return ix
                 Nothing -> addParam name
-        return $ EParamMaybe paramNumber name (pgUnknown Nullable)
+        return $ EParamMaybe paramNumber name (PgUnknown Nullable)
     (ELit litVal _) -> case litVal of
-        NumericLiteral -> return $ ELit litVal (Scalar "numeric" NonNullable)
-        TextLiteral _ -> return $ ELit litVal (Scalar "text" NonNullable)
-        (BoolLiteral _) -> return $ ELit litVal (Scalar "boolean" NonNullable)
+        NumericLiteral -> return $ ELit litVal (PgNumeric NonNullable)
+        TextLiteral _ -> return $ ELit litVal (PgText NonNullable)
+        (BoolLiteral _) -> return $ ELit litVal (PgBoolean NonNullable)
     (ECol colName _) -> do
         envCol <- columnByName colName
         -- FIXME NonNullable from colDef
@@ -139,7 +139,7 @@ tcExpr = \cases
     (ENot not expr) -> do
         tyExpr <- tcExpr expr
         let ty = exprType tyExpr
-        when (ty ~/=~ pgBoolean Nullable) do
+        when (ty ~/=~ PgBoolean Nullable) do
             throwError $ Err "argument of 'NOT' must be type 'boolean'"
         return $ ENot not tyExpr
     (EAnd lhs and rhs) -> do
@@ -190,9 +190,9 @@ tcExpr = \cases
     tyMustBeBoolean func lhs rhs = do
         tyLhs <- tcExpr lhs
         tyRhs <- tcExpr rhs
-        when (exprType tyLhs ~/=~ pgBoolean Nullable) do
+        when (exprType tyLhs ~/=~ PgBoolean Nullable) do
             throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
-        when (exprType tyRhs ~/=~ pgBoolean Nullable) do
+        when (exprType tyRhs ~/=~ PgBoolean Nullable) do
             throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
         return (tyLhs, tyRhs)
 
