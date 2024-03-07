@@ -30,9 +30,6 @@ data STerm t
   = Select (NonEmpty (AliasedExpr t)) (Maybe (From t)) (Maybe (Where t))
   deriving (Show)
 
-_where :: STerm SqlType -> Maybe (Where SqlType)
-_where (Select _ _ whereClause) = whereClause
-
 collectExprs :: STerm SqlType -> [Expr SqlType]
 collectExprs = \cases
   (Select output mbFrom mbWhere) ->
