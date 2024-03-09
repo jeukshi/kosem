@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternSynonyms #-}
 
 module Database.Kosem.PostgreSQL.Internal.Ast where
 
@@ -10,19 +9,12 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.List.NonEmpty qualified as NE
 import Data.Text (Text)
 import Data.Text qualified as T
-import Database.Kosem.PostgreSQL.Schema.Internal.Parser (PgType (..))
+import Database.Kosem.PostgreSQL.Internal.PgBuiltin
+import Database.Kosem.PostgreSQL.Internal.Types
+import Database.Kosem.PostgreSQL.Internal.Classes
 
 astToRawSql :: STerm SqlType -> ByteString
 astToRawSql = toStrict . toLazyByteString . toRawSql
-
-class ToRawSql a where
-  toRawSql :: a -> Builder
-
--- TODO this prolly can be done better?
--- Or maybe we will switch to parsing ByteString instead of Text
--- in the first place.
-textToBuilder :: Text -> Builder
-textToBuilder = stringUtf8 . T.unpack
 
 (<->) :: Builder -> Builder -> Builder
 (<->) lhs rhs = lhs <> " " <> rhs
@@ -134,8 +126,6 @@ instance ToRawSql Outer where
   toRawSql :: Outer -> Builder
   toRawSql _ = "OUTER"
 
-type ColumnName = Text
-
 type ColumnAlias = Text
 
 data As = As
@@ -198,27 +188,6 @@ instance ToRawSql (AliasedExpr SqlType) where
     (WithAlias expr alias (Just as)) ->
       toRawSql expr <-> toRawSql as <-> textToBuilder alias
 
-pattern PgBoolean :: IsNullable -> SqlType
-pattern PgBoolean a <- Scalar "boolean" a where
-  PgBoolean a = Scalar "boolean" a
-
-pattern PgUnknown :: IsNullable -> SqlType
-pattern PgUnknown a <- Scalar "unknown" a where
-  PgUnknown a = Scalar "unknown" a
-
-pattern PgNumeric :: IsNullable -> SqlType
-pattern PgNumeric a <- Scalar "numeric" a where
-  PgNumeric a = Scalar "numeric" a
-
-pattern PgText :: IsNullable -> SqlType
-pattern PgText a <- Scalar "text" a where
-  PgText a = Scalar "text" a
-
-data IsNullable
-  = NonNullable
-  | Nullable
-  deriving (Show, Eq)
-
 -- | Equals, ignoring IsNullable
 (~==~) :: SqlType -> SqlType -> Bool
 (~==~) = \cases
@@ -229,9 +198,6 @@ data IsNullable
 (~/=~) = \cases
   (Scalar lhs _) (Scalar rhs _) -> lhs /= rhs
 
-data SqlType
-  = Scalar PgType IsNullable
-  deriving (Show, Eq)
 
 isNullable :: SqlType -> IsNullable
 isNullable = \cases
@@ -298,7 +264,7 @@ instance ToRawSql (Expr SqlType) where
     (EParamMaybe n _ _) -> textToBuilder (T.pack $ "$" <> show n)
     (EParens expr _) -> "(" <> toRawSql expr <> ")"
     (ELit lit _) -> toRawSql lit
-    (ECol columnName _) -> textToBuilder columnName
+    (ECol columnName _) -> toRawSql columnName
     (EPgCast lhs ty _) -> toRawSql lhs <> "::" <> textToBuilder ty
     (ENot not rhs) -> toRawSql not <-> toRawSql rhs
     (EAnd lhs and rhs) -> toRawSql lhs <-> toRawSql and <-> toRawSql rhs

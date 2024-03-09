@@ -14,6 +14,8 @@ import Text.Megaparsec.Char.Lexer qualified as L
 import Data.String (IsString)
 import Language.Haskell.TH.Lift (Lift)
 import Language.Haskell.TH (Name)
+import Database.Kosem.PostgreSQL.Internal.PgBuiltin
+import Database.Kosem.PostgreSQL.Internal.Types
 
 labelS :: Parser Text
 labelS = lexemeS dbLabel
@@ -30,7 +32,6 @@ tableNameP = do
     tableName <- labelS
     return tableName
 
-
 databaseNameP :: Parser Text
 databaseNameP = do
     databaseK
@@ -41,37 +42,6 @@ databaseNameP = do
 data TableItem
     = TableColumn ColumnName PgType
     | TableConstraint
-    deriving (Show, Eq, Lift)
-
-newtype ColumnName = ColumnName Text
-   deriving Show via Text
-   deriving Eq via Text
-   deriving IsString via Text
-   deriving (Lift)
-
-newtype PgType = PgType { unPgType :: Text }
-   deriving Show via Text
-   deriving Eq via Text
-   deriving IsString via Text
-   deriving (Lift)
-
-data Database = Database
-  { name :: Text
-  , typesMap :: [(PgType, Name)]
-  , tables :: [Table]
-  }
-  deriving (Show, Eq, Lift)
-
-data Table = Table
-    { name :: Text
-    , columns :: [Column]
-    }
-    deriving (Show, Eq, Lift)
-
-data Column = Column
-    { name :: ColumnName
-    , typeName :: PgType
-    }
     deriving (Show, Eq, Lift)
 
 tableP :: Parser Table -- header and list items
@@ -87,6 +57,9 @@ tableItemP = lexemeS do
     columnName <- ColumnName <$> labelS <?> "column name"
     pgType <- PgType <$> labelS <?> "column data type"
     return $ Column columnName pgType
+
+isNullableP :: Parser IsNullable
+isNullableP = undefined
 
 schemaP :: Parser Database
 schemaP = lexeme do

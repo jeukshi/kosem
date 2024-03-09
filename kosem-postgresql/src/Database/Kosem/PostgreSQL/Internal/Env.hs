@@ -10,7 +10,7 @@ import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT), asks)
 import Control.Monad.State.Strict (MonadState (get, put), StateT (runStateT), evalStateT)
 import Control.Monad.Trans (MonadTrans, lift)
 import Data.Text (Text)
-import Database.Kosem.PostgreSQL.Schema.Internal.Parser
+import Database.Kosem.PostgreSQL.Internal.Types
 
 data IntroType
     = Subquery
@@ -57,7 +57,7 @@ class (Monad m) => MonadTc m where
     getEnv :: m Env
     setEnv :: m Env
     getTableByName :: Text -> m [Table]
-    getColumnByName :: Text -> m [Field]
+    getColumnByName :: ColumnName -> m [Field]
     addFieldsToEnv :: [Field] -> m ()
     getParamNumber :: Text -> m (Maybe Int)
     addParam :: Text -> m Int
@@ -81,9 +81,9 @@ instance MonadTc TcM where
     getTableByName tableName =
         asks (filter (\table -> table.name == tableName) . tables)
 
-    getColumnByName :: Text -> TcM [Field]
+    getColumnByName :: ColumnName -> TcM [Field]
     getColumnByName name =
-        filter (\e -> e.label == ColumnName name)
+        filter (\e -> e.label == name)
             <$> fmap (.fields) get
 
     getParamNumber :: Text -> TcM (Maybe Int)

@@ -19,6 +19,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Debug (dbg)
 import Text.Pretty.Simple
 import Prelude hiding (takeWhile)
+import Database.Kosem.PostgreSQL.Internal.Types
 
 data Token = Token SourcePos (STerm ())
 
@@ -220,7 +221,7 @@ exprLitP = lexeme do
 
 exprColP :: Parser (Expr ())
 exprColP = lexeme do
-    flip ECol () <$> labelP
+    flip ECol () <$> (ColumnName <$> labelP)
 
 exprAndP :: Parser (Expr ())
 exprAndP = do

@@ -6,7 +6,6 @@
 module Database.Kosem.PostgreSQL.Internal.TH where
 
 import Data.Text (Text)
-import Database.Kosem.PostgreSQL.Internal.Ast (IsNullable (..))
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.ToField (ToField (toField'Internal))
@@ -14,6 +13,7 @@ import GHC.Records
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import Unsafe.Coerce (unsafeCoerce)
+import Database.Kosem.PostgreSQL.Internal.Types
 
 genRowType :: [(String, Name, IsNullable)] -> Q Type
 genRowType columns = return $ AppT (ConT ''Row) (go columns)

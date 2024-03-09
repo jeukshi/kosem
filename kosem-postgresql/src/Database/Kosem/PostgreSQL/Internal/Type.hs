@@ -7,9 +7,12 @@ import Control.Monad (when)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
+import Data.Text qualified as T
 import Database.Kosem.PostgreSQL.Internal.Ast
 import Database.Kosem.PostgreSQL.Internal.Env
 import Database.Kosem.PostgreSQL.Internal.Parser
+import Database.Kosem.PostgreSQL.Internal.PgBuiltin
+import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Text.Megaparsec (parseMaybe, parseTest)
 
@@ -204,12 +207,12 @@ tcExpr = \cases
             throwError $ Err $ "arguments of '" <> func <> "' must be of the same type"
         return (tyLhs, tyRhs)
 
-columnByName :: Text -> Tc Field
+columnByName :: ColumnName -> Tc Field
 columnByName name =
     getColumnByName name >>= \case
-        [] -> throwError $ Err ("column does not exist: " <> name)
+        [] -> throwError $ Err ("column does not exist: " <> T.pack (show name))
         [t] -> return t
-        ts -> throwError $ Err ("Column name is ambigious: " <> name)
+        ts -> throwError $ Err ("Column name is ambigious: " <> T.pack (show name))
 
 tableByName :: Text -> Tc Table
 tableByName name =

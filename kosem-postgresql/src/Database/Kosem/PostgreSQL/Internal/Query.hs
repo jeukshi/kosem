@@ -12,12 +12,6 @@ import Data.List.NonEmpty (toList)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Database.Kosem.PostgreSQL.Internal.Ast
-import Database.Kosem.PostgreSQL.Internal.Ast (
-  AliasedExpr (..),
-  Expr (..),
-  STerm (Select),
-  SqlType (..),
- )
 import Database.Kosem.PostgreSQL.Internal.Env (runProgram)
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Parser (selectCore)
@@ -25,8 +19,7 @@ import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
 import Database.Kosem.PostgreSQL.Internal.TH
 import Database.Kosem.PostgreSQL.Internal.Type (exprType, typecheck)
-import Database.Kosem.PostgreSQL.Schema.Internal.Parser (Database (..), PgType, unPgType)
-import Database.Kosem.PostgreSQL.Schema.Internal.Parser qualified
+import Database.Kosem.PostgreSQL.Internal.Types
 import GHC.Exts (Any)
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
@@ -37,25 +30,25 @@ import Unsafe.Coerce (unsafeCoerce)
 -- TODO type para `database` - database token
 data Query result = Query
   { statement :: ByteString
-  , columns :: Int
+  , columnsNumber :: Int
   , rowProto :: result
   , rowParser :: [Maybe ByteString -> Any]
   , params :: [Maybe ByteString]
   , astS :: String
   }
 
-resultFromAst :: STerm SqlType -> Either String [(Text, SqlType)]
+resultFromAst :: STerm SqlType -> Either String [(ColumnName, SqlType)]
 resultFromAst (Select resultColumns _ _) = do
   let (errors, columns) = partitionEithers $ map columnName (toList resultColumns)
   case errors of
     [] -> Right columns
     (x : xs) -> Left x
  where
-  columnName :: AliasedExpr SqlType -> Either String (Text, SqlType)
+  columnName :: AliasedExpr SqlType -> Either String (ColumnName, SqlType)
   columnName = \cases
-    (WithAlias expr alias _) -> Right (alias, exprType expr)
+    (WithAlias expr alias _) -> Right (ColumnName alias, exprType expr)
     (WithoutAlias (ECol columnname ty)) -> Right (columnname, ty)
-    (WithoutAlias (EPgCast (EParam _ name _) _ ty)) -> Right (name, ty)
+    (WithoutAlias (EPgCast (EParam _ name _) _ ty)) -> Right (ColumnName name, ty)
     -- FIXME error msg
     (WithoutAlias _) -> Left "every result should have an alias"
 
@@ -91,7 +84,7 @@ unsafeSql database userInput = do
   let resultColumns = case resultFromAst typedAst of
         Left e -> error (show e)
         Right resultColumns -> resultColumns
-  let hsTypes = lookupTypes resultColumns (typesMap database)
+  let hsTypes = lookupTypes (map (first unColumnName) resultColumns) (typesMap database)
   let queryToRun = astToRawSql typedAst
   let params =
         map (\(_, l, t) -> (l, t))
@@ -106,7 +99,7 @@ unsafeSql database userInput = do
   [e|
     Query
       { statement = queryToRun
-      , columns = numberOfColumns
+      , columnsNumber = numberOfColumns
       , rowProto = Row [] :: $(genRowType hsTypes)
       , rowParser = $(genRowParser hsTypes)
       , params = $(genParamsList hsParams)

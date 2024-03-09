@@ -4,6 +4,7 @@
 module Test.Database.Kosem.PostgreSQL.Schema.Internal.Parser where
 
 import Database.Kosem.PostgreSQL.Internal.ParserUtils
+import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Test.Hspec
 import Test.Hspec.Megaparsec
