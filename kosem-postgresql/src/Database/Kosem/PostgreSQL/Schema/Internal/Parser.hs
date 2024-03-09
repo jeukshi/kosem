@@ -40,7 +40,7 @@ databaseNameP = do
 
 -- TODO only for parser
 data TableItem
-    = TableColumn ColumnName PgType
+    = TableColumn Identifier PgType
     | TableConstraint
     deriving (Show, Eq, Lift)
 
@@ -54,7 +54,7 @@ tableP = L.nonIndented spaceNewlineP (L.indentBlock spaceNewlineP p)
 
 tableItemP :: Parser Column
 tableItemP = lexemeS do
-    columnName <- ColumnName <$> labelS <?> "column name"
+    columnName <- Identifier <$> labelS <?> "column name"
     pgType <- PgType <$> labelS <?> "column data type"
     return $ Column columnName pgType
 

@@ -161,15 +161,19 @@ termP = lexeme do
         , paramP
         ]
 
+identifierP :: Parser Identifier
+identifierP = Identifier <$> labelP
+
+
 paramP :: Parser (Expr ())
 paramP = lexeme do
   symbol ":"
-  (EParam 0 <$> labelP) <*> pure ()
+  (EParam 0 <$> identifierP) <*> pure ()
 
 paramMaybeP :: Parser (Expr ())
 paramMaybeP = lexeme do
   symbol ":?"
-  (EParamMaybe 0 <$> labelP) <*> pure ()
+  (EParamMaybe 0 <$> identifierP) <*> pure ()
 
 pgCastP :: Parser Text
 pgCastP = lexeme do
@@ -221,7 +225,7 @@ exprLitP = lexeme do
 
 exprColP :: Parser (Expr ())
 exprColP = lexeme do
-    flip ECol () <$> (ColumnName <$> labelP)
+    flip ECol () <$> (Identifier <$> labelP)
 
 exprAndP :: Parser (Expr ())
 exprAndP = do

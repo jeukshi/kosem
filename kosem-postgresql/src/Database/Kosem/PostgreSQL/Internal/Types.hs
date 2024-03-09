@@ -2,40 +2,45 @@
 
 module Database.Kosem.PostgreSQL.Internal.Types where
 
-import Language.Haskell.TH.Lift (Lift)
-import Data.Text (Text)
-import Data.String (IsString)
-import Language.Haskell.TH (Name)
-import Database.Kosem.PostgreSQL.Internal.Classes
 import Data.ByteString.Builder (Builder)
+import Data.Coerce (coerce)
+import Data.String (IsString)
+import Data.Text (Text)
+import Data.Text qualified as T
+import Database.Kosem.PostgreSQL.Internal.Classes
+import Language.Haskell.TH (Name)
+import Language.Haskell.TH.Lift (Lift)
 
 data IsNullable
-  = NonNullable
-  | Nullable
-  deriving (Show, Eq)
+    = NonNullable
+    | Nullable
+    deriving (Show, Eq)
 
-newtype PgType = PgType { unPgType :: Text }
-   deriving Show via Text
-   deriving Eq via Text
-   deriving IsString via Text
-   deriving (Lift)
+newtype PgType = PgType {unPgType :: Text}
+    deriving (Show) via Text
+    deriving (Eq) via Text
+    deriving (IsString) via Text
+    deriving (Lift)
 
-newtype ColumnName = ColumnName { unColumnName :: Text }
-   deriving Show via Text
-   deriving Eq via Text
-   deriving IsString via Text
-   deriving (Lift)
+newtype Identifier = Identifier Text
+    deriving (Show) via Text
+    deriving (Eq) via Text
+    deriving (IsString) via Text
+    deriving (Lift)
 
-instance ToRawSql ColumnName where
-  toRawSql :: ColumnName -> Builder
-  toRawSql = textToBuilder . unColumnName
+identifierToString :: Identifier -> String
+identifierToString = T.unpack . coerce
+
+instance ToRawSql Identifier where
+    toRawSql :: Identifier -> Builder
+    toRawSql = textToBuilder . coerce
 
 data Database = Database
-  { name :: Text
-  , typesMap :: [(PgType, Name)]
-  , tables :: [Table]
-  }
-  deriving (Show, Eq, Lift)
+    { name :: Text
+    , typesMap :: [(PgType, Name)]
+    , tables :: [Table]
+    }
+    deriving (Show, Eq, Lift)
 
 data Table = Table
     { name :: Text
@@ -44,11 +49,11 @@ data Table = Table
     deriving (Show, Eq, Lift)
 
 data Column = Column
-    { name :: ColumnName
+    { name :: Identifier
     , typeName :: PgType
     }
     deriving (Show, Eq, Lift)
 
 data SqlType
-  = Scalar PgType IsNullable
-  deriving (Show, Eq)
+    = Scalar PgType IsNullable
+    deriving (Show, Eq)

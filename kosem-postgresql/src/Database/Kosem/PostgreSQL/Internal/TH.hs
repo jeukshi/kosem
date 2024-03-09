@@ -9,43 +9,49 @@ import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.ToField (ToField (toField'Internal))
+import Database.Kosem.PostgreSQL.Internal.Types
 import GHC.Records
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import Unsafe.Coerce (unsafeCoerce)
-import Database.Kosem.PostgreSQL.Internal.Types
 
-genRowType :: [(String, Name, IsNullable)] -> Q Type
+genRowType :: [(Identifier, Name, IsNullable)] -> Q Type
 genRowType columns = return $ AppT (ConT ''Row) (go columns)
   where
     go = \cases
         (column : columns) -> AppT (makeTuple column) (go columns)
         [] -> PromotedNilT
-    -- \| `label := type`
     makeTuple = \cases
-        (label, ty, NonNullable) ->
+        -- \| `label := type`
+        (identifier, ty, NonNullable) ->
             AppT
                 PromotedConsT
                 ( AppT
-                    (AppT (ConT ''(:=)) (LitT (StrTyLit label)))
+                    ( AppT
+                        (ConT ''(:=))
+                        (LitT (StrTyLit (identifierToString identifier)))
+                    )
                     (ConT ty)
                 )
-    -- \| `label := (Maybe type)`
-        (label, ty, Nullable) ->
+        -- \| `label := (Maybe type)`
+        (identifier, ty, Nullable) ->
             AppT
                 PromotedConsT
                 ( AppT
-                    (AppT (ConT ''(:=)) (LitT (StrTyLit label)))
+                    ( AppT
+                        (ConT ''(:=))
+                        (LitT (StrTyLit (identifierToString identifier)))
+                    )
                     (AppT (ConT ''Maybe) (ConT ty))
                 )
 
-genRowParser :: [(String, Name, IsNullable)] -> Q Exp
+genRowParser :: [(Identifier, Name, IsNullable)] -> Q Exp
 genRowParser names =
     return
         . ListE
         $ map genParseField names
   where
-    genParseField :: (String, Name, IsNullable) -> Exp
+    genParseField :: (Identifier, Name, IsNullable) -> Exp
     genParseField = \cases
         (_, ty, NonNullable) ->
             -- \| `unsafeCoerce . parseField'Internal @Text`
@@ -65,7 +71,7 @@ genRowParser names =
                     )
                 )
 
-genParamsList :: [(String, Name, IsNullable)] -> Q Exp
+genParamsList :: [(Identifier, Name, IsNullable)] -> Q Exp
 genParamsList = \cases
     [] -> return $ ConE '[]
     names ->
@@ -73,16 +79,16 @@ genParamsList = \cases
             ListE $
                 map genToField names
   where
-    genToField :: (String, Name, IsNullable) -> Exp
+    genToField :: (Identifier, Name, IsNullable) -> Exp
     genToField = \cases
         (name, ty, NonNullable) -> do
-            let hsName = mkName name
+            let hsName = mkName (identifierToString name)
             -- \| toField'Internal @Type variable
             AppE
                 (AppTypeE (VarE 'toField'Internal) (ConT ty))
                 (VarE hsName)
         (name, ty, Nullable) -> do
-            let hsName = mkName name
+            let hsName = mkName (identifierToString name)
             -- \| toField'Internal @(Maybe Type) variable
             AppE
                 ( AppTypeE

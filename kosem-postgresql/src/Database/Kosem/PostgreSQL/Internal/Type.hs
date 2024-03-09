@@ -207,7 +207,7 @@ tcExpr = \cases
             throwError $ Err $ "arguments of '" <> func <> "' must be of the same type"
         return (tyLhs, tyRhs)
 
-columnByName :: ColumnName -> Tc Field
+columnByName :: Identifier -> Tc Field
 columnByName name =
     getColumnByName name >>= \case
         [] -> throwError $ Err ("column does not exist: " <> T.pack (show name))

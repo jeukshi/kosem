@@ -38,30 +38,30 @@ data Query result = Query
   , astS :: String
   }
 
-resultFromAst :: STerm SqlType -> Either String [(ColumnName, SqlType)]
+resultFromAst :: STerm SqlType -> Either String [(Identifier, SqlType)]
 resultFromAst (Select resultColumns _ _) = do
   let (errors, columns) = partitionEithers $ map columnName (toList resultColumns)
   case errors of
     [] -> Right columns
     (x : xs) -> Left x
  where
-  columnName :: AliasedExpr SqlType -> Either String (ColumnName, SqlType)
+  columnName :: AliasedExpr SqlType -> Either String (Identifier, SqlType)
   columnName = \cases
-    (WithAlias expr alias _) -> Right (ColumnName alias, exprType expr)
+    (WithAlias expr alias _) -> Right (Identifier alias, exprType expr)
     (WithoutAlias (ECol columnname ty)) -> Right (columnname, ty)
-    (WithoutAlias (EPgCast (EParam _ name _) _ ty)) -> Right (ColumnName name, ty)
+    (WithoutAlias (EPgCast (EParam _ name _) _ ty)) -> Right (name, ty)
     -- FIXME error msg
     (WithoutAlias _) -> Left "every result should have an alias"
 
-lookupTypes :: [(Text, SqlType)] -> [(PgType, Name)] -> [(String, Name, IsNullable)]
+lookupTypes :: [(Identifier, SqlType)] -> [(PgType, Name)] -> [(Identifier, Name, IsNullable)]
 lookupTypes = \cases
   (x : xs) mappings -> fromMapping x mappings : lookupTypes xs mappings
   [] _ -> []
  where
-  fromMapping :: (Text, SqlType) -> [(PgType, Name)] -> (String, Name, IsNullable)
+  fromMapping :: (Identifier, SqlType) -> [(PgType, Name)] -> (Identifier, Name, IsNullable)
   fromMapping (label, ty) mappings = case filter (isInMap ty) mappings of
     [] -> error $ "no mapping for type: " <> T.unpack (unPgType $ toPgType ty)
-    [(pgType, name)] -> (T.unpack label, name, isNullable ty)
+    [(pgType, name)] -> (label, name, isNullable ty)
     (x : xs) ->
       error $ "too many mapping for type: " <> T.unpack (unPgType $ toPgType ty)
   isInMap :: SqlType -> (PgType, Name) -> Bool
@@ -85,7 +85,7 @@ unsafeSql database userInput = do
   let resultColumns = case resultFromAst typedAst of
         Left e -> error (show e)
         Right resultColumns -> resultColumns
-  let hsTypes = lookupTypes (map (first unColumnName) resultColumns) (typesMap database)
+  let hsTypes = lookupTypes resultColumns (typesMap database)
   let queryToRun = astToRawSql typedAst
   let params =
         map (\(_, l, t) -> (l, t))

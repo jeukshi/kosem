@@ -19,14 +19,14 @@ data IntroType
 
 data Field = Field
     { alias :: Text
-    , label :: ColumnName
+    , label :: Identifier
     , typeName :: PgType
     }
     deriving (Show)
 
 data Env = Env
     { fields :: [Field]
-    , params :: [Text]
+    , params :: [Identifier]
     }
 
 emptyEnv :: Env
@@ -57,10 +57,10 @@ class (Monad m) => MonadTc m where
     getEnv :: m Env
     setEnv :: m Env
     getTableByName :: Text -> m [Table]
-    getColumnByName :: ColumnName -> m [Field]
+    getColumnByName :: Identifier -> m [Field]
     addFieldsToEnv :: [Field] -> m ()
-    getParamNumber :: Text -> m (Maybe Int)
-    addParam :: Text -> m Int
+    getParamNumber :: Identifier -> m (Maybe Int)
+    addParam :: Identifier -> m Int
 
     throwError :: TcError -> m a
 
@@ -81,12 +81,12 @@ instance MonadTc TcM where
     getTableByName tableName =
         asks (filter (\table -> table.name == tableName) . tables)
 
-    getColumnByName :: ColumnName -> TcM [Field]
+    getColumnByName :: Identifier -> TcM [Field]
     getColumnByName name =
         filter (\e -> e.label == name)
             <$> fmap (.fields) get
 
-    getParamNumber :: Text -> TcM (Maybe Int)
+    getParamNumber :: Identifier -> TcM (Maybe Int)
     getParamNumber name = do
         params <- fmap (.params) get
         case filter (\ixElem -> snd ixElem == name) (zip [1 ..] params) of
@@ -94,7 +94,7 @@ instance MonadTc TcM where
             [(ix, _)] -> return $ Just ix
             _ -> error "oops" -- FIXME
 
-    addParam :: Text -> TcM Int
+    addParam :: Identifier -> TcM Int
     addParam name = do
         currentEnv <- get
         put (currentEnv{params = currentEnv.params ++ [name]})

@@ -208,11 +208,11 @@ instance ToRawSql SqlType where
 
 data Expr t
   = EParens (Expr t) t
-  | EParam Int Text t
-  | EParamMaybe Int Text t
+  | EParam Int Identifier t
+  | EParamMaybe Int Identifier t
   | ELit LiteralValue t
-  | ECol ColumnName t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
-  | EPgCast (Expr t) Text t
+  | ECol Identifier t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
+  | EPgCast (Expr t) Text t -- TODO Identifier
   | -- | expression::type
     ENot Not (Expr t)
   | EAnd (Expr t) And (Expr t)
@@ -229,13 +229,13 @@ data Expr t
   | ENotBetween (Expr t) Not Between (Expr t) And (Expr t)
   deriving (Show)
 
-collectAllVariables :: STerm SqlType -> [(Int, Text, SqlType)]
+collectAllVariables :: STerm SqlType -> [(Int, Identifier, SqlType)]
 collectAllVariables = concatMap collectVariables . collectExprs
  where
-  collectVariables :: Expr SqlType -> [(Int, Text, SqlType)]
+  collectVariables :: Expr SqlType -> [(Int, Identifier, SqlType)]
   collectVariables expr = go expr []
    where
-    go :: Expr SqlType -> [(Int, Text, SqlType)] -> [(Int, Text, SqlType)]
+    go :: Expr SqlType -> [(Int, Identifier, SqlType)] -> [(Int, Identifier, SqlType)]
     go expr acc = case expr of
       (EParam n t ty) -> acc ++ [(n, t, ty)]
       (EParamMaybe n t ty) -> acc ++ [(n, t, ty)]
