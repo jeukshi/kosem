@@ -44,6 +44,7 @@ spec = around withDB $ do
                              where col = abc2
                                and :hello::boolean
                                and :ello::boolean
+                               and col || abc = 'abc'
                                 |]
             "it compiles" `shouldBe` "it compiles"
     describe "parameters" do

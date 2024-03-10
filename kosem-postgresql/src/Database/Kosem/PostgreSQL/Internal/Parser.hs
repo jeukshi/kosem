@@ -1,8 +1,10 @@
 module Database.Kosem.PostgreSQL.Internal.Parser where
 
-import Control.Monad (void)
-import Control.Monad.Combinators.Expr
-    ( makeExprParser, Operator (..) )
+import Control.Monad (void, when)
+import Control.Monad.Combinators.Expr (
+    Operator (..),
+    makeExprParser,
+ )
 import Control.Monad.Combinators.NonEmpty qualified as Combinators.NonEmpty
 import Control.Monad.Cont (MonadPlus (mzero))
 import Data.Char (isNumber)
@@ -14,13 +16,13 @@ import Data.Text qualified as T
 import Data.Void (Void)
 import Database.Kosem.PostgreSQL.Internal.Ast
 import Database.Kosem.PostgreSQL.Internal.ParserUtils
+import Database.Kosem.PostgreSQL.Internal.Types
 import Text.Megaparsec
 import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Debug (dbg)
 import Text.Pretty.Simple
 import Prelude hiding (takeWhile)
-import Database.Kosem.PostgreSQL.Internal.Types
 
 data Token = Token SourcePos (STerm ())
 
@@ -167,13 +169,13 @@ identifierP = Identifier <$> labelP
 
 paramP :: Parser (Expr ())
 paramP = lexeme do
-  symbol ":"
-  (EParam 0 <$> identifierP) <*> pure ()
+    symbol ":"
+    (EParam 0 <$> identifierP) <*> pure ()
 
 paramMaybeP :: Parser (Expr ())
 paramMaybeP = lexeme do
-  symbol ":?"
-  (EParamMaybe 0 <$> identifierP) <*> pure ()
+    symbol ":?"
+    (EParamMaybe 0 <$> identifierP) <*> pure ()
 
 pgCastP :: Parser Identifier
 pgCastP = lexeme do
@@ -182,13 +184,50 @@ pgCastP = lexeme do
 
 operatorP :: Text -> Parser Database.Kosem.PostgreSQL.Internal.Types.Operator
 operatorP sym = lexeme do
-  Operator <$> symbol sym
+    Operator <$> symbol sym
+
+anyOperatorP :: Parser Database.Kosem.PostgreSQL.Internal.Types.Operator
+anyOperatorP = lexeme do
+    operator <- T.pack <$> some allowedSymbols
+    when (operator == "=>") do
+        fail "=> cannot be used as an operator name"
+    -- TODO implement other restictions
+    -- https://www.postgresql.org/docs/current/sql-createoperator.html
+    return $ Operator operator
+  where
+    allowedSymbols :: Parser Char
+    allowedSymbols = choice
+                [ C.char '+'
+                , C.char '-'
+                , C.char '*'
+                , C.char '/'
+                , C.char '<'
+                , C.char '>'
+                , C.char '='
+                , C.char '~'
+                , C.char '!'
+                , C.char '@'
+                , C.char '#'
+                , C.char '%'
+                , C.char '^'
+                , C.char '&'
+                , C.char '|'
+                , C.char '`'
+                , C.char '?'
+                ]
 
 binOpP :: Text -> Parser (Expr () -> Expr () -> Expr ())
 binOpP sym = mkBinOp <$> operatorP sym
   where
     mkBinOp operator lhs rhs =
-      EBinOp lhs operator rhs ()
+        EBinOp lhs operator rhs ()
+
+anyBinOpP :: Parser (Expr () -> Expr () -> Expr ())
+anyBinOpP = lexeme do
+    mkBinOp <$> anyOperatorP
+  where
+    mkBinOp operator lhs rhs =
+        EBinOp lhs operator rhs ()
 
 exprP :: Parser (Expr ())
 exprP = makeExprParser termP operatorsTable
@@ -197,6 +236,23 @@ exprP = makeExprParser termP operatorsTable
         -- TODO precedence:
         -- https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE
         [ [Postfix do mkCast <$> pgCastP <*> pure ()]
+        , [InfixL do binOpP "^"]
+        ,
+            [ InfixL do binOpP "*"
+            , InfixL do binOpP "/"
+            , InfixL do binOpP "%"
+            ]
+        ,
+            [ InfixL do binOpP "+"
+            , InfixL do binOpP "-"
+            ]
+        , [InfixL do anyBinOpP]
+        ,
+            [ Postfix do
+                mkBetween <$> betweenK <*> termP <*> andK <*> termP
+            , Postfix do
+                mkNotBetween <$> notK <*> betweenK <*> termP <*> andK <*> termP
+            ]
         ,
             [ InfixL do binOpP "<>"
             , InfixL do binOpP "!="
@@ -205,12 +261,6 @@ exprP = makeExprParser termP operatorsTable
             , InfixL do binOpP ">="
             , InfixL do binOpP ">"
             , InfixL do binOpP "="
-            ]
-        ,
-            [ Postfix do
-                mkBetween <$> betweenK <*> termP <*> andK <*> termP
-            , Postfix do
-                mkNotBetween <$> notK <*> betweenK <*> termP <*> andK <*> termP
             ]
         , [Prefix do ENot <$> notK]
         , [InfixL do flip EAnd <$> andK]
