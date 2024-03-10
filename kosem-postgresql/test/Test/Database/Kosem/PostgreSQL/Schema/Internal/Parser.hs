@@ -16,7 +16,7 @@ spec = parallel do
     describe "tableItemP" do
         it "does its job" do
             parseOnly tableItemP "sElEcT abc"
-                `shouldBe` Right (Column (UnsafeIdentifier "sElEcT") (Scalar (UnsafeIdentifier "abc")))
+                `shouldBe` Right (Column "sElEcT" (Scalar "abc"))
 
     describe "tableP" do
         it "does its job" do
@@ -28,9 +28,9 @@ table abc
     col2 text|]
                 `shouldBe` Right do
                     Table
-                        (UnsafeIdentifier "abc")
-                        [ Column (UnsafeIdentifier "col1") (Scalar (UnsafeIdentifier "text"))
-                        , Column (UnsafeIdentifier "col2") (Scalar (UnsafeIdentifier "text"))
+                        "abc"
+                        [ Column "col1" (Scalar "text")
+                        , Column "col2" (Scalar "text")
                         ]
     describe "schemaP" do
         it "does its job" do
@@ -50,13 +50,13 @@ table abc2
                         "MyDatabase"
                         []
                         [ Table
-                            (UnsafeIdentifier "abc")
-                            [ Column (UnsafeIdentifier "col1") (Scalar (UnsafeIdentifier "text"))
-                            , Column (UnsafeIdentifier "col2") (Scalar (UnsafeIdentifier "text"))
+                            "abc"
+                            [ Column "col1" (Scalar "text")
+                            , Column "col2" (Scalar "text")
                             ]
                         , Table
-                            (UnsafeIdentifier "abc2")
-                            [ Column (UnsafeIdentifier "col1") (Scalar (UnsafeIdentifier "text"))
-                            , Column (UnsafeIdentifier "col2") (Scalar (UnsafeIdentifier "text"))
+                            "abc2"
+                            [ Column "col1" (Scalar "text")
+                            , Column "col2" (Scalar "text")
                             ]
                         ]

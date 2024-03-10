@@ -19,9 +19,10 @@ data IsNullable
 newtype PgType = Scalar Identifier
     deriving (Show, Eq, Lift)
 
-newtype Identifier = UnsafeIdentifier Text
+newtype Identifier = Identifier Text
     deriving (Show) via Text
     deriving (Eq) via Text
+    deriving (IsString) via Text
     deriving (Lift)
 
 identifierToString :: Identifier -> String

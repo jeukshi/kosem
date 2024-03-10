@@ -125,7 +125,7 @@ tableNameP = lexeme do
     rest <- takeWhile do
         anyPred [isAlpha, isDigit, isUnderscore]
 
-    return $ UnsafeIdentifier (T.cons first rest)
+    return $ Identifier (T.cons first rest)
 
 reserved = ["from", "where", "and", "not", "or"]
 
@@ -162,7 +162,7 @@ termP = lexeme do
         ]
 
 identifierP :: Parser Identifier
-identifierP = UnsafeIdentifier <$> labelP
+identifierP = Identifier <$> labelP
 
 paramP :: Parser (Expr ())
 paramP = lexeme do
@@ -224,7 +224,7 @@ exprLitP = lexeme do
 
 exprColP :: Parser (Expr ())
 exprColP = lexeme do
-    flip ECol () <$> (UnsafeIdentifier <$> labelP)
+    flip ECol () <$> (Identifier <$> labelP)
 
 exprAndP :: Parser (Expr ())
 exprAndP = do

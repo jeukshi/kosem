@@ -19,7 +19,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 
 identifierS :: Parser Identifier
 identifierS = lexemeS do
-  UnsafeIdentifier <$> dbLabel
+  Identifier <$> dbLabel
 
 databaseK :: Parser ()
 databaseK = pKeyword "database"

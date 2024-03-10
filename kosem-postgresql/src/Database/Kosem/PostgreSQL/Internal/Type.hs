@@ -99,22 +99,22 @@ tcExpr = \cases
         tyVar <-
             tcExpr var >>= \case
                 (EParam no name _) ->
-                    return $ EParam no name (TypeInfo (Scalar (UnsafeIdentifier ty)) NonNullable)
+                    return $ EParam no name (TypeInfo (Scalar (Identifier ty)) NonNullable)
                 _ -> throwError $ Err "impossible!"
-        return $ EPgCast tyVar ty (TypeInfo (Scalar (UnsafeIdentifier ty)) NonNullable)
+        return $ EPgCast tyVar ty (TypeInfo (Scalar (Identifier ty)) NonNullable)
     (EPgCast var@(EParamMaybe{}) ty ()) -> do
         -- FIXME check text, check if can be casted
         tyVar <-
             tcExpr var >>= \case
                 (EParamMaybe no name _) ->
-                    return $ EParamMaybe no name (TypeInfo (Scalar (UnsafeIdentifier ty)) Nullable)
+                    return $ EParamMaybe no name (TypeInfo (Scalar (Identifier ty)) Nullable)
                 _ -> throwError $ Err "impossible!"
-        return $ EPgCast tyVar ty (TypeInfo (Scalar (UnsafeIdentifier ty)) Nullable)
+        return $ EPgCast tyVar ty (TypeInfo (Scalar (Identifier ty)) Nullable)
     (EPgCast expr text ()) -> do
         tyExpr <- tcExpr expr
         -- FIXME check text, check if can be casted
         -- FIXME preserve IsNullable from underlying type
-        return $ EPgCast tyExpr text (TypeInfo (Scalar (UnsafeIdentifier text)) Nullable)
+        return $ EPgCast tyExpr text (TypeInfo (Scalar (Identifier text)) Nullable)
     (EParens expr ()) -> do
         tyExpr <- tcExpr expr
         let innerTy = exprType tyExpr
