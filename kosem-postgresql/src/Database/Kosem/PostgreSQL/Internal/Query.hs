@@ -38,38 +38,38 @@ data Query result = Query
   , astS :: String
   }
 
-resultFromAst :: STerm SqlType -> Either String [(Identifier, SqlType)]
+resultFromAst :: STerm TypeInfo -> Either String [(Identifier, TypeInfo)]
 resultFromAst (Select resultColumns _ _) = do
   let (errors, columns) = partitionEithers $ map columnName (toList resultColumns)
   case errors of
     [] -> Right columns
     (x : xs) -> Left x
  where
-  columnName :: AliasedExpr SqlType -> Either String (Identifier, SqlType)
+  columnName :: AliasedExpr TypeInfo -> Either String (Identifier, TypeInfo)
   columnName = \cases
-    (WithAlias expr alias _) -> Right (Identifier alias, exprType expr)
+    (WithAlias expr alias _) -> Right (alias, exprType expr)
     (WithoutAlias (ECol columnname ty)) -> Right (columnname, ty)
     (WithoutAlias (EPgCast (EParam _ name _) _ ty)) -> Right (name, ty)
     -- FIXME error msg
     (WithoutAlias _) -> Left "every result should have an alias"
 
-lookupTypes :: [(Identifier, SqlType)] -> [(PgType, Name)] -> [(Identifier, Name, IsNullable)]
+lookupTypes :: [(Identifier, TypeInfo)] -> [(PgType, Name)] -> [(Identifier, Name, IsNullable)]
 lookupTypes = \cases
   (x : xs) mappings -> fromMapping x mappings : lookupTypes xs mappings
   [] _ -> []
  where
-  fromMapping :: (Identifier, SqlType) -> [(PgType, Name)] -> (Identifier, Name, IsNullable)
+  fromMapping :: (Identifier, TypeInfo) -> [(PgType, Name)] -> (Identifier, Name, IsNullable)
   fromMapping (label, ty) mappings = case filter (isInMap ty) mappings of
-    [] -> error $ "no mapping for type: " <> T.unpack (unPgType $ toPgType ty)
+    [] -> error $ "no mapping for type: " <> show ty
     [(pgType, name)] -> (label, name, isNullable ty)
     (x : xs) ->
-      error $ "too many mapping for type: " <> T.unpack (unPgType $ toPgType ty)
-  isInMap :: SqlType -> (PgType, Name) -> Bool
+      error $ "too many mapping for type: " <> show ty
+  isInMap :: TypeInfo -> (PgType, Name) -> Bool
   isInMap sqlType (pgType, _) = case sqlType of
-    Scalar ty _ -> ty == pgType
-  toPgType :: SqlType -> PgType
+    TypeInfo ty _ -> ty == pgType
+  toPgType :: TypeInfo -> PgType
   toPgType = \cases
-    (Scalar ty _) -> ty
+    (TypeInfo ty _) -> ty
 
 unsafeSql :: Database -> String -> Q Exp
 unsafeSql database userInput = do

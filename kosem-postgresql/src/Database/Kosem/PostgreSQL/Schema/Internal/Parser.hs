@@ -4,21 +4,22 @@
 module Database.Kosem.PostgreSQL.Schema.Internal.Parser where
 
 import Control.Monad (void)
+import Data.String (IsString)
 import Data.Text (Text)
 import Data.Void (Void)
 import Database.Kosem.PostgreSQL.Internal.ParserUtils
+import Database.Kosem.PostgreSQL.Internal.PgBuiltin
+import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal
+import Language.Haskell.TH (Name)
+import Language.Haskell.TH.Lift (Lift)
 import Text.Megaparsec
 import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
-import Data.String (IsString)
-import Language.Haskell.TH.Lift (Lift)
-import Language.Haskell.TH (Name)
-import Database.Kosem.PostgreSQL.Internal.PgBuiltin
-import Database.Kosem.PostgreSQL.Internal.Types
 
-labelS :: Parser Text
-labelS = lexemeS dbLabel
+identifierS :: Parser Identifier
+identifierS = lexemeS do
+  UnsafeIdentifier <$> dbLabel
 
 databaseK :: Parser ()
 databaseK = pKeyword "database"
@@ -26,37 +27,38 @@ databaseK = pKeyword "database"
 tableK :: Parser ()
 tableK = pKeyword "table"
 
-tableNameP :: Parser Text
+tableNameP :: Parser Identifier
 tableNameP = do
-    tableK
-    tableName <- labelS
-    return tableName
+  tableK
+  tableName <- identifierS
+  return tableName
 
 databaseNameP :: Parser Text
 databaseNameP = do
-    databaseK
-    databaseName <- labelP
-    return databaseName
+  databaseK
+  databaseName <- labelP
+  return databaseName
 
 -- TODO only for parser
 data TableItem
-    = TableColumn Identifier PgType
-    | TableConstraint
-    deriving (Show, Eq, Lift)
+  = TableColumn Identifier PgType
+  | TableConstraint
+  deriving (Show, Eq, Lift)
 
 tableP :: Parser Table -- header and list items
 tableP = L.nonIndented spaceNewlineP (L.indentBlock spaceNewlineP p)
-  where
-    p = do
-        tableName <- tableNameP
+ where
+  p = do
+    tableName <- tableNameP
 
-        return (L.IndentSome Nothing (return . Table tableName) tableItemP)
+    return (L.IndentSome Nothing (return . Table tableName) tableItemP)
 
 tableItemP :: Parser Column
 tableItemP = lexemeS do
-    columnName <- Identifier <$> labelS <?> "column name"
-    pgType <- PgType <$> labelS <?> "column data type"
-    return $ Column columnName pgType
+  columnName <- identifierS <?> "column name"
+  -- FIXME assumes Scalar
+  pgType <- Scalar <$> identifierS <?> "column data type"
+  return $ Column columnName pgType
 
 isNullableP :: Parser IsNullable
 isNullableP = undefined

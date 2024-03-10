@@ -18,7 +18,7 @@ data IntroType
     deriving (Show)
 
 data Field = Field
-    { alias :: Text
+    { alias :: Identifier
     , label :: Identifier
     , typeName :: PgType
     }
@@ -56,7 +56,7 @@ runProgram schema prog =
 class (Monad m) => MonadTc m where
     getEnv :: m Env
     setEnv :: m Env
-    getTableByName :: Text -> m [Table]
+    getTableByName :: Identifier -> m [Table]
     getColumnByName :: Identifier -> m [Field]
     addFieldsToEnv :: [Field] -> m ()
     getParamNumber :: Identifier -> m (Maybe Int)
@@ -77,7 +77,7 @@ instance MonadTc TcM where
         put (currentEnv{fields = currentEnv.fields ++ newFields})
         return ()
 
-    getTableByName :: Text -> TcM [Table]
+    getTableByName :: Identifier -> TcM [Table]
     getTableByName tableName =
         asks (filter (\table -> table.name == tableName) . tables)
 

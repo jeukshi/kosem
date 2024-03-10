@@ -11,6 +11,7 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (NameSpace (VarName))
 import Text.Megaparsec qualified as Megaparsec
+import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 
 database :: QuasiQuoter
 database =
@@ -30,10 +31,10 @@ database' userInput = do
     let dbWithTypes =
             db
                 { typesMap =
-                    [ ("text", ''Text)
-                    , ("integer", ''Int)
-                    , ("bigint", ''Int)
-                    , ("boolean", ''Bool)
+                    [ (PgText, ''Text)
+                    , (PgInteger, ''Int)
+                    , (PgBigint, ''Int)
+                    , (PgBoolean, ''Bool)
                     ]
                 }
     dbExp <- [e|dbWithTypes|]

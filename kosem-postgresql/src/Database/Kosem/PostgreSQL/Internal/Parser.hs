@@ -118,14 +118,14 @@ fromItemTableNameP :: Parser (FromItem ())
 fromItemTableNameP = lexeme do
     FiTableName <$> tableNameP
 
-tableNameP :: Parser TableName
+tableNameP :: Parser Identifier
 tableNameP = lexeme do
     first <- satisfy isAlpha
 
     rest <- takeWhile do
         anyPred [isAlpha, isDigit, isUnderscore]
 
-    return $ TableName (T.cons first rest)
+    return $ UnsafeIdentifier (T.cons first rest)
 
 reserved = ["from", "where", "and", "not", "or"]
 
@@ -141,10 +141,10 @@ aliasedExprP = lexeme do
                     if lookAheadAlias `elem` reserved
                         then return $ WithoutAlias expr
                         else do
-                            alias <- labelP
+                            alias <- identifierP
                             return $ WithAlias expr alias Nothing
         Just _ -> do
-            alias <- labelP
+            alias <- identifierP
             return $ WithAlias expr alias maybeAs
 
 parens :: Parser a -> Parser a
@@ -162,8 +162,7 @@ termP = lexeme do
         ]
 
 identifierP :: Parser Identifier
-identifierP = Identifier <$> labelP
-
+identifierP = UnsafeIdentifier <$> labelP
 
 paramP :: Parser (Expr ())
 paramP = lexeme do
@@ -225,7 +224,7 @@ exprLitP = lexeme do
 
 exprColP :: Parser (Expr ())
 exprColP = lexeme do
-    flip ECol () <$> (Identifier <$> labelP)
+    flip ECol () <$> (UnsafeIdentifier <$> labelP)
 
 exprAndP :: Parser (Expr ())
 exprAndP = do

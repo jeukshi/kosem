@@ -16,16 +16,12 @@ data IsNullable
     | Nullable
     deriving (Show, Eq)
 
-newtype PgType = PgType {unPgType :: Text}
-    deriving (Show) via Text
-    deriving (Eq) via Text
-    deriving (IsString) via Text
-    deriving (Lift)
+newtype PgType = Scalar Identifier
+    deriving (Show, Eq, Lift)
 
-newtype Identifier = Identifier Text
+newtype Identifier = UnsafeIdentifier Text
     deriving (Show) via Text
     deriving (Eq) via Text
-    deriving (IsString) via Text
     deriving (Lift)
 
 identifierToString :: Identifier -> String
@@ -43,7 +39,7 @@ data Database = Database
     deriving (Show, Eq, Lift)
 
 data Table = Table
-    { name :: Text
+    { name :: Identifier
     , columns :: [Column]
     }
     deriving (Show, Eq, Lift)
@@ -54,6 +50,6 @@ data Column = Column
     }
     deriving (Show, Eq, Lift)
 
-data SqlType
-    = Scalar PgType IsNullable
+data TypeInfo
+    = TypeInfo PgType IsNullable
     deriving (Show, Eq)

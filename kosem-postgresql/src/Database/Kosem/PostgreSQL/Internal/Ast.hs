@@ -13,7 +13,7 @@ import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Internal.Classes
 
-astToRawSql :: STerm SqlType -> ByteString
+astToRawSql :: STerm TypeInfo -> ByteString
 astToRawSql = toStrict . toLazyByteString . toRawSql
 
 (<->) :: Builder -> Builder -> Builder
@@ -24,14 +24,14 @@ data STerm t
   = Select (NonEmpty (AliasedExpr t)) (Maybe (From t)) (Maybe (Where t))
   deriving (Show)
 
-collectExprs :: STerm SqlType -> [Expr SqlType]
+collectExprs :: STerm TypeInfo -> [Expr TypeInfo]
 collectExprs = \cases
   (Select output mbFrom mbWhere) ->
     fromOutput output
       ++ maybe [] fromFrom mbFrom
       ++ maybe [] fromWhere mbWhere
  where
-  fromOutput :: NonEmpty (AliasedExpr SqlType) -> [Expr SqlType]
+  fromOutput :: NonEmpty (AliasedExpr TypeInfo) -> [Expr TypeInfo]
   fromOutput =
     map
       ( \case
@@ -39,23 +39,23 @@ collectExprs = \cases
           WithAlias expr _ _ -> expr
       )
       . NE.toList
-  fromWhere :: Where SqlType -> [Expr SqlType]
+  fromWhere :: Where TypeInfo -> [Expr TypeInfo]
   fromWhere (Where expr) = [expr]
-  fromFrom :: From SqlType -> [Expr SqlType]
+  fromFrom :: From TypeInfo -> [Expr TypeInfo]
   fromFrom (From fromItem) = fromFromItem fromItem
-  fromFromItem :: FromItem SqlType -> [Expr SqlType]
+  fromFromItem :: FromItem TypeInfo -> [Expr TypeInfo]
   fromFromItem = \cases
     (FiTableName _) -> []
     (FiJoin lhs _ rhs joinCondition) ->
       fromJoinCondition joinCondition
         ++ fromFromItem lhs
         ++ fromFromItem rhs
-  fromJoinCondition :: JoinCondition SqlType -> [Expr SqlType]
+  fromJoinCondition :: JoinCondition TypeInfo -> [Expr TypeInfo]
   fromJoinCondition = \cases
     JcUsing -> []
     (JcOn expr) -> [expr]
 
-instance ToRawSql (STerm SqlType) where
+instance ToRawSql (STerm TypeInfo) where
   toRawSql = \cases
     (Select output from whereClause) ->
       "SELECT"
@@ -64,11 +64,11 @@ instance ToRawSql (STerm SqlType) where
         <-> maybe "" toRawSql whereClause
 
 data FromItem t
-  = FiTableName TableName
+  = FiTableName Identifier
   | FiJoin (FromItem t) JoinType (FromItem t) (JoinCondition t)
   deriving (Show)
 
-instance ToRawSql (FromItem SqlType) where
+instance ToRawSql (FromItem TypeInfo) where
   toRawSql = \cases
     (FiTableName tableName) -> toRawSql tableName
     (FiJoin lhs joinType rhs condition) ->
@@ -80,14 +80,14 @@ instance ToRawSql (FromItem SqlType) where
 data From t = From (FromItem t)
   deriving (Show)
 
-instance ToRawSql (From SqlType) where
+instance ToRawSql (From TypeInfo) where
   toRawSql (From item) = "FROM" <-> toRawSql item
 
 data Where t = Where (Expr t)
   deriving (Show)
 
-instance ToRawSql (Where SqlType) where
-  toRawSql :: Where SqlType -> Builder
+instance ToRawSql (Where TypeInfo) where
+  toRawSql :: Where TypeInfo -> Builder
   toRawSql (Where expr) = "WHERE" <-> toRawSql expr
 
 data JoinCondition t
@@ -95,8 +95,8 @@ data JoinCondition t
   | JcUsing
   deriving (Show)
 
-instance ToRawSql (JoinCondition SqlType) where
-  toRawSql :: JoinCondition SqlType -> Builder
+instance ToRawSql (JoinCondition TypeInfo) where
+  toRawSql :: JoinCondition TypeInfo -> Builder
   toRawSql = \cases
     (JcOn expr) -> "ON" <-> toRawSql expr
     JcUsing -> undefined
@@ -125,8 +125,6 @@ data Outer = Outer
 instance ToRawSql Outer where
   toRawSql :: Outer -> Builder
   toRawSql _ = "OUTER"
-
-type ColumnAlias = Text
 
 data As = As
   deriving (Show)
@@ -175,35 +173,35 @@ instance ToRawSql NotEqualStyle where
     NotEqualStandardStyle -> "!="
 
 data AliasedExpr t
-  = WithAlias (Expr t) ColumnAlias (Maybe As)
+  = WithAlias (Expr t) Identifier (Maybe As)
   | WithoutAlias (Expr t)
   deriving (Show)
 
-instance ToRawSql (AliasedExpr SqlType) where
-  toRawSql :: AliasedExpr SqlType -> Builder
+instance ToRawSql (AliasedExpr TypeInfo) where
+  toRawSql :: AliasedExpr TypeInfo -> Builder
   toRawSql = \cases
     (WithoutAlias expr) -> toRawSql expr
     (WithAlias expr alias Nothing) ->
-      toRawSql expr <-> textToBuilder alias
+      toRawSql expr <-> toRawSql alias
     (WithAlias expr alias (Just as)) ->
-      toRawSql expr <-> toRawSql as <-> textToBuilder alias
+      toRawSql expr <-> toRawSql as <-> toRawSql alias
 
 -- | Equals, ignoring IsNullable
-(~==~) :: SqlType -> SqlType -> Bool
+(~==~) :: TypeInfo -> TypeInfo -> Bool
 (~==~) = \cases
-  (Scalar lhs _) (Scalar rhs _) -> lhs == rhs
+  (TypeInfo lhs _) (TypeInfo rhs _) -> lhs == rhs
 
 -- | Not equals, ignoring IsNullable
-(~/=~) :: SqlType -> SqlType -> Bool
+(~/=~) :: TypeInfo -> TypeInfo -> Bool
 (~/=~) = \cases
-  (Scalar lhs _) (Scalar rhs _) -> lhs /= rhs
+  (TypeInfo lhs _) (TypeInfo rhs _) -> lhs /= rhs
 
 
-isNullable :: SqlType -> IsNullable
+isNullable :: TypeInfo -> IsNullable
 isNullable = \cases
-  (Scalar _ nullable) -> nullable
+  (TypeInfo _ nullable) -> nullable
 
-instance ToRawSql SqlType where
+instance ToRawSql TypeInfo where
   toRawSql _ = ""
 
 data Expr t
@@ -229,13 +227,13 @@ data Expr t
   | ENotBetween (Expr t) Not Between (Expr t) And (Expr t)
   deriving (Show)
 
-collectAllVariables :: STerm SqlType -> [(Int, Identifier, SqlType)]
+collectAllVariables :: STerm TypeInfo -> [(Int, Identifier, TypeInfo)]
 collectAllVariables = concatMap collectVariables . collectExprs
  where
-  collectVariables :: Expr SqlType -> [(Int, Identifier, SqlType)]
+  collectVariables :: Expr TypeInfo -> [(Int, Identifier, TypeInfo)]
   collectVariables expr = go expr []
    where
-    go :: Expr SqlType -> [(Int, Identifier, SqlType)] -> [(Int, Identifier, SqlType)]
+    go :: Expr TypeInfo -> [(Int, Identifier, TypeInfo)] -> [(Int, Identifier, TypeInfo)]
     go expr acc = case expr of
       (EParam n t ty) -> acc ++ [(n, t, ty)]
       (EParamMaybe n t ty) -> acc ++ [(n, t, ty)]
@@ -257,8 +255,8 @@ collectAllVariables = concatMap collectVariables . collectExprs
       (ENotBetween lhs not between rhs1 and rhs2) ->
         go rhs1 (go rhs2 (go lhs acc))
 
-instance ToRawSql (Expr SqlType) where
-  toRawSql :: Expr SqlType -> Builder
+instance ToRawSql (Expr TypeInfo) where
+  toRawSql :: Expr TypeInfo -> Builder
   toRawSql = \cases
     (EParam n _ _) -> textToBuilder (T.pack $ "$" <> show n)
     (EParamMaybe n _ _) -> textToBuilder (T.pack $ "$" <> show n)
@@ -301,10 +299,3 @@ instance ToRawSql LiteralValue where
     NumericLiteral -> undefined
     (TextLiteral text) -> "'" <> textToBuilder text <> "'"
     (BoolLiteral text) -> textToBuilder text
-
-data TableName = TableName Text
-  deriving (Show)
-
-instance ToRawSql TableName where
-  toRawSql :: TableName -> Builder
-  toRawSql (TableName text) = textToBuilder text

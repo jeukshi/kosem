@@ -16,7 +16,7 @@ import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Text.Megaparsec (parseMaybe, parseTest)
 
-typecheck :: STerm () -> Tc (STerm SqlType)
+typecheck :: STerm () -> Tc (STerm TypeInfo)
 typecheck = \cases
     (Select res (Just (From fromItem)) whereClause) -> do
         tyFromItem <- tcFromItem fromItem
@@ -28,21 +28,21 @@ typecheck = \cases
         tyWhereClause <- tcWhereClause whereClause
         return $ Select tcRes Nothing tyWhereClause
 
-tcWhereClause :: Maybe (Where ()) -> Tc (Maybe (Where SqlType))
+tcWhereClause :: Maybe (Where ()) -> Tc (Maybe (Where TypeInfo))
 tcWhereClause = \cases
     Nothing -> return Nothing
     (Just (Where expr)) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr ~/=~ PgBoolean Nullable) do
+        when (exprType tyExpr ~/=~ TypeInfo PgBoolean Nullable) do
             throwError $ Err "argument of 'WHERE' must be type 'boolean'"
         return $ Just $ Where tyExpr
 
 tcSelectExpr
     :: NonEmpty (AliasedExpr ())
-    -> Tc (NonEmpty (AliasedExpr SqlType))
+    -> Tc (NonEmpty (AliasedExpr TypeInfo))
 tcSelectExpr = mapM tc
   where
-    tc :: AliasedExpr () -> Tc (AliasedExpr SqlType)
+    tc :: AliasedExpr () -> Tc (AliasedExpr TypeInfo)
     tc = \cases
         (WithAlias expr colAlias maybeAs) -> do
             tcExpr <- tcExpr expr
@@ -51,28 +51,28 @@ tcSelectExpr = mapM tc
             tcExpr <- tcExpr expr
             return $ WithoutAlias tcExpr
 
-tcFromItem :: FromItem () -> Tc (FromItem SqlType)
+tcFromItem :: FromItem () -> Tc (FromItem TypeInfo)
 tcFromItem = \cases
-    (FiTableName (TableName tableName)) -> do
+    (FiTableName tableName) -> do
         table <- tableByName tableName
         addTableToEnv table
-        return $ FiTableName (TableName tableName)
+        return $ FiTableName tableName
     (FiJoin lhs joinType rhs joinCondition) -> do
         tyLhs <- tcFromItem lhs
         tyRhs <- tcFromItem rhs
         tyJoinCondition <- tcJoinCondition joinCondition
         return $ FiJoin tyLhs joinType tyRhs tyJoinCondition
 
-tcJoinCondition :: JoinCondition () -> Tc (JoinCondition SqlType)
+tcJoinCondition :: JoinCondition () -> Tc (JoinCondition TypeInfo)
 tcJoinCondition = \cases
     JcUsing -> return JcUsing
     (JcOn expr) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr ~/=~ PgBoolean Nullable) do
+        when (exprType tyExpr ~/=~ TypeInfo PgBoolean Nullable) do
             throwError $ Err "argument of 'JOIN/ON' must be type 'boolean'"
         return $ JcOn tyExpr
 
-exprType :: Expr SqlType -> SqlType
+exprType :: Expr TypeInfo -> TypeInfo
 exprType = \cases
     (EPgCast _ _ ty) -> ty
     (EParens _ ty) -> ty
@@ -80,41 +80,41 @@ exprType = \cases
     (EParamMaybe _ _ ty) -> ty
     (ELit _ ty) -> ty
     (ECol _ ty) -> ty
-    (ENot{}) -> PgBoolean Nullable
-    (EAnd{}) -> PgBoolean Nullable
-    (EOr{}) -> PgBoolean Nullable
-    (ELessThan{}) -> PgBoolean Nullable
-    (EGreaterThan{}) -> PgBoolean Nullable
-    (ELessThanOrEqualTo{}) -> PgBoolean Nullable
-    (EGreaterThanOrEqualTo{}) -> PgBoolean Nullable
-    (EEqual{}) -> PgBoolean Nullable
-    (ENotEqual{}) -> PgBoolean Nullable
-    (EBetween{}) -> PgBoolean Nullable
-    (ENotBetween{}) -> PgBoolean Nullable
+    (ENot{}) -> TypeInfo PgBoolean Nullable
+    (EAnd{}) -> TypeInfo PgBoolean Nullable
+    (EOr{}) -> TypeInfo PgBoolean Nullable
+    (ELessThan{}) -> TypeInfo PgBoolean Nullable
+    (EGreaterThan{}) -> TypeInfo PgBoolean Nullable
+    (ELessThanOrEqualTo{}) -> TypeInfo PgBoolean Nullable
+    (EGreaterThanOrEqualTo{}) -> TypeInfo PgBoolean Nullable
+    (EEqual{}) -> TypeInfo PgBoolean Nullable
+    (ENotEqual{}) -> TypeInfo PgBoolean Nullable
+    (EBetween{}) -> TypeInfo PgBoolean Nullable
+    (ENotBetween{}) -> TypeInfo PgBoolean Nullable
 
-tcExpr :: Expr () -> Tc (Expr SqlType)
+tcExpr :: Expr () -> Tc (Expr TypeInfo)
 tcExpr = \cases
     (EPgCast var@(EParam{}) ty ()) -> do
         -- FIXME check text, check if can be casted
         tyVar <-
             tcExpr var >>= \case
                 (EParam no name _) ->
-                    return $ EParam no name (Scalar (PgType ty) NonNullable)
+                    return $ EParam no name (TypeInfo (Scalar (UnsafeIdentifier ty)) NonNullable)
                 _ -> throwError $ Err "impossible!"
-        return $ EPgCast tyVar ty (Scalar (PgType ty) NonNullable)
+        return $ EPgCast tyVar ty (TypeInfo (Scalar (UnsafeIdentifier ty)) NonNullable)
     (EPgCast var@(EParamMaybe{}) ty ()) -> do
         -- FIXME check text, check if can be casted
         tyVar <-
             tcExpr var >>= \case
                 (EParamMaybe no name _) ->
-                    return $ EParamMaybe no name (Scalar (PgType ty) Nullable)
+                    return $ EParamMaybe no name (TypeInfo (Scalar (UnsafeIdentifier ty)) Nullable)
                 _ -> throwError $ Err "impossible!"
-        return $ EPgCast tyVar ty (Scalar (PgType ty) Nullable)
+        return $ EPgCast tyVar ty (TypeInfo (Scalar (UnsafeIdentifier ty)) Nullable)
     (EPgCast expr text ()) -> do
         tyExpr <- tcExpr expr
         -- FIXME check text, check if can be casted
         -- FIXME preserve IsNullable from underlying type
-        return $ EPgCast tyExpr text (Scalar (PgType text) Nullable)
+        return $ EPgCast tyExpr text (TypeInfo (Scalar (UnsafeIdentifier text)) Nullable)
     (EParens expr ()) -> do
         tyExpr <- tcExpr expr
         let innerTy = exprType tyExpr
@@ -124,25 +124,25 @@ tcExpr = \cases
             getParamNumber name >>= \case
                 Just ix -> return ix
                 Nothing -> addParam name
-        return $ EParam paramNumber name (PgUnknown NonNullable)
+        return $ EParam paramNumber name (TypeInfo PgUnknown NonNullable)
     (EParamMaybe _ name ()) -> do
         paramNumber <-
             getParamNumber name >>= \case
                 Just ix -> return ix
                 Nothing -> addParam name
-        return $ EParamMaybe paramNumber name (PgUnknown Nullable)
+        return $ EParamMaybe paramNumber name (TypeInfo PgUnknown Nullable)
     (ELit litVal _) -> case litVal of
-        NumericLiteral -> return $ ELit litVal (PgNumeric NonNullable)
-        TextLiteral _ -> return $ ELit litVal (PgText NonNullable)
-        (BoolLiteral _) -> return $ ELit litVal (PgBoolean NonNullable)
+        NumericLiteral -> return $ ELit litVal (TypeInfo PgNumeric NonNullable)
+        TextLiteral _ -> return $ ELit litVal (TypeInfo PgText NonNullable) -- FIXME this is 'unknown'
+        (BoolLiteral _) -> return $ ELit litVal (TypeInfo PgBoolean NonNullable)
     (ECol colName _) -> do
         envCol <- columnByName colName
         -- FIXME NonNullable from colDef
-        return $ ECol colName (Scalar envCol.typeName NonNullable)
+        return $ ECol colName (TypeInfo envCol.typeName NonNullable)
     (ENot not expr) -> do
         tyExpr <- tcExpr expr
         let ty = exprType tyExpr
-        when (ty ~/=~ PgBoolean Nullable) do
+        when (ty ~/=~ TypeInfo PgBoolean Nullable) do
             throwError $ Err "argument of 'NOT' must be type 'boolean'"
         return $ ENot not tyExpr
     (EAnd lhs and rhs) -> do
@@ -189,17 +189,17 @@ tcExpr = \cases
             <*> pure and
             <*> tcExpr rhs2
   where
-    tyMustBeBoolean :: Text -> Expr () -> Expr () -> Tc (Expr SqlType, Expr SqlType)
+    tyMustBeBoolean :: Text -> Expr () -> Expr () -> Tc (Expr TypeInfo, Expr TypeInfo)
     tyMustBeBoolean func lhs rhs = do
         tyLhs <- tcExpr lhs
         tyRhs <- tcExpr rhs
-        when (exprType tyLhs ~/=~ PgBoolean Nullable) do
+        when (exprType tyLhs ~/=~ TypeInfo PgBoolean Nullable) do
             throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
-        when (exprType tyRhs ~/=~ PgBoolean Nullable) do
+        when (exprType tyRhs ~/=~ TypeInfo PgBoolean Nullable) do
             throwError $ Err $ "argument of '" <> func <> "' must be type 'boolean'"
         return (tyLhs, tyRhs)
 
-    tyMustBeEqual :: Text -> Expr () -> Expr () -> Tc (Expr SqlType, Expr SqlType)
+    tyMustBeEqual :: Text -> Expr () -> Expr () -> Tc (Expr TypeInfo, Expr TypeInfo)
     tyMustBeEqual func lhs rhs = do
         tyLhs <- tcExpr lhs
         tyRhs <- tcExpr rhs
@@ -214,7 +214,7 @@ columnByName name =
         [t] -> return t
         ts -> throwError $ Err ("Column name is ambigious: " <> T.pack (show name))
 
-tableByName :: Text -> Tc Table
+tableByName :: Identifier -> Tc Table
 tableByName name =
     getTableByName name >>= \case
         [] -> throwError $ Err "relation does not exist"
@@ -225,7 +225,7 @@ addTableToEnv :: Table -> Tc ()
 addTableToEnv table =
     addFieldsToEnv . map (toEnvElem table.name) . columns $ table
   where
-    toEnvElem :: Text -> Column -> Field
+    toEnvElem :: Identifier -> Column -> Field
     toEnvElem alias column =
         Field
             { alias = alias
