@@ -49,6 +49,7 @@ table abc2
                     Database
                         "MyDatabase"
                         []
+                        []
                         [ Table
                             "abc"
                             [ Column "col1" (Scalar "text")

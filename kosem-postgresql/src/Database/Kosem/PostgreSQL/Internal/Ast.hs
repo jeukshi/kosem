@@ -1,4 +1,3 @@
-
 module Database.Kosem.PostgreSQL.Internal.Ast where
 
 import Data.ByteString (ByteString)
@@ -9,9 +8,9 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.List.NonEmpty qualified as NE
 import Data.Text (Text)
 import Data.Text qualified as T
+import Database.Kosem.PostgreSQL.Internal.Classes
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Types
-import Database.Kosem.PostgreSQL.Internal.Classes
 
 astToRawSql :: STerm TypeInfo -> ByteString
 astToRawSql = toStrict . toLazyByteString . toRawSql
@@ -161,17 +160,6 @@ instance ToRawSql Between where
   toRawSql :: Between -> Builder
   toRawSql _ = "BETWEEN"
 
-data NotEqualStyle
-  = NotEqualStandardStyle -- !=
-  | NotEqualPostgresStyle -- <>
-  deriving (Show)
-
-instance ToRawSql NotEqualStyle where
-  toRawSql :: NotEqualStyle -> Builder
-  toRawSql = \cases
-    NotEqualPostgresStyle -> "<>"
-    NotEqualStandardStyle -> "!="
-
 data AliasedExpr t
   = WithAlias (Expr t) Identifier (Maybe As)
   | WithoutAlias (Expr t)
@@ -196,7 +184,6 @@ instance ToRawSql (AliasedExpr TypeInfo) where
 (~/=~) = \cases
   (TypeInfo lhs _) (TypeInfo rhs _) -> lhs /= rhs
 
-
 isNullable :: TypeInfo -> IsNullable
 isNullable = \cases
   (TypeInfo _ nullable) -> nullable
@@ -215,13 +202,7 @@ data Expr t
     ENot Not (Expr t)
   | EAnd (Expr t) And (Expr t)
   | EOr (Expr t) Or (Expr t)
-  | -- Comparsion operators
-    ELessThan (Expr t) (Expr t)
-  | EGreaterThan (Expr t) (Expr t)
-  | ELessThanOrEqualTo (Expr t) (Expr t)
-  | EGreaterThanOrEqualTo (Expr t) (Expr t)
-  | EEqual (Expr t) (Expr t)
-  | ENotEqual (Expr t) NotEqualStyle (Expr t)
+  | EBinOp (Expr t) Operator (Expr t) t
   | -- Comparsion predicates
     EBetween (Expr t) Between (Expr t) And (Expr t)
   | ENotBetween (Expr t) Not Between (Expr t) And (Expr t)
@@ -244,12 +225,7 @@ collectAllVariables = concatMap collectVariables . collectExprs
       (ENot not expr) -> go expr acc
       (EAnd lhs and rhs) -> go rhs (go lhs acc)
       (EOr lhs or rhs) -> go rhs (go lhs acc)
-      (ELessThan lhs rhs) -> go rhs (go lhs acc)
-      (EGreaterThan lhs rhs) -> go rhs (go lhs acc)
-      (ELessThanOrEqualTo lhs rhs) -> go rhs (go lhs acc)
-      (EGreaterThanOrEqualTo lhs rhs) -> go rhs (go lhs acc)
-      (EEqual lhs rhs) -> go rhs (go lhs acc)
-      (ENotEqual lhs style rhs) -> go rhs (go lhs acc)
+      (EBinOp lhs or rhs _) -> go rhs (go lhs acc)
       (EBetween lhs between rhs1 and rhs2) ->
         go rhs1 (go rhs2 (go lhs acc))
       (ENotBetween lhs not between rhs1 and rhs2) ->
@@ -267,12 +243,8 @@ instance ToRawSql (Expr TypeInfo) where
     (ENot not rhs) -> toRawSql not <-> toRawSql rhs
     (EAnd lhs and rhs) -> toRawSql lhs <-> toRawSql and <-> toRawSql rhs
     (EOr lhs or rhs) -> toRawSql lhs <-> toRawSql or <-> toRawSql rhs
-    (ELessThan lhs rhs) -> toRawSql lhs <-> "<" <-> toRawSql rhs
-    (EGreaterThan lhs rhs) -> toRawSql lhs <-> ">" <-> toRawSql rhs
-    (ELessThanOrEqualTo lhs rhs) -> toRawSql lhs <-> "<=" <-> toRawSql rhs
-    (EGreaterThanOrEqualTo lhs rhs) -> toRawSql lhs <-> ">=" <-> toRawSql rhs
-    (EEqual lhs rhs) -> toRawSql lhs <-> "=" <-> toRawSql rhs
-    (ENotEqual lhs style rhs) -> toRawSql lhs <-> toRawSql style <-> toRawSql rhs
+    (EBinOp lhs operator rhs _) ->
+      toRawSql lhs <-> toRawSql operator <-> toRawSql rhs
     (EBetween lhs between rhs1 and rhs2) ->
       toRawSql lhs
         <-> toRawSql between

@@ -25,16 +25,27 @@ newtype Identifier = Identifier Text
     deriving (IsString) via Text
     deriving (Lift)
 
+instance ToRawSql Identifier where
+    toRawSql :: Identifier -> Builder
+    toRawSql = textToBuilder . coerce
+
 identifierToString :: Identifier -> String
 identifierToString = T.unpack . coerce
 
-instance ToRawSql Identifier where
-    toRawSql :: Identifier -> Builder
+newtype Operator = Operator Text
+    deriving (Show) via Text
+    deriving (Eq) via Text
+    deriving (IsString) via Text
+    deriving (Lift)
+
+instance ToRawSql Operator where
+    toRawSql :: Operator -> Builder
     toRawSql = textToBuilder . coerce
 
 data Database = Database
     { name :: Text
     , typesMap :: [(Identifier, PgType, Name)]
+    , binaryOps :: [(Operator, PgType, PgType, PgType)]
     , tables :: [Table]
     }
     deriving (Show, Eq, Lift)

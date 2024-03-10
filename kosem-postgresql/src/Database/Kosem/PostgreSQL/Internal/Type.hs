@@ -83,14 +83,14 @@ exprType = \cases
     (ENot{}) -> TypeInfo PgBoolean Nullable
     (EAnd{}) -> TypeInfo PgBoolean Nullable
     (EOr{}) -> TypeInfo PgBoolean Nullable
-    (ELessThan{}) -> TypeInfo PgBoolean Nullable
-    (EGreaterThan{}) -> TypeInfo PgBoolean Nullable
-    (ELessThanOrEqualTo{}) -> TypeInfo PgBoolean Nullable
-    (EGreaterThanOrEqualTo{}) -> TypeInfo PgBoolean Nullable
-    (EEqual{}) -> TypeInfo PgBoolean Nullable
-    (ENotEqual{}) -> TypeInfo PgBoolean Nullable
+    (EBinOp _ _ _ ty) -> ty
     (EBetween{}) -> TypeInfo PgBoolean Nullable
     (ENotBetween{}) -> TypeInfo PgBoolean Nullable
+
+tcNullable :: IsNullable -> IsNullable -> IsNullable
+tcNullable = \cases
+  NonNullable NonNullable -> NonNullable
+  _ _ -> Nullable
 
 tcExpr :: Expr () -> Tc (Expr TypeInfo)
 tcExpr = \cases
@@ -150,24 +150,14 @@ tcExpr = \cases
     (EOr lhs or rhs) -> do
         (tyLhs, tyRhs) <- tyMustBeBoolean "OR" lhs rhs
         return $ EOr tyLhs or tyRhs
-    (ELessThan lhs rhs) -> do
-        (tyLhs, tyRhs) <- tyMustBeEqual "<" lhs rhs
-        return $ ELessThan tyLhs tyRhs
-    (EGreaterThan lhs rhs) -> do
-        (tyLhs, tyRhs) <- tyMustBeEqual ">" lhs rhs
-        return $ EGreaterThan tyLhs tyRhs
-    (ELessThanOrEqualTo lhs rhs) -> do
-        (tyLhs, tyRhs) <- tyMustBeEqual "<=" lhs rhs
-        return $ ELessThanOrEqualTo tyLhs tyRhs
-    (EGreaterThanOrEqualTo lhs rhs) -> do
-        (tyLhs, tyRhs) <- tyMustBeEqual ">=" lhs rhs
-        return $ EGreaterThanOrEqualTo tyLhs tyRhs
-    (EEqual lhs rhs) -> do
-        (tyLhs, tyRhs) <- tyMustBeEqual "=" lhs rhs
-        return $ EEqual tyLhs tyRhs
-    (ENotEqual lhs style rhs) -> do
-        (tyLhs, tyRhs) <- tyMustBeEqual "<>" lhs rhs
-        return $ ENotEqual tyLhs style tyRhs
+    (EBinOp lhs op rhs ()) -> do
+        tcLhs <- tcExpr lhs
+        tcRhs <- tcExpr rhs
+        let (TypeInfo tyLhs nullableLhs) = exprType tcLhs
+        let (TypeInfo tyRhs nullableRhs) = exprType tcRhs
+        tyRes <- getBinaryOpResult tyLhs op tyRhs
+        let nullableRes = tcNullable nullableLhs nullableRhs
+        return $ EBinOp tcLhs op tcRhs (TypeInfo tyRes nullableRes)
     (EBetween lhs between rhs1 and rhs2) -> do
         -- TODO typecheck `between` against <= >=
         tyLhs <- tcExpr lhs

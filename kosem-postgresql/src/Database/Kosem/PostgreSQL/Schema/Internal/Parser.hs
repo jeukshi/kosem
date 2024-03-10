@@ -68,4 +68,4 @@ schemaP = lexeme do
   _ <- skipMany C.spaceChar
   databaseName <- databaseNameP
   tables <- some tableP
-  return $ Database databaseName [] tables
+  return $ Database databaseName [] [] tables

@@ -2,6 +2,7 @@ module Database.Kosem.PostgreSQL.Internal.Parser where
 
 import Control.Monad (void)
 import Control.Monad.Combinators.Expr
+    ( makeExprParser, Operator (..) )
 import Control.Monad.Combinators.NonEmpty qualified as Combinators.NonEmpty
 import Control.Monad.Cont (MonadPlus (mzero))
 import Data.Char (isNumber)
@@ -179,22 +180,31 @@ pgCastP = lexeme do
     symbol "::"
     identifierP
 
+operatorP :: Text -> Parser Database.Kosem.PostgreSQL.Internal.Types.Operator
+operatorP sym = lexeme do
+  Operator <$> symbol sym
+
+binOpP :: Text -> Parser (Expr () -> Expr () -> Expr ())
+binOpP sym = mkBinOp <$> operatorP sym
+  where
+    mkBinOp operator lhs rhs =
+      EBinOp lhs operator rhs ()
+
 exprP :: Parser (Expr ())
 exprP = makeExprParser termP operatorsTable
   where
-    operatorsTable :: [[Operator Parser (Expr ())]]
     operatorsTable =
         -- TODO precedence:
         -- https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE
         [ [Postfix do mkCast <$> pgCastP <*> pure ()]
         ,
-            [ InfixL do flip ENotEqual NotEqualPostgresStyle <$ lexeme "<>"
-            , InfixL do flip ENotEqual NotEqualStandardStyle <$ lexeme "!="
-            , InfixL do ELessThanOrEqualTo <$ lexeme "<="
-            , InfixL do ELessThan <$ lexeme "<"
-            , InfixL do EGreaterThanOrEqualTo <$ lexeme ">="
-            , InfixL do EGreaterThan <$ lexeme ">"
-            , InfixL do EEqual <$ lexeme "="
+            [ InfixL do binOpP "<>"
+            , InfixL do binOpP "!="
+            , InfixL do binOpP "<="
+            , InfixL do binOpP "<"
+            , InfixL do binOpP ">="
+            , InfixL do binOpP ">"
+            , InfixL do binOpP "="
             ]
         ,
             [ Postfix do

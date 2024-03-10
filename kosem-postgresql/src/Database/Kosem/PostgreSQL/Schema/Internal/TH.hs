@@ -33,6 +33,7 @@ database' databaseConfig userInput = do
     let dbWithTypes =
             db
                 { typesMap = databaseConfig.types
+                , binaryOps = databaseConfig.binaryOperators
                 }
     dbExp <- [e|dbWithTypes|]
     let sql = mkName "sql"
