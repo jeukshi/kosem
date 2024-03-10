@@ -210,7 +210,7 @@ data Expr t
   | EParamMaybe Int Identifier t
   | ELit LiteralValue t
   | ECol Identifier t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
-  | EPgCast (Expr t) Text t -- TODO Identifier
+  | EPgCast (Expr t) Identifier t -- TODO Identifier
   | -- | expression::type
     ENot Not (Expr t)
   | EAnd (Expr t) And (Expr t)
@@ -263,7 +263,7 @@ instance ToRawSql (Expr TypeInfo) where
     (EParens expr _) -> "(" <> toRawSql expr <> ")"
     (ELit lit _) -> toRawSql lit
     (ECol columnName _) -> toRawSql columnName
-    (EPgCast lhs ty _) -> toRawSql lhs <> "::" <> textToBuilder ty
+    (EPgCast lhs identifier _) -> toRawSql lhs <> "::" <> toRawSql identifier
     (ENot not rhs) -> toRawSql not <-> toRawSql rhs
     (EAnd lhs and rhs) -> toRawSql lhs <-> toRawSql and <-> toRawSql rhs
     (EOr lhs or rhs) -> toRawSql lhs <-> toRawSql or <-> toRawSql rhs

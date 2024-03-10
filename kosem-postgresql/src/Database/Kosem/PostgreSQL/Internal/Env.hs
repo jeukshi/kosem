@@ -11,6 +11,7 @@ import Control.Monad.State.Strict (MonadState (get, put), StateT (runStateT), ev
 import Control.Monad.Trans (MonadTrans, lift)
 import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.Types
+import Language.Haskell.TH (Name)
 
 data IntroType
     = Subquery
@@ -56,6 +57,7 @@ runProgram schema prog =
 class (Monad m) => MonadTc m where
     getEnv :: m Env
     setEnv :: m Env
+    getType :: Identifier -> m PgType
     getTableByName :: Identifier -> m [Table]
     getColumnByName :: Identifier -> m [Field]
     addFieldsToEnv :: [Field] -> m ()
@@ -98,8 +100,22 @@ instance MonadTc TcM where
     addParam name = do
         currentEnv <- get
         put (currentEnv{params = currentEnv.params ++ [name]})
-        -- | + 1 for new elemen we just added.
+        -- \| + 1 for new elemen we just added.
         return $ length currentEnv.params + 1
 
     throwError :: TcError -> TcM a
     throwError = Control.Monad.Except.throwError
+
+    getType :: Identifier -> TcM PgType
+    getType identifier = do
+        types <- asks (.typesMap)
+        pgType <- find identifier types
+        pure pgType
+      where
+        find :: Identifier -> [(Identifier, PgType, Name)] -> TcM PgType
+        find identifier = \cases
+            [] -> error $ "no type: " <> show identifier
+            ((i, t, _) : xs) ->
+                if i == identifier
+                    then pure t
+                    else find identifier xs

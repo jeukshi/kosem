@@ -94,43 +94,42 @@ exprType = \cases
 
 tcExpr :: Expr () -> Tc (Expr TypeInfo)
 tcExpr = \cases
-    (EPgCast var@(EParam{}) ty ()) -> do
-        -- FIXME check text, check if can be casted
-        tyVar <-
-            tcExpr var >>= \case
-                (EParam no name _) ->
-                    return $ EParam no name (TypeInfo (Scalar (Identifier ty)) NonNullable)
-                _ -> throwError $ Err "impossible!"
-        return $ EPgCast tyVar ty (TypeInfo (Scalar (Identifier ty)) NonNullable)
-    (EPgCast var@(EParamMaybe{}) ty ()) -> do
-        -- FIXME check text, check if can be casted
-        tyVar <-
-            tcExpr var >>= \case
-                (EParamMaybe no name _) ->
-                    return $ EParamMaybe no name (TypeInfo (Scalar (Identifier ty)) Nullable)
-                _ -> throwError $ Err "impossible!"
-        return $ EPgCast tyVar ty (TypeInfo (Scalar (Identifier ty)) Nullable)
-    (EPgCast expr text ()) -> do
+    (EPgCast var@(EParam _ name _) identifier ()) -> do
+        -- FIXME check if can be casted
+        ty <- getType identifier
+        paramNumber <-
+            getParamNumber name >>= \case
+                Just ix -> return ix
+                Nothing -> addParam name
+        let typeInfo = TypeInfo ty NonNullable
+        let tyVar = EParam paramNumber name typeInfo
+        return $ EPgCast tyVar identifier typeInfo
+    (EPgCast var@(EParamMaybe _ name _) identifier ()) -> do
+        -- FIXME check if can be casted
+        ty <- getType identifier
+        paramNumber <-
+            getParamNumber name >>= \case
+                Just ix -> return ix
+                Nothing -> addParam name
+        let typeInfo = TypeInfo ty Nullable
+        let tyVar = EParamMaybe paramNumber name typeInfo
+        return $ EPgCast tyVar identifier typeInfo
+    (EPgCast expr identifier ()) -> do
         tyExpr <- tcExpr expr
         -- FIXME check text, check if can be casted
         -- FIXME preserve IsNullable from underlying type
-        return $ EPgCast tyExpr text (TypeInfo (Scalar (Identifier text)) Nullable)
+        ty <- getType identifier
+        return $ EPgCast tyExpr identifier (TypeInfo ty Nullable)
     (EParens expr ()) -> do
         tyExpr <- tcExpr expr
         let innerTy = exprType tyExpr
         return $ EParens tyExpr innerTy
-    (EParam _ name ()) -> do
-        paramNumber <-
-            getParamNumber name >>= \case
-                Just ix -> return ix
-                Nothing -> addParam name
-        return $ EParam paramNumber name (TypeInfo PgUnknown NonNullable)
+    (EParam _ name ()) ->
+        -- TODO
+        throwError $ Err "parameters without cast are not supported"
     (EParamMaybe _ name ()) -> do
-        paramNumber <-
-            getParamNumber name >>= \case
-                Just ix -> return ix
-                Nothing -> addParam name
-        return $ EParamMaybe paramNumber name (TypeInfo PgUnknown Nullable)
+        -- TODO
+        throwError $ Err "parameters without cast are not supported"
     (ELit litVal _) -> case litVal of
         NumericLiteral -> return $ ELit litVal (TypeInfo PgNumeric NonNullable)
         TextLiteral _ -> return $ ELit litVal (TypeInfo PgText NonNullable) -- FIXME this is 'unknown'

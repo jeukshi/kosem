@@ -174,10 +174,10 @@ paramMaybeP = lexeme do
   symbol ":?"
   (EParamMaybe 0 <$> identifierP) <*> pure ()
 
-pgCastP :: Parser Text
+pgCastP :: Parser Identifier
 pgCastP = lexeme do
     symbol "::"
-    labelP
+    identifierP
 
 exprP :: Parser (Expr ())
 exprP = makeExprParser termP operatorsTable
