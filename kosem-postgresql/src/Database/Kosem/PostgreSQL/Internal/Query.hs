@@ -53,19 +53,19 @@ resultFromAst (Select resultColumns _ _) = do
     -- FIXME error msg
     (WithoutAlias _) -> Left "every result should have an alias"
 
-lookupTypes :: [(Identifier, TypeInfo)] -> [(PgType, Name)] -> [(Identifier, Name, IsNullable)]
+lookupTypes :: [(Identifier, TypeInfo)] -> [(Identifier, PgType, Name)] -> [(Identifier, Name, IsNullable)]
 lookupTypes = \cases
   (x : xs) mappings -> fromMapping x mappings : lookupTypes xs mappings
   [] _ -> []
  where
-  fromMapping :: (Identifier, TypeInfo) -> [(PgType, Name)] -> (Identifier, Name, IsNullable)
+  fromMapping :: (Identifier, TypeInfo) -> [(Identifier, PgType, Name)] -> (Identifier, Name, IsNullable)
   fromMapping (label, ty) mappings = case filter (isInMap ty) mappings of
     [] -> error $ "no mapping for type: " <> show ty
-    [(pgType, name)] -> (label, name, isNullable ty)
+    [(_, pgType, name)] -> (label, name, isNullable ty)
     (x : xs) ->
       error $ "too many mapping for type: " <> show ty
-  isInMap :: TypeInfo -> (PgType, Name) -> Bool
-  isInMap sqlType (pgType, _) = case sqlType of
+  isInMap :: TypeInfo -> (identifier, PgType, Name) -> Bool
+  isInMap sqlType (_, pgType, _) = case sqlType of
     TypeInfo ty _ -> ty == pgType
   toPgType :: TypeInfo -> PgType
   toPgType = \cases

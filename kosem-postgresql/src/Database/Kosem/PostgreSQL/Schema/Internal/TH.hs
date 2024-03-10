@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Database.Kosem.PostgreSQL.Schema.Internal.TH where
 
@@ -12,30 +13,26 @@ import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (NameSpace (VarName))
 import Text.Megaparsec qualified as Megaparsec
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
+import qualified Database.Kosem.PostgreSQL.Internal.PgBuiltin
 
 database :: QuasiQuoter
 database =
     QuasiQuoter
         { quotePat = error "quasiquoter used in pattern context"
         , quoteType = error "quasiquoter used in type context"
-        , quoteDec = database'
+        , quoteDec = database' defaultDatabaseConfig
         , quoteExp = error "quasiquoter used in expression context"
         }
 
-database' :: String -> Q [Dec]
-database' userInput = do
+database' :: DatabaseConfig -> String -> Q [Dec]
+database' databaseConfig userInput = do
     let parserResult = Megaparsec.parse schemaP "" (T.pack userInput)
     let db = case parserResult of
             Left e -> error (Megaparsec.errorBundlePretty e)
             Right db -> db
     let dbWithTypes =
             db
-                { typesMap =
-                    [ (PgText, ''Text)
-                    , (PgInteger, ''Int)
-                    , (PgBigint, ''Int)
-                    , (PgBoolean, ''Bool)
-                    ]
+                { typesMap = databaseConfig.types
                 }
     dbExp <- [e|dbWithTypes|]
     let sql = mkName "sql"

@@ -34,7 +34,7 @@ instance ToRawSql Identifier where
 
 data Database = Database
     { name :: Text
-    , typesMap :: [(PgType, Name)]
+    , typesMap :: [(Identifier, PgType, Name)]
     , tables :: [Table]
     }
     deriving (Show, Eq, Lift)
