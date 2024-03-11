@@ -8,13 +8,13 @@ import Data.String (IsString)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Database.Kosem.PostgreSQL.Internal.Classes
-import Language.Haskell.TH (Name)
+import Language.Haskell.TH (Name, Extension (DuplicateRecordFields))
 import Language.Haskell.TH.Lift (Lift)
 
 data IsNullable
     = NonNullable
     | Nullable
-    deriving (Show, Eq)
+    deriving (Show, Eq, Lift)
 
 newtype PgType = Scalar Identifier
     deriving (Show, Eq, Lift)
@@ -59,6 +59,7 @@ data Table = Table
 data Column = Column
     { name :: Identifier
     , typeName :: PgType
+    , nullable :: IsNullable
     }
     deriving (Show, Eq, Lift)
 

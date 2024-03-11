@@ -38,6 +38,7 @@ spec = around withDB $ do
                     [Tdb.sql|
                             select abc
                                  , col2
+                                 , col
                               from tab1
                               left join tab2
                                 on abc = col
@@ -50,7 +51,7 @@ spec = around withDB $ do
     describe "parameters" do
         it "in output don't need an alias" $ \conn -> do
             let abc = True
-            let _ = [Tdb.sql| select :abc::boolean |]
+            let _ = [Tdb.sql| select :abc::boolean|]
             "it compiles" `shouldBe` "it compiles"
 
         it "in output can have an alias" $ \conn -> do

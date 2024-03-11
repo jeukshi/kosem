@@ -8,16 +8,16 @@ import Language.Haskell.TH.Quote (QuasiQuoter (..))
 [database|
 database testDb
 table tab1
-    abc text
+    abc text not null
     abc2 text
 
 table tab2
     col text
-    col2 integer
+    col2 integer not null
 
 table data_types
-    type_text text
-    type_integer integer
-    type_bigint bigint
-    type_boolean boolean
+    type_text text not null
+    type_integer integer not null
+    type_bigint bigint not null
+    type_boolean boolean not null
 |]

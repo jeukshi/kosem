@@ -16,7 +16,7 @@ spec = parallel do
     describe "tableItemP" do
         it "does its job" do
             parseOnly tableItemP "sElEcT abc"
-                `shouldBe` Right (Column "sElEcT" (Scalar "abc"))
+                `shouldBe` Right (Column "sElEcT" (Scalar "abc") Nullable)
 
     describe "tableP" do
         it "does its job" do
@@ -29,8 +29,8 @@ table abc
                 `shouldBe` Right do
                     Table
                         "abc"
-                        [ Column "col1" (Scalar "text")
-                        , Column "col2" (Scalar "text")
+                        [ Column "col1" (Scalar "text") Nullable
+                        , Column "col2" (Scalar "text") Nullable
                         ]
     describe "schemaP" do
         it "does its job" do
@@ -42,7 +42,7 @@ table abc
     col1 text
     col2 text
 table abc2
-    col1 text
+    col1 text not null
     col2 text
 |]
                 `shouldBe` Right do
@@ -52,12 +52,12 @@ table abc2
                         []
                         [ Table
                             "abc"
-                            [ Column "col1" (Scalar "text")
-                            , Column "col2" (Scalar "text")
+                            [ Column "col1" (Scalar "text") Nullable
+                            , Column "col2" (Scalar "text") Nullable
                             ]
                         , Table
                             "abc2"
-                            [ Column "col1" (Scalar "text")
-                            , Column "col2" (Scalar "text")
+                            [ Column "col1" (Scalar "text") NonNullable
+                            , Column "col2" (Scalar "text") Nullable
                             ]
                         ]

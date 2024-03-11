@@ -24,6 +24,7 @@ data Field = Field
     { alias :: Identifier
     , label :: Identifier
     , typeName :: PgType
+    , nullable :: IsNullable
     }
     deriving (Show)
 

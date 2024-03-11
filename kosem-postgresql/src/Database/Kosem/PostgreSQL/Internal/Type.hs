@@ -137,7 +137,7 @@ tcExpr = \cases
     (ECol colName _) -> do
         envCol <- columnByName colName
         -- FIXME NonNullable from colDef
-        return $ ECol colName (TypeInfo envCol.typeName NonNullable)
+        return $ ECol colName (TypeInfo envCol.typeName envCol.nullable)
     (ENot not expr) -> do
         tyExpr <- tcExpr expr
         let ty = exprType tyExpr
@@ -220,4 +220,5 @@ addTableToEnv table =
             { alias = alias
             , label = column.name
             , typeName = column.typeName
+            , nullable = column.nullable
             }

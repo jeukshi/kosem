@@ -58,10 +58,13 @@ tableItemP = lexemeS do
   columnName <- identifierS <?> "column name"
   -- FIXME assumes Scalar
   pgType <- Scalar <$> identifierS <?> "column data type"
-  return $ Column columnName pgType
+  Column columnName pgType <$> isNullableP
 
 isNullableP :: Parser IsNullable
-isNullableP = undefined
+isNullableP = lexemeS do
+  optional (C.string "not null") >>= \case
+    Nothing -> return Nullable
+    Just _ -> return NonNullable
 
 schemaP :: Parser Database
 schemaP = lexeme do
