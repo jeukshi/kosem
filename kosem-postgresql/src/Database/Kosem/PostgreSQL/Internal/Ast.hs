@@ -219,8 +219,8 @@ collectAllVariables = concatMap collectVariables . collectExprs
       (EParam n t ty) -> acc ++ [(n, t, ty)]
       (EParamMaybe n t ty) -> acc ++ [(n, t, ty)]
       (EParens expr _) -> go expr acc
-      (ELit lit _) -> []
-      (ECol columnName _) -> []
+      (ELit lit _) -> acc
+      (ECol columnName _) -> acc
       (EPgCast expr ty _) -> go expr acc
       (ENot not expr) -> go expr acc
       (EAnd lhs and rhs) -> go rhs (go lhs acc)
