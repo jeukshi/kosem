@@ -11,6 +11,7 @@ import Data.Text qualified as T
 import Database.Kosem.PostgreSQL.Internal.Classes
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Types
+import Database.Kosem.PostgreSQL.Internal.Diagnostics (P)
 
 astToRawSql :: STerm TypeInfo -> ByteString
 astToRawSql = toStrict . toLazyByteString . toRawSql
@@ -192,20 +193,20 @@ instance ToRawSql TypeInfo where
   toRawSql _ = ""
 
 data Expr t
-  = EParens (Expr t) t
-  | EParam Int Identifier t
-  | EParamMaybe Int Identifier t
-  | ELit LiteralValue t
-  | ECol Identifier t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
-  | EPgCast (Expr t) Identifier t -- TODO Identifier
+  = EParens P (Expr t) P t
+  | EParam P Int Identifier t
+  | EParamMaybe P Int Identifier t
+  | ELit P LiteralValue t
+  | ECol P Identifier t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
+  | EPgCast P (Expr t) Identifier t -- TODO Identifi
   | -- | expression::type
-    ENot Not (Expr t)
-  | EAnd (Expr t) And (Expr t)
-  | EOr (Expr t) Or (Expr t)
-  | EBinOp (Expr t) Operator (Expr t) t
+    ENot P Not (Expr t)
+  | EAnd P (Expr t) And (Expr t)
+  | EOr P (Expr t) Or (Expr t)
+  | EBinOp P (Expr t) Operator (Expr t) t
   | -- Comparsion predicates
-    EBetween (Expr t) Between (Expr t) And (Expr t)
-  | ENotBetween (Expr t) Not Between (Expr t) And (Expr t)
+    EBetween P (Expr t) Between (Expr t) And (Expr t)
+  | ENotBetween P (Expr t) Not Between (Expr t) And (Expr t)
   deriving (Show)
 
 collectAllVariables :: STerm TypeInfo -> [(Int, Identifier, TypeInfo)]
@@ -216,42 +217,42 @@ collectAllVariables = concatMap collectVariables . collectExprs
    where
     go :: Expr TypeInfo -> [(Int, Identifier, TypeInfo)] -> [(Int, Identifier, TypeInfo)]
     go expr acc = case expr of
-      (EParam n t ty) -> acc ++ [(n, t, ty)]
-      (EParamMaybe n t ty) -> acc ++ [(n, t, ty)]
-      (EParens expr _) -> go expr acc
-      (ELit lit _) -> acc
-      (ECol columnName _) -> acc
-      (EPgCast expr ty _) -> go expr acc
-      (ENot not expr) -> go expr acc
-      (EAnd lhs and rhs) -> go rhs (go lhs acc)
-      (EOr lhs or rhs) -> go rhs (go lhs acc)
-      (EBinOp lhs or rhs _) -> go rhs (go lhs acc)
-      (EBetween lhs between rhs1 and rhs2) ->
+      (EParam _ n t ty) -> acc ++ [(n, t, ty)]
+      (EParamMaybe _ n t ty) -> acc ++ [(n, t, ty)]
+      (EParens _ expr _ _) -> go expr acc
+      (ELit _ lit _) -> acc
+      (ECol _ columnName _) -> acc
+      (EPgCast _ expr ty _) -> go expr acc
+      (ENot _ not expr) -> go expr acc
+      (EAnd _ lhs and rhs) -> go rhs (go lhs acc)
+      (EOr _ lhs or rhs) -> go rhs (go lhs acc)
+      (EBinOp _ lhs or rhs _) -> go rhs (go lhs acc)
+      (EBetween _ lhs between rhs1 and rhs2) ->
         go rhs1 (go rhs2 (go lhs acc))
-      (ENotBetween lhs not between rhs1 and rhs2) ->
+      (ENotBetween _ lhs not between rhs1 and rhs2) ->
         go rhs1 (go rhs2 (go lhs acc))
 
 instance ToRawSql (Expr TypeInfo) where
   toRawSql :: Expr TypeInfo -> Builder
   toRawSql = \cases
-    (EParam n _ _) -> textToBuilder (T.pack $ "$" <> show n)
-    (EParamMaybe n _ _) -> textToBuilder (T.pack $ "$" <> show n)
-    (EParens expr _) -> "(" <> toRawSql expr <> ")"
-    (ELit lit _) -> toRawSql lit
-    (ECol columnName _) -> toRawSql columnName
-    (EPgCast lhs identifier _) -> toRawSql lhs <> "::" <> toRawSql identifier
-    (ENot not rhs) -> toRawSql not <-> toRawSql rhs
-    (EAnd lhs and rhs) -> toRawSql lhs <-> toRawSql and <-> toRawSql rhs
-    (EOr lhs or rhs) -> toRawSql lhs <-> toRawSql or <-> toRawSql rhs
-    (EBinOp lhs operator rhs _) ->
+    (EParam _ n _ _) -> textToBuilder (T.pack $ "$" <> show n)
+    (EParamMaybe _ n _ _) -> textToBuilder (T.pack $ "$" <> show n)
+    (EParens _ expr _ _) -> "(" <> toRawSql expr <> ")"
+    (ELit _ lit _) -> toRawSql lit
+    (ECol _ columnName _) -> toRawSql columnName
+    (EPgCast _ lhs identifier _) -> toRawSql lhs <> "::" <> toRawSql identifier
+    (ENot _ not rhs) -> toRawSql not <-> toRawSql rhs
+    (EAnd _ lhs and rhs) -> toRawSql lhs <-> toRawSql and <-> toRawSql rhs
+    (EOr _ lhs or rhs) -> toRawSql lhs <-> toRawSql or <-> toRawSql rhs
+    (EBinOp _ lhs operator rhs _) ->
       toRawSql lhs <-> toRawSql operator <-> toRawSql rhs
-    (EBetween lhs between rhs1 and rhs2) ->
+    (EBetween _ lhs between rhs1 and rhs2) ->
       toRawSql lhs
         <-> toRawSql between
         <-> toRawSql rhs1
         <-> toRawSql and
         <-> toRawSql rhs2
-    (ENotBetween lhs not between rhs1 and rhs2) ->
+    (ENotBetween _ lhs not between rhs1 and rhs2) ->
       toRawSql lhs
         <-> toRawSql not
         <-> toRawSql between

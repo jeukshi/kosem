@@ -20,7 +20,7 @@ spec = around withDB $ do
             rows <-
                 execute
                     conn
-                    [Tdb.sql| select false field1
+                        [Tdb.sql| select false field1
                                    , true field2
                                    , 'xyz' field3
                                    |]

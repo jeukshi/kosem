@@ -15,16 +15,35 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Void (Void)
 import Database.Kosem.PostgreSQL.Internal.Ast
+import Database.Kosem.PostgreSQL.Internal.Diagnostics
 import Database.Kosem.PostgreSQL.Internal.ParserUtils
 import Database.Kosem.PostgreSQL.Internal.Types
-import Text.Megaparsec
+import Text.Megaparsec hiding (parse)
 import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Debug (dbg)
 import Text.Pretty.Simple
 import Prelude hiding (takeWhile)
 
-data Token = Token SourcePos (STerm ())
+parse
+    :: Text
+    -> Either CompileError (STerm ())
+parse input = do
+    let state =
+            State
+                { stateInput = input
+                , stateOffset = 0
+                , statePosState = initPosState input
+                , stateParseErrors = []
+                }
+    let (_, res) = runParser' selectCore state
+    case res of
+        Left e -> do
+            let firstErr = NonEmpty.head (bundleErrors e)
+            let p = MkP $ errorOffset firstErr
+            let errMsg = parseErrorTextPretty firstErr
+            Left $ ParseError p errMsg
+        Right r -> Right r
 
 symbol :: Text -> Parser Text
 symbol = L.symbol' skipWhitespace
@@ -150,14 +169,17 @@ aliasedExprP = lexeme do
             alias <- identifierP
             return $ WithAlias expr alias maybeAs
 
-parens :: Parser a -> Parser a
-parens p = lexeme do
-    between (symbol "(") (symbol ")") p
+parensExprP :: Parser (Expr ())
+parensExprP = lexeme do
+    p1 <- getP
+    expr <- between (symbol "(") (symbol ")") exprP
+    p2 <- getP
+    return $ EParens p1 expr p2 ()
 
 termP :: Parser (Expr ())
 termP = lexeme do
     choice
-        [ flip EParens () <$> parens exprP
+        [ parensExprP
         , exprLitP
         , exprColP
         , paramMaybeP
@@ -167,15 +189,20 @@ termP = lexeme do
 identifierP :: Parser Identifier
 identifierP = Identifier <$> labelP
 
+getP :: Parser P
+getP = MkP <$> getOffset
+
 paramP :: Parser (Expr ())
 paramP = lexeme do
+    p <- getP
     symbol ":"
-    (EParam 0 <$> identifierP) <*> pure ()
+    (EParam p 0 <$> identifierP) <*> pure ()
 
 paramMaybeP :: Parser (Expr ())
 paramMaybeP = lexeme do
+    p <- getP
     symbol ":?"
-    (EParamMaybe 0 <$> identifierP) <*> pure ()
+    (EParamMaybe p 0 <$> identifierP) <*> pure ()
 
 pgCastP :: Parser Identifier
 pgCastP = lexeme do
@@ -196,38 +223,39 @@ anyOperatorP = lexeme do
     return $ Operator operator
   where
     allowedSymbols :: Parser Char
-    allowedSymbols = choice
-                [ C.char '+'
-                , C.char '-'
-                , C.char '*'
-                , C.char '/'
-                , C.char '<'
-                , C.char '>'
-                , C.char '='
-                , C.char '~'
-                , C.char '!'
-                , C.char '@'
-                , C.char '#'
-                , C.char '%'
-                , C.char '^'
-                , C.char '&'
-                , C.char '|'
-                , C.char '`'
-                , C.char '?'
-                ]
+    allowedSymbols =
+        choice
+            [ C.char '+'
+            , C.char '-'
+            , C.char '*'
+            , C.char '/'
+            , C.char '<'
+            , C.char '>'
+            , C.char '='
+            , C.char '~'
+            , C.char '!'
+            , C.char '@'
+            , C.char '#'
+            , C.char '%'
+            , C.char '^'
+            , C.char '&'
+            , C.char '|'
+            , C.char '`'
+            , C.char '?'
+            ]
 
 binOpP :: Text -> Parser (Expr () -> Expr () -> Expr ())
-binOpP sym = mkBinOp <$> operatorP sym
+binOpP sym = mkBinOp <$> getP <*> operatorP sym
   where
-    mkBinOp operator lhs rhs =
-        EBinOp lhs operator rhs ()
+    mkBinOp p operator lhs rhs =
+        EBinOp p lhs operator rhs ()
 
 anyBinOpP :: Parser (Expr () -> Expr () -> Expr ())
 anyBinOpP = lexeme do
-    mkBinOp <$> anyOperatorP
+    mkBinOp <$> getP <*> anyOperatorP
   where
-    mkBinOp operator lhs rhs =
-        EBinOp lhs operator rhs ()
+    mkBinOp p operator lhs rhs =
+        EBinOp p lhs operator rhs ()
 
 exprP :: Parser (Expr ())
 exprP = makeExprParser termP operatorsTable
@@ -235,7 +263,7 @@ exprP = makeExprParser termP operatorsTable
     operatorsTable =
         -- TODO precedence:
         -- https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE
-        [ [Postfix do mkCast <$> pgCastP <*> pure ()]
+        [ [Postfix do mkCast <$> lexeme getP <*> pgCastP <*> pure ()]
         , [InfixL do binOpP "^"]
         ,
             [ InfixL do binOpP "*"
@@ -249,9 +277,20 @@ exprP = makeExprParser termP operatorsTable
         , [InfixL do anyBinOpP]
         ,
             [ Postfix do
-                mkBetween <$> betweenK <*> termP <*> andK <*> termP
+                mkBetween
+                    <$> lexeme getP
+                    <*> betweenK
+                    <*> termP
+                    <*> andK
+                    <*> termP
             , Postfix do
-                mkNotBetween <$> notK <*> betweenK <*> termP <*> andK <*> termP
+                mkNotBetween
+                    <$> lexeme getP
+                    <*> notK
+                    <*> betweenK
+                    <*> termP
+                    <*> andK
+                    <*> termP
             ]
         ,
             [ InfixL do binOpP "<>"
@@ -262,35 +301,33 @@ exprP = makeExprParser termP operatorsTable
             , InfixL do binOpP ">"
             , InfixL do binOpP "="
             ]
-        , [Prefix do ENot <$> notK]
-        , [InfixL do flip EAnd <$> andK]
-        , [InfixL do flip EOr <$> orK]
+        , [Prefix do ENot <$> lexeme getP <*> notK]
+        , [InfixL do mkAnd <$> lexeme getP <*> andK]
+        , [InfixL do mkOr <$> lexeme getP <*> orK]
         ]
-    mkCast text ty expr = EPgCast expr text ty
-    mkBetween between rhs1 and rhs2 lhs =
-        EBetween lhs between rhs1 and rhs2
+    mkCast p text ty expr = EPgCast p expr text ty
+    mkBetween p between rhs1 and rhs2 lhs =
+        EBetween p lhs between rhs1 and rhs2
 
-    mkNotBetween not between rhs1 and rhs2 lhs =
-        ENotBetween lhs not between rhs1 and rhs2
+    mkNotBetween p not between rhs1 and rhs2 lhs =
+        ENotBetween p lhs not between rhs1 and rhs2
+    mkAnd p and lhs = EAnd p lhs and
+    mkOr p and lhs = EOr p lhs and
 
 exprLitP :: Parser (Expr ())
 exprLitP = lexeme do
+    p <- getP
     lit <-
         choice
             [ boolLiteralP
             , textLiteralP
             ]
-    return $ ELit lit ()
+    return $ ELit p lit ()
 
 exprColP :: Parser (Expr ())
 exprColP = lexeme do
-    flip ECol () <$> (Identifier <$> labelP)
-
-exprAndP :: Parser (Expr ())
-exprAndP = do
-    leftExpr <- exprP
-    andK
-    EAnd leftExpr And <$> exprP
+    p <- getP
+    flip (ECol p) () <$> (Identifier <$> labelP)
 
 boolLiteralP :: Parser LiteralValue
 boolLiteralP = lexeme do
