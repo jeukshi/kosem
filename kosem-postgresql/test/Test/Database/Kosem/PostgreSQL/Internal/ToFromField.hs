@@ -7,13 +7,10 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Text (Text)
 import Data.Vector qualified as V
 import Database.Kosem.PostgreSQL.Internal
-import Database.Kosem.PostgreSQL.Internal.FromField (
-    FromField (..),
-    parseField,
- )
-import Database.Kosem.PostgreSQL.Internal.ToField (
-    ToField (..),
- )
+import Database.Kosem.PostgreSQL.Internal.FromField
+    ( parseField, FromField(..) )
+import Database.Kosem.PostgreSQL.Internal.ToField
+    ( ToField(toField), ToField(..) )
 import Hedgehog.Gen qualified as Gen
 import Hedgehog.Range qualified as Range
 import Test.Db qualified as Tdb
@@ -125,8 +122,7 @@ specIO = around withDB do
             let hsMbTextNothing = Nothing
             let hsMbBoolNothing = Nothing
             let hsMbIntNothing = Nothing
-            let query =
-                    [Tdb.sql|
+            let query = [Tdb.sql|
                 select :?hsMbFalse::boolean dbMbFalse
                      , :?hsMbTrue::boolean dbMbTrue
                      , :?hsMbTextNothing::text dbMbTextNothing

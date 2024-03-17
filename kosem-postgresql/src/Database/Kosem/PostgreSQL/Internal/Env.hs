@@ -14,6 +14,7 @@ import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin (DatabaseConfig (binaryOperators))
 import Database.Kosem.PostgreSQL.Internal.Types
 import Language.Haskell.TH (Name)
+import Database.Kosem.PostgreSQL.Internal.Diagnostics (CompileError)
 
 data IntroType
     = Subquery
@@ -36,20 +37,14 @@ data Env = Env
 emptyEnv :: Env
 emptyEnv = Env [] []
 
-data TcError
-    = NotInScope Text
-    | AmbiguousColumnReference Text
-    | Err Text
-    deriving (Show)
-
-type TcM = ReaderT Database (StateT Env (ExceptT TcError Identity))
+type TcM = ReaderT Database (StateT Env (ExceptT CompileError Identity))
 
 newtype Tc a = Tc
     { runTc :: TcM a
     }
     deriving (Monad, Functor, Applicative, MonadTc)
 
-runProgram :: Database -> Tc a -> Either TcError a
+runProgram :: Database -> Tc a -> Either CompileError a
 runProgram schema prog =
     runIdentity
         . runExceptT
@@ -68,7 +63,7 @@ class (Monad m) => MonadTc m where
     getParamNumber :: Identifier -> m (Maybe Int)
     addParam :: Identifier -> m Int
 
-    throwError :: TcError -> m a
+    throwError :: CompileError -> m a
 
 instance MonadTc TcM where
     getEnv = do
@@ -107,7 +102,7 @@ instance MonadTc TcM where
         -- \| + 1 for new elemen we just added.
         return $ length currentEnv.params + 1
 
-    throwError :: TcError -> TcM a
+    throwError :: CompileError -> TcM a
     throwError = Control.Monad.Except.throwError
 
     getType :: Identifier -> TcM PgType
