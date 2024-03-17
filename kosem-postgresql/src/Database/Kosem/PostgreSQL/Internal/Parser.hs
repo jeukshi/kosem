@@ -6,7 +6,6 @@ import Control.Monad.Combinators.Expr (
     makeExprParser,
  )
 import Control.Monad.Combinators.NonEmpty qualified as Combinators.NonEmpty
-import Control.Monad.Cont (MonadPlus (mzero))
 import Data.Char (isNumber)
 import Data.Functor (($>), (<&>))
 import Data.List.NonEmpty (NonEmpty (..))

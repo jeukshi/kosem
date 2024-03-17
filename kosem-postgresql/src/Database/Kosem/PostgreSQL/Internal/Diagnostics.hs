@@ -6,20 +6,13 @@ module Database.Kosem.PostgreSQL.Internal.Diagnostics where
 import Data.Coerce (coerce)
 import Data.String (IsString (fromString))
 import Data.Text (Text)
+import Database.Kosem.PostgreSQL.Internal.Diagnostics.GHC (errorWithSpan)
 import GHC (mkSrcSpan)
-import GHC.Driver.Errors.Types (GhcMessage (..))
-import GHC.Parser.Errors.Types (PsMessage (..))
-import GHC.Tc.Errors.Types (TcRnMessage (TcRnUnknownMessage))
 import GHC.Tc.Types (TcM)
-import GHC.Tc.Utils.Monad (addErrAt)
-import GHC.Types.Error (mkPlainError, noHints)
 import GHC.Types.SrcLoc (SrcSpan, mkSrcLoc)
-import GHC.Utils.Outputable (text)
-import Language.Haskell.TH (runIO)
 import Language.Haskell.TH.Syntax (Exp, Loc (..), Q (Q), location)
 import Text.Megaparsec (PosState (..), TraversableStream (reachOffsetNoLine))
 import Text.Megaparsec.Pos (SourcePos (..), mkPos, unPos)
-import Unsafe.Coerce (unsafeCoerce)
 
 initPosState :: Text -> PosState Text
 initPosState input =
@@ -82,6 +75,7 @@ compileError input error = do
                 -- except the first line, which starts at arbitrary position.
                     errColumn + qqColumn - 1
                 else errColumn
+        -- TODO move all SrcSpan business to Diagnostics.GHC
         srcLocStart =
             mkSrcLoc qqFilename srcLine srcColumn
         srcLocEnd =
@@ -91,21 +85,3 @@ compileError input error = do
     -- \| Return any 'Exp', so GHC can type-check this function.
     -- We report an error, so it doesn't matter.
     [e|()|]
-
-errorWithSpan :: SrcSpan -> String -> Q ()
-errorWithSpan loc msg = unsafeRunTcM $ addErrAt loc msg'
-  where
-    msg' =
-        TcRnUnknownMessage
-            ( GhcPsMessage $
-                PsUnknownMessage $
-                    mkPlainError noHints $
-                        text msg
-            )
-    -- \| Stolen from: https://github.com/guibou/PyF
-    -- Which comes from:
-    -- https://www.tweag.io/blog/2021-01-07-haskell-dark-arts-part-i/
-    -- Like PyF, we keep it for errors only, so it "should be fine".
-    -- TODO check if it is fine with warnings too, when we have them.
-    unsafeRunTcM :: TcM a -> Q a
-    unsafeRunTcM m = Q (unsafeCoerce m)
