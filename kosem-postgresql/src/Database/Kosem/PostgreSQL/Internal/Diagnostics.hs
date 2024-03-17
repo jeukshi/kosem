@@ -98,11 +98,12 @@ spanWithCodePoint
                 }
 
 data CompileError
-    = ParseError (DiagnosticSpan P) String
-    | TypeError (DiagnosticSpan P) String
-    | NoAliasError (DiagnosticSpan P) String
-    | ParametersWithoutCastError (DiagnosticSpan P) String
-    | ExprWithNoAlias (DiagnosticSpan P) String
+    = ParseError (DiagnosticSpan P) Text
+    | TypeError (DiagnosticSpan P) Text
+    | NoAliasError (DiagnosticSpan P) Text
+    | ParametersWithoutCastError (DiagnosticSpan P) Text
+    | ExprWithNoAlias (DiagnosticSpan P) Text
+    | OperatorDoesntExist (DiagnosticSpan P) Text
     deriving (Show)
 
 compileErrorSpan :: CompileError -> DiagnosticSpan P
@@ -112,14 +113,16 @@ compileErrorSpan = \case
     NoAliasError span _ -> span
     ParametersWithoutCastError span _ -> span
     ExprWithNoAlias span _ -> span
+    OperatorDoesntExist span _ -> span
 
-compileErrorMsg :: CompileError -> String
+compileErrorMsg :: CompileError -> Text
 compileErrorMsg = \case
     ParseError _ msg -> msg
     TypeError _ msg -> msg
     NoAliasError _ msg -> msg
     ParametersWithoutCastError _ msg -> msg
     ExprWithNoAlias _ msg -> msg
+    OperatorDoesntExist _ msg -> msg
 
 compileError :: Text -> CompileError -> Q Exp
 compileError input error = do

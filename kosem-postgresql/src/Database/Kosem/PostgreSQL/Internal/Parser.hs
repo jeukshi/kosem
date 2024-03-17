@@ -42,7 +42,7 @@ parse input = do
             let p = MkP $ errorOffset firstErr
             let errMsg = parseErrorTextPretty firstErr
             -- TODO maybe we can allow longer DiagnosticSpans
-            Left $ ParseError (DiagnosticSpan p p) errMsg
+            Left $ ParseError (DiagnosticSpan p p) (T.pack errMsg)
         Right r -> Right r
 
 symbol :: Text -> Parser Text

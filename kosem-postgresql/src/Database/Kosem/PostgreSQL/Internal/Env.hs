@@ -56,7 +56,7 @@ class (Monad m) => MonadTc m where
     getEnv :: m Env
     setEnv :: m Env
     getType :: Identifier -> m PgType
-    getBinaryOpResult :: PgType -> Operator -> PgType -> m PgType
+    getBinaryOpResult :: PgType -> Operator -> PgType -> m (Maybe PgType)
     getTableByName :: Identifier -> m [Table]
     getColumnByName :: Identifier -> m [Field]
     addFieldsToEnv :: [Field] -> m ()
@@ -119,24 +119,15 @@ instance MonadTc TcM where
                     then pure t
                     else find identifier xs
 
-    getBinaryOpResult :: PgType -> Operator -> PgType -> TcM PgType
+    getBinaryOpResult :: PgType -> Operator -> PgType -> TcM (Maybe PgType)
     getBinaryOpResult lhs op rhs = do
         -- | Postgres converts '!=' to '<>', see note:
         -- https://www.postgresql.org/docs/current/functions-comparison.html
         let realOp = if op == "!=" then "<>" else op
         binOpsMap <- asks (.binaryOps)
-        let ty =
-                listToMaybe
+        return $ listToMaybe
                     . map (\(_, _, _, ty) -> ty)
                     . filter (\(_, _, r, _) -> r == rhs)
                     . filter (\(_, l, _, _) -> l == lhs)
                     . filter (\(o, _, _, _) -> o == realOp)
                     $ binOpsMap
-        case ty of
-            Just x -> return x
-            Nothing ->
-                error $
-                    "operator does not exist: "
-                        <> show lhs
-                        <> show realOp
-                        <> show rhs

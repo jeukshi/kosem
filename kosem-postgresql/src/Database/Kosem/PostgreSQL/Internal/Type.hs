@@ -216,9 +216,21 @@ tcExpr = \cases
         tcRhs <- tcExpr rhs
         let (TypeInfo tyLhs nullableLhs) = exprType tcLhs
         let (TypeInfo tyRhs nullableRhs) = exprType tcRhs
-        tyRes <- getBinaryOpResult tyLhs op tyRhs
         let nullableRes = tcNullable nullableLhs nullableRhs
-        return $ EBinOp p tcLhs op tcRhs (TypeInfo tyRes nullableRes)
+        getBinaryOpResult tyLhs op tyRhs >>= \case
+            Just tyRes ->
+                return $ EBinOp p tcLhs op tcRhs (TypeInfo tyRes nullableRes)
+            Nothing ->
+                throwError $
+                    OperatorDoesntExist
+                        (DiagnosticSpan p (p `movePby` operatorLength op))
+                        ("operator does not exist: "
+                        <> pgTypePretty tyLhs
+                        <> " "
+                        <> operatorPretty op
+                        <> " "
+                        <> pgTypePretty tyRhs
+                        )
     (EBetween p lhs between rhs1 and rhs2) -> do
         -- TODO typecheck `between` against <= >=
         tyLhs <- tcExpr lhs
@@ -246,11 +258,11 @@ tcExpr = \cases
         when (exprType tyLhs ~/=~ TypeInfo PgBoolean Nullable) do
             throwError $
                 TypeError (toDiagnosticSpan tyLhs) $
-                    "argument of '" <> T.unpack func <> "' must be type 'boolean'"
+                    "argument of '" <> func <> "' must be type 'boolean'"
         when (exprType tyRhs ~/=~ TypeInfo PgBoolean Nullable) do
             throwError $
                 TypeError (toDiagnosticSpan tyRhs) $
-                    "argument of '" <> T.unpack func <> "' must be type 'boolean'"
+                    "argument of '" <> func <> "' must be type 'boolean'"
         return (tyLhs, tyRhs)
 
     tyMustBeEqual :: Text -> Expr () -> Expr () -> Tc (Expr TypeInfo, Expr TypeInfo)
@@ -261,7 +273,7 @@ tcExpr = \cases
             -- TODO prolly not tyLhs
             throwError $
                 TypeError (toDiagnosticSpan tyLhs) $
-                    "arguments of '" <> T.unpack func <> "' must be of the same type"
+                    "arguments of '" <> func <> "' must be of the same type"
         return (tyLhs, tyRhs)
 
 columnByName :: Identifier -> Tc Field

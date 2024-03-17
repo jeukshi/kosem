@@ -19,6 +19,10 @@ data IsNullable
 newtype PgType = Scalar Identifier
     deriving (Show, Eq, Lift)
 
+pgTypePretty :: PgType -> Text
+pgTypePretty = \cases
+  (Scalar identifier) -> identifierPretty identifier
+
 newtype Identifier = Identifier Text
     deriving (Show) via Text
     deriving (Eq) via Text
@@ -35,11 +39,20 @@ identifierLength = T.length . coerce
 identifierToString :: Identifier -> String
 identifierToString = T.unpack . coerce
 
+identifierPretty :: Identifier -> Text
+identifierPretty = coerce
+
 newtype Operator = Operator Text
     deriving (Show) via Text
     deriving (Eq) via Text
     deriving (IsString) via Text
     deriving (Lift)
+
+operatorLength :: Operator -> Int
+operatorLength = T.length . coerce
+
+operatorPretty :: Operator -> Text
+operatorPretty = coerce
 
 instance ToRawSql Operator where
     toRawSql :: Operator -> Builder
