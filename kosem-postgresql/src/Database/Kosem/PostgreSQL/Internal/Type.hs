@@ -90,12 +90,12 @@ toDiagnosticSpan = \cases
     (EParam p _ identifier _) ->
         DiagnosticSpan
             p
-            -- | +1 from ':' prefix.
+            -- \| +1 from ':' prefix.
             (p `movePby` (identifierLength identifier + 1))
     (EParamMaybe p _ identifier _) ->
         DiagnosticSpan
             p
-            -- | +2 from ':?' prefix.
+            -- \| +2 from ':?' prefix.
             (p `movePby` (identifierLength identifier + 2))
     (ELit p lit _) -> case lit of
         NumericLiteral -> undefined -- TODO
@@ -106,7 +106,7 @@ toDiagnosticSpan = \cases
         TextLiteral text ->
             DiagnosticSpan
                 p
-                -- | +2 from single quote.
+                -- \| +2 from single quote.
                 (p `movePby` (T.length text + 2))
     (ECol p identifier _) ->
         DiagnosticSpan
@@ -130,21 +130,6 @@ toDiagnosticSpan = \cases
     (ENotBetween _ lhs _ _ _ _ rhs2) ->
         toDiagnosticSpan lhs
             `combineSpans` toDiagnosticSpan rhs2
-
-exprPosition :: Expr a -> P
-exprPosition = \cases
-    (EPgCast p _ _ _ _) -> p
-    (EParens p _ _ _) -> p
-    (EParam p _ _ _) -> p
-    (EParamMaybe p _ _ _) -> p
-    (ELit p _ _) -> p
-    (ECol p _ _) -> p
-    (ENot p _ _) -> p
-    (EAnd p _ _ _) -> p
-    (EOr p _ _ _) -> p
-    (EBinOp p _ _ _ _) -> p
-    (EBetween p _ _ _ _ _) -> p
-    (ENotBetween p _ _ _ _ _ _) -> p
 
 exprType :: Expr TypeInfo -> TypeInfo
 exprType = \cases
