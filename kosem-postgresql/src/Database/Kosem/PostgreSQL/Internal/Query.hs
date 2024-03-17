@@ -22,7 +22,7 @@ import Database.Kosem.PostgreSQL.Internal.Parser (parse)
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
 import Database.Kosem.PostgreSQL.Internal.TH
-import Database.Kosem.PostgreSQL.Internal.Type (exprPosition, exprType, typecheck, toDiagnosticSpan)
+import Database.Kosem.PostgreSQL.Internal.Type (exprType, typecheck, toDiagnosticSpan)
 import Database.Kosem.PostgreSQL.Internal.Types
 import GHC.Driver.Errors.Types (GhcMessage (..))
 import GHC.Exts (Any)
