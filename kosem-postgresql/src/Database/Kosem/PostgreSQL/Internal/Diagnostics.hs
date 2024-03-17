@@ -106,6 +106,8 @@ data CompileError
     | OperatorDoesntExist (DiagnosticSpan P) Text
     | ColumnDoesNotExist (DiagnosticSpan P) Text
     | ColumnNameIsAmbigious (DiagnosticSpan P) Text
+    | TableDoesNotExist (DiagnosticSpan P) Text
+    | TableNameIsAmbigious (DiagnosticSpan P) Text
     deriving (Show)
 
 compileErrorSpan :: CompileError -> DiagnosticSpan P
@@ -118,6 +120,9 @@ compileErrorSpan = \case
     OperatorDoesntExist span _ -> span
     ColumnDoesNotExist span _ -> span
     ColumnNameIsAmbigious span _ -> span
+    TableDoesNotExist span _ -> span
+    TableNameIsAmbigious span _ -> span
+
 
 compileErrorMsg :: CompileError -> Text
 compileErrorMsg = \case
@@ -129,6 +134,8 @@ compileErrorMsg = \case
     OperatorDoesntExist _ msg -> msg
     ColumnDoesNotExist _ msg -> msg
     ColumnNameIsAmbigious _ msg -> msg
+    TableDoesNotExist _ msg -> msg
+    TableNameIsAmbigious _ msg -> msg
 
 compileError :: Text -> CompileError -> Q Exp
 compileError input error = do

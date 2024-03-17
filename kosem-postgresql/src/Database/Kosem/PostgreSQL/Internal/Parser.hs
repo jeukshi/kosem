@@ -138,7 +138,7 @@ joinOnP = lexeme do
 
 fromItemTableNameP :: Parser (FromItem ())
 fromItemTableNameP = lexeme do
-    FiTableName <$> tableNameP
+    FiTableName <$> getP <*> tableNameP
 
 tableNameP :: Parser Identifier
 tableNameP = lexeme do

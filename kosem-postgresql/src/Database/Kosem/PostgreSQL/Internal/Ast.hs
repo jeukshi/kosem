@@ -45,7 +45,7 @@ collectExprs = \cases
   fromFrom (From fromItem) = fromFromItem fromItem
   fromFromItem :: FromItem TypeInfo -> [Expr TypeInfo]
   fromFromItem = \cases
-    (FiTableName _) -> []
+    (FiTableName _ _) -> []
     (FiJoin lhs _ rhs joinCondition) ->
       fromJoinCondition joinCondition
         ++ fromFromItem lhs
@@ -64,13 +64,13 @@ instance ToRawSql (STerm TypeInfo) where
         <-> maybe "" toRawSql whereClause
 
 data FromItem t
-  = FiTableName Identifier
+  = FiTableName P Identifier
   | FiJoin (FromItem t) JoinType (FromItem t) (JoinCondition t)
   deriving (Show)
 
 instance ToRawSql (FromItem TypeInfo) where
   toRawSql = \cases
-    (FiTableName tableName) -> toRawSql tableName
+    (FiTableName _ tableName) -> toRawSql tableName
     (FiJoin lhs joinType rhs condition) ->
       toRawSql lhs
         <-> toRawSql joinType

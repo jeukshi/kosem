@@ -60,10 +60,21 @@ tcSelectExpr = mapM tc
 
 tcFromItem :: FromItem () -> Tc (FromItem TypeInfo)
 tcFromItem = \cases
-    (FiTableName tableName) -> do
-        table <- tableByName tableName
-        addTableToEnv table
-        return $ FiTableName tableName
+    (FiTableName p tableName) -> do
+        getTableByName tableName >>= \case
+            [] ->
+                throwError $
+                    TableDoesNotExist
+                        (DiagnosticSpan p (p `movePby` identifierLength tableName))
+                        ("table does not exist: " <> identifierPretty tableName)
+            [table] -> do
+                addTableToEnv table
+                return $ FiTableName p tableName
+            ts ->
+                throwError $
+                    TableNameIsAmbigious
+                        (DiagnosticSpan p (p `movePby` identifierLength tableName))
+                        ("table name is ambigious: " <> identifierPretty tableName)
     (FiJoin lhs joinType rhs joinCondition) -> do
         tyLhs <- tcFromItem lhs
         tyRhs <- tcFromItem rhs
@@ -285,13 +296,6 @@ tcExpr = \cases
                 TypeError (toDiagnosticSpan tyLhs) $
                     "arguments of '" <> func <> "' must be of the same type"
         return (tyLhs, tyRhs)
-
-tableByName :: Identifier -> Tc Table
-tableByName name =
-    getTableByName name >>= \case
-        [] -> throwError $ error "relation does not exist"
-        [t] -> return t
-        ts -> throwError $ error "Table name is ambigious"
 
 addTableToEnv :: Table -> Tc ()
 addTableToEnv table =
