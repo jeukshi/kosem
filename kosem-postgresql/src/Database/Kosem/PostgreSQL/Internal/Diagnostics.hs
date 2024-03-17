@@ -1,18 +1,32 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Database.Kosem.PostgreSQL.Internal.Diagnostics where
+module Database.Kosem.PostgreSQL.Internal.Diagnostics (
+    initPosState,
+    P (..),
+    movePby,
+    DiagnosticSpan (..),
+    combineSpans,
+    CompileError (..),
+    compileError,
+)
+where
 
 import Data.Coerce (coerce)
 import Data.String (IsString (fromString))
 import Data.Text (Text)
-import Database.Kosem.PostgreSQL.Internal.Diagnostics.GHC (errorWithSpan)
+import Database.Kosem.PostgreSQL.Internal.Diagnostics.GHC (
+    DiagnosticSpan (..),
+    SourcePoint (..),
+    errorWithSpan,
+ )
 import GHC (mkSrcSpan)
 import GHC.Tc.Types (TcM)
 import GHC.Types.SrcLoc (SrcSpan, mkSrcLoc)
 import Language.Haskell.TH.Syntax (Exp, Loc (..), Q (Q), location)
 import Text.Megaparsec (PosState (..), TraversableStream (reachOffsetNoLine))
 import Text.Megaparsec.Pos (SourcePos (..), mkPos, unPos)
+import GHC.Data.FastString (FastString)
 
 initPosState :: Text -> PosState Text
 initPosState input =
@@ -29,24 +43,75 @@ initPosState input =
         , pstateLinePrefix = ""
         }
 
+-- TODO explain P
 newtype P = MkP {unP :: Int}
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
+
+movePby :: P -> Int -> P
+movePby p int = coerce $ coerce p + int
+
+combineSpans
+    :: DiagnosticSpan P
+    -> DiagnosticSpan P
+    -> DiagnosticSpan P
+combineSpans
+    (DiagnosticSpan p1_min p1_max)
+    (DiagnosticSpan p2_min p2_max) =
+        DiagnosticSpan
+            (min p1_min p2_min)
+            (max p1_max p2_max)
+
+spanWithCodePoint
+    :: String
+    -> (Int, Int)
+    -> Text
+    -> DiagnosticSpan P
+    -> DiagnosticSpan SourcePoint
+spanWithCodePoint
+    filename
+    qqPoint
+    input
+    (DiagnosticSpan pStart pEnd) = do
+        let errSourcePosStart =
+                pstateSourcePos $
+                    reachOffsetNoLine (coerce pStart) (initPosState input)
+            errSourcePosEnd =
+                pstateSourcePos $
+                    reachOffsetNoLine (coerce pEnd) (initPosState input)
+        DiagnosticSpan
+            (toSourcePoint filename qqPoint errSourcePosStart)
+            (toSourcePoint filename qqPoint errSourcePosEnd)
+      where
+        toSourcePoint :: String -> (Int, Int) -> SourcePos -> SourcePoint
+        toSourcePoint filename (qqLine, qqColumn) errSourcePos = do
+            let errLine = unPos errSourcePos.sourceLine
+                errColumn = unPos errSourcePos.sourceColumn
+            SourcePoint
+                { line = qqLine + errLine - 1
+                , -- \| In QuasiQuotes every line starts at column == 1,
+                  -- except the first line, which starts at arbitrary position.
+                  column =
+                    if errLine == 1
+                        then errColumn + qqColumn - 1
+                        else errColumn
+                , filename = filename
+                }
 
 data CompileError
-    = ParseError P String
-    | TypeError P String
-    | NoAliasError P String
-    | ParametersWithoutCastError P String
-    | ExprWithNoAlias P String
+    = ParseError (DiagnosticSpan P) String
+    | TypeError (DiagnosticSpan P) String
+    | NoAliasError (DiagnosticSpan P) String
+    | ParametersWithoutCastError (DiagnosticSpan P) String
+    | ExprWithNoAlias (DiagnosticSpan P) String
     deriving (Show)
 
-compileErrorP :: CompileError -> P
-compileErrorP = \case
-    ParseError p _ -> p
-    TypeError p _ -> p
-    NoAliasError p _ -> p
-    ParametersWithoutCastError p _ -> p
-    ExprWithNoAlias p _ -> p
+compileErrorSpan :: CompileError -> DiagnosticSpan P
+compileErrorSpan = \case
+    ParseError span _ -> span
+    TypeError span _ -> span
+    NoAliasError span _ -> span
+    ParametersWithoutCastError span _ -> span
+    ExprWithNoAlias span _ -> span
 
 compileErrorMsg :: CompileError -> String
 compileErrorMsg = \case
@@ -58,30 +123,13 @@ compileErrorMsg = \case
 
 compileError :: Text -> CompileError -> Q Exp
 compileError input error = do
-    let p = compileErrorP error
+    let diagnosticSpan = compileErrorSpan error
     let msg = compileErrorMsg error
     qqLoc <- location
-    let (qqLine, qqColumn) = loc_start qqLoc
-        qqFilename = fromString . loc_filename $ qqLoc
-        errSourcePos =
-            pstateSourcePos $
-                reachOffsetNoLine (coerce p) (initPosState input)
-        errLine = unPos errSourcePos.sourceLine
-        errColumn = unPos errSourcePos.sourceColumn
-        srcLine = qqLine + errLine - 1
-        srcColumn =
-            if errLine == 1
-                then -- \| In QuasiQuotes every line starts at column == 1,
-                -- except the first line, which starts at arbitrary position.
-                    errColumn + qqColumn - 1
-                else errColumn
-        -- TODO move all SrcSpan business to Diagnostics.GHC
-        srcLocStart =
-            mkSrcLoc qqFilename srcLine srcColumn
-        srcLocEnd =
-            mkSrcLoc qqFilename srcLine srcColumn
-        srcSpan = mkSrcSpan srcLocStart srcLocEnd
-    errorWithSpan srcSpan msg
+    let qqPoint = loc_start qqLoc
+        -- (qqFilename :: String) = fromString . loc_filename $ qqLoc
+        span = spanWithCodePoint qqLoc.loc_filename qqPoint input diagnosticSpan
+    errorWithSpan span msg
     -- \| Return any 'Exp', so GHC can type-check this function.
     -- We report an error, so it doesn't matter.
     [e|()|]

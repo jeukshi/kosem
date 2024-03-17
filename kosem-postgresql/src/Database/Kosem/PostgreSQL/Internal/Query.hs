@@ -22,7 +22,7 @@ import Database.Kosem.PostgreSQL.Internal.Parser (parse)
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
 import Database.Kosem.PostgreSQL.Internal.TH
-import Database.Kosem.PostgreSQL.Internal.Type (exprPosition, exprType, typecheck)
+import Database.Kosem.PostgreSQL.Internal.Type (exprPosition, exprType, typecheck, toDiagnosticSpan)
 import Database.Kosem.PostgreSQL.Internal.Types
 import GHC.Driver.Errors.Types (GhcMessage (..))
 import GHC.Exts (Any)
@@ -61,9 +61,9 @@ resultFromAst (Select resultColumns _ _) = do
   columnName = \cases
     (WithAlias expr alias _) -> Right (alias, exprType expr)
     (WithoutAlias (ECol _ columnname ty)) -> Right (columnname, ty)
-    (WithoutAlias (EPgCast _ (EParam _ _ name _) _ ty)) -> Right (name, ty)
+    (WithoutAlias (EPgCast _ (EParam _ _ name _) _ _ ty)) -> Right (name, ty)
     -- FIXME error msg
-    (WithoutAlias expr) -> Left $ ExprWithNoAlias (exprPosition expr) "expression does not have an alias"
+    (WithoutAlias expr) -> Left $ ExprWithNoAlias (toDiagnosticSpan expr) "expression does not have an alias"
 
 lookupTypes
   :: [(Identifier, TypeInfo)] -> [(Identifier, PgType, Name)] -> [(Identifier, Name, IsNullable)]

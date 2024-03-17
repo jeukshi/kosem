@@ -198,7 +198,7 @@ data Expr t
   | EParamMaybe P Int Identifier t
   | ELit P LiteralValue t
   | ECol P Identifier t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
-  | EPgCast P (Expr t) Identifier t -- TODO Identifi
+  | EPgCast P (Expr t) P Identifier t -- TODO Identifi
   | -- | expression::type
     ENot P Not (Expr t)
   | EAnd P (Expr t) And (Expr t)
@@ -222,7 +222,7 @@ collectAllVariables = concatMap collectVariables . collectExprs
       (EParens _ expr _ _) -> go expr acc
       (ELit _ lit _) -> acc
       (ECol _ columnName _) -> acc
-      (EPgCast _ expr ty _) -> go expr acc
+      (EPgCast _ expr _ _ _) -> go expr acc
       (ENot _ not expr) -> go expr acc
       (EAnd _ lhs and rhs) -> go rhs (go lhs acc)
       (EOr _ lhs or rhs) -> go rhs (go lhs acc)
@@ -240,7 +240,7 @@ instance ToRawSql (Expr TypeInfo) where
     (EParens _ expr _ _) -> "(" <> toRawSql expr <> ")"
     (ELit _ lit _) -> toRawSql lit
     (ECol _ columnName _) -> toRawSql columnName
-    (EPgCast _ lhs identifier _) -> toRawSql lhs <> "::" <> toRawSql identifier
+    (EPgCast _ lhs _ identifier _) -> toRawSql lhs <> "::" <> toRawSql identifier
     (ENot _ not rhs) -> toRawSql not <-> toRawSql rhs
     (EAnd _ lhs and rhs) -> toRawSql lhs <-> toRawSql and <-> toRawSql rhs
     (EOr _ lhs or rhs) -> toRawSql lhs <-> toRawSql or <-> toRawSql rhs

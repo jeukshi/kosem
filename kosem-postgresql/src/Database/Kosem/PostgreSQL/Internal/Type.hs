@@ -9,13 +9,19 @@ import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Database.Kosem.PostgreSQL.Internal.Ast
+import Database.Kosem.PostgreSQL.Internal.Diagnostics (
+    CompileError (..),
+    DiagnosticSpan (..),
+    P,
+    combineSpans,
+    movePby,
+ )
 import Database.Kosem.PostgreSQL.Internal.Env
 import Database.Kosem.PostgreSQL.Internal.Parser
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Text.Megaparsec (parseMaybe, parseTest)
-import Database.Kosem.PostgreSQL.Internal.Diagnostics (P, CompileError (..))
 
 typecheck :: STerm () -> Tc (STerm TypeInfo)
 typecheck = \cases
@@ -35,7 +41,7 @@ tcWhereClause = \cases
     (Just (Where expr)) -> do
         tyExpr <- tcExpr expr
         when (exprType tyExpr ~/=~ TypeInfo PgBoolean Nullable) do
-            throwError $ TypeError (exprPosition tyExpr)  "argument of 'WHERE' must be type 'boolean'"
+            throwError $ TypeError (toDiagnosticSpan tyExpr) "argument of 'WHERE' must be type 'boolean'"
         return $ Just $ Where tyExpr
 
 tcSelectExpr
@@ -70,12 +76,64 @@ tcJoinCondition = \cases
     (JcOn expr) -> do
         tyExpr <- tcExpr expr
         when (exprType tyExpr ~/=~ TypeInfo PgBoolean Nullable) do
-            throwError $ TypeError (exprPosition tyExpr) "argument of 'JOIN/ON' must be type 'boolean'"
+            throwError $ TypeError (toDiagnosticSpan tyExpr) "argument of 'JOIN/ON' must be type 'boolean'"
         return $ JcOn tyExpr
+
+toDiagnosticSpan :: Expr a -> DiagnosticSpan P
+toDiagnosticSpan = \cases
+    (EPgCast p1 _ p2 identifier _) ->
+        DiagnosticSpan
+            p1
+            (p2 `movePby` identifierLength identifier)
+    (EParens p1 _ p2 _) ->
+        DiagnosticSpan p1 p2
+    (EParam p _ identifier _) ->
+        DiagnosticSpan
+            p
+            -- | +1 from ':' prefix.
+            (p `movePby` (identifierLength identifier + 1))
+    (EParamMaybe p _ identifier _) ->
+        DiagnosticSpan
+            p
+            -- | +2 from ':?' prefix.
+            (p `movePby` (identifierLength identifier + 2))
+    (ELit p lit _) -> case lit of
+        NumericLiteral -> undefined -- TODO
+        BoolLiteral text ->
+            DiagnosticSpan
+                p
+                (p `movePby` T.length text)
+        TextLiteral text ->
+            DiagnosticSpan
+                p
+                -- | +2 from single quote.
+                (p `movePby` (T.length text + 2))
+    (ECol p identifier _) ->
+        DiagnosticSpan
+            p
+            (p `movePby` identifierLength identifier)
+    (ENot p _ expr) ->
+        DiagnosticSpan p p
+            `combineSpans` toDiagnosticSpan expr
+    (EAnd _ lhs _ rhs) ->
+        toDiagnosticSpan lhs
+            `combineSpans` toDiagnosticSpan rhs
+    (EOr _ lhs _ rhs) ->
+        toDiagnosticSpan lhs
+            `combineSpans` toDiagnosticSpan rhs
+    (EBinOp _ lhs _ rhs _) ->
+        toDiagnosticSpan lhs
+            `combineSpans` toDiagnosticSpan rhs
+    (EBetween _ lhs _ _ _ rhs2) ->
+        toDiagnosticSpan lhs
+            `combineSpans` toDiagnosticSpan rhs2
+    (ENotBetween _ lhs _ _ _ _ rhs2) ->
+        toDiagnosticSpan lhs
+            `combineSpans` toDiagnosticSpan rhs2
 
 exprPosition :: Expr a -> P
 exprPosition = \cases
-    (EPgCast p _ _ _) -> p
+    (EPgCast p _ _ _ _) -> p
     (EParens p _ _ _) -> p
     (EParam p _ _ _) -> p
     (EParamMaybe p _ _ _) -> p
@@ -90,7 +148,7 @@ exprPosition = \cases
 
 exprType :: Expr TypeInfo -> TypeInfo
 exprType = \cases
-    (EPgCast _ _ _ ty) -> ty
+    (EPgCast _ _ _ _ ty) -> ty
     (EParens _ _ _ ty) -> ty
     (EParam _ _ _ ty) -> ty
     (EParamMaybe _ _ _ ty) -> ty
@@ -110,7 +168,7 @@ tcNullable = \cases
 
 tcExpr :: Expr () -> Tc (Expr TypeInfo)
 tcExpr = \cases
-    (EPgCast p var@(EParam pParam _ name _) identifier ()) -> do
+    (EPgCast p1 var@(EParam pParam _ name _) p2 identifier ()) -> do
         -- FIXME check if can be casted
         ty <- getType identifier
         paramNumber <-
@@ -119,8 +177,8 @@ tcExpr = \cases
                 Nothing -> addParam name
         let typeInfo = TypeInfo ty NonNullable
         let tyVar = EParam pParam paramNumber name typeInfo
-        return $ EPgCast p tyVar identifier typeInfo
-    (EPgCast p var@(EParamMaybe pParam _ name _) identifier ()) -> do
+        return $ EPgCast p1 tyVar p2 identifier typeInfo
+    (EPgCast p1 var@(EParamMaybe pParam _ name _) p2 identifier ()) -> do
         -- FIXME check if can be casted
         ty <- getType identifier
         paramNumber <-
@@ -129,23 +187,25 @@ tcExpr = \cases
                 Nothing -> addParam name
         let typeInfo = TypeInfo ty Nullable
         let tyVar = EParamMaybe pParam paramNumber name typeInfo
-        return $ EPgCast p tyVar identifier typeInfo
-    (EPgCast p expr identifier ()) -> do
+        return $ EPgCast p1 tyVar p2 identifier typeInfo
+    (EPgCast p1 expr p2 identifier ()) -> do
         tyExpr <- tcExpr expr
         -- FIXME check text, check if can be casted
         -- FIXME preserve IsNullable from underlying type
         ty <- getType identifier
-        return $ EPgCast p tyExpr identifier (TypeInfo ty Nullable)
+        return $ EPgCast p1 tyExpr p2 identifier (TypeInfo ty Nullable)
     (EParens p1 expr p2 ()) -> do
         tyExpr <- tcExpr expr
         let innerTy = exprType tyExpr
         return $ EParens p1 tyExpr p2 innerTy
     expr@(EParam p _ name ()) ->
         -- TODO
-        throwError $ ParametersWithoutCastError (exprPosition expr) "parameters without cast are not supported"
+        throwError $
+            ParametersWithoutCastError (toDiagnosticSpan expr) "parameters without cast are not supported"
     expr@(EParamMaybe _ _ name ()) -> do
         -- TODO
-        throwError $ ParametersWithoutCastError (exprPosition expr) "parameters without cast are not supported"
+        throwError $
+            ParametersWithoutCastError (toDiagnosticSpan expr) "parameters without cast are not supported"
     (ELit p litVal _) -> case litVal of
         NumericLiteral -> return $ ELit p litVal (TypeInfo PgNumeric NonNullable)
         TextLiteral _ -> return $ ELit p litVal (TypeInfo PgText NonNullable) -- FIXME this is 'unknown'
@@ -158,7 +218,7 @@ tcExpr = \cases
         tyExpr <- tcExpr innerExpr
         let ty = exprType tyExpr
         when (ty ~/=~ TypeInfo PgBoolean Nullable) do
-            throwError $ TypeError (exprPosition expr) "argument of 'NOT' must be type 'boolean'"
+            throwError $ TypeError (toDiagnosticSpan expr) "argument of 'NOT' must be type 'boolean'"
         return $ ENot p not tyExpr
     (EAnd p lhs and rhs) -> do
         (tyLhs, tyRhs) <- tyMustBeBoolean "AND" lhs rhs
@@ -199,9 +259,13 @@ tcExpr = \cases
         tyLhs <- tcExpr lhs
         tyRhs <- tcExpr rhs
         when (exprType tyLhs ~/=~ TypeInfo PgBoolean Nullable) do
-            throwError $ TypeError (exprPosition tyLhs) $ "argument of '" <> T.unpack func <> "' must be type 'boolean'"
+            throwError $
+                TypeError (toDiagnosticSpan tyLhs) $
+                    "argument of '" <> T.unpack func <> "' must be type 'boolean'"
         when (exprType tyRhs ~/=~ TypeInfo PgBoolean Nullable) do
-            throwError $ TypeError (exprPosition tyRhs) $ "argument of '" <> T.unpack func <> "' must be type 'boolean'"
+            throwError $
+                TypeError (toDiagnosticSpan tyRhs) $
+                    "argument of '" <> T.unpack func <> "' must be type 'boolean'"
         return (tyLhs, tyRhs)
 
     tyMustBeEqual :: Text -> Expr () -> Expr () -> Tc (Expr TypeInfo, Expr TypeInfo)
@@ -210,7 +274,9 @@ tcExpr = \cases
         tyRhs <- tcExpr rhs
         when (exprType tyLhs ~/=~ exprType tyRhs) do
             -- TODO prolly not tyLhs
-            throwError $ TypeError (exprPosition tyLhs) $ "arguments of '" <> T.unpack func <> "' must be of the same type"
+            throwError $
+                TypeError (toDiagnosticSpan tyLhs) $
+                    "arguments of '" <> T.unpack func <> "' must be of the same type"
         return (tyLhs, tyRhs)
 
 columnByName :: Identifier -> Tc Field

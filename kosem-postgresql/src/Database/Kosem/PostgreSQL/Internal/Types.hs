@@ -29,6 +29,9 @@ instance ToRawSql Identifier where
     toRawSql :: Identifier -> Builder
     toRawSql = textToBuilder . coerce
 
+identifierLength :: Identifier -> Int
+identifierLength = T.length . coerce
+
 identifierToString :: Identifier -> String
 identifierToString = T.unpack . coerce
 

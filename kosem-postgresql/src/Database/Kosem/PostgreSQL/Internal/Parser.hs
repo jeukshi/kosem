@@ -41,7 +41,8 @@ parse input = do
             let firstErr = NonEmpty.head (bundleErrors e)
             let p = MkP $ errorOffset firstErr
             let errMsg = parseErrorTextPretty firstErr
-            Left $ ParseError p errMsg
+            -- TODO maybe we can allow longer DiagnosticSpans
+            Left $ ParseError (DiagnosticSpan p p) errMsg
         Right r -> Right r
 
 symbol :: Text -> Parser Text
@@ -172,7 +173,7 @@ parensExprP :: Parser (Expr ())
 parensExprP = lexeme do
     p1 <- getP
     expr <- between (symbol "(") (symbol ")") exprP
-    p2 <- getP
+    p2 <- getP -- FIXME p2 is way off ')' symbol
     return $ EParens p1 expr p2 ()
 
 termP :: Parser (Expr ())
@@ -203,10 +204,13 @@ paramMaybeP = lexeme do
     symbol ":?"
     (EParamMaybe p 0 <$> identifierP) <*> pure ()
 
-pgCastP :: Parser Identifier
+pgCastP :: Parser (P, Identifier)
 pgCastP = lexeme do
     symbol "::"
-    identifierP
+    lexeme do
+        p <- getP
+        i <- identifierP
+        pure (p, i)
 
 operatorP :: Text -> Parser Database.Kosem.PostgreSQL.Internal.Types.Operator
 operatorP sym = lexeme do
@@ -262,7 +266,13 @@ exprP = makeExprParser termP operatorsTable
     operatorsTable =
         -- TODO precedence:
         -- https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-PRECEDENCE
-        [ [Postfix do mkCast <$> lexeme getP <*> pgCastP <*> pure ()]
+        [
+            [ Postfix do
+                mkCast
+                    <$> lexeme getP
+                    <*> pgCastP
+                    <*> pure ()
+            ]
         , [InfixL do binOpP "^"]
         ,
             [ InfixL do binOpP "*"
@@ -304,7 +314,7 @@ exprP = makeExprParser termP operatorsTable
         , [InfixL do mkAnd <$> lexeme getP <*> andK]
         , [InfixL do mkOr <$> lexeme getP <*> orK]
         ]
-    mkCast p text ty expr = EPgCast p expr text ty
+    mkCast p1 (p2,identifier) ty expr = EPgCast p1 expr p2 identifier ty
     mkBetween p between rhs1 and rhs2 lhs =
         EBetween p lhs between rhs1 and rhs2
 
