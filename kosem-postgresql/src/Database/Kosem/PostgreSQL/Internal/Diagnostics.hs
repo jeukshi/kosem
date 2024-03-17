@@ -104,6 +104,8 @@ data CompileError
     | ParametersWithoutCastError (DiagnosticSpan P) Text
     | ExprWithNoAlias (DiagnosticSpan P) Text
     | OperatorDoesntExist (DiagnosticSpan P) Text
+    | ColumnDoesNotExist (DiagnosticSpan P) Text
+    | ColumnNameIsAmbigious (DiagnosticSpan P) Text
     deriving (Show)
 
 compileErrorSpan :: CompileError -> DiagnosticSpan P
@@ -114,6 +116,8 @@ compileErrorSpan = \case
     ParametersWithoutCastError span _ -> span
     ExprWithNoAlias span _ -> span
     OperatorDoesntExist span _ -> span
+    ColumnDoesNotExist span _ -> span
+    ColumnNameIsAmbigious span _ -> span
 
 compileErrorMsg :: CompileError -> Text
 compileErrorMsg = \case
@@ -123,6 +127,8 @@ compileErrorMsg = \case
     ParametersWithoutCastError _ msg -> msg
     ExprWithNoAlias _ msg -> msg
     OperatorDoesntExist _ msg -> msg
+    ColumnDoesNotExist _ msg -> msg
+    ColumnNameIsAmbigious _ msg -> msg
 
 compileError :: Text -> CompileError -> Q Exp
 compileError input error = do

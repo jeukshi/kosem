@@ -196,9 +196,19 @@ tcExpr = \cases
         TextLiteral _ -> return $ ELit p litVal (TypeInfo PgText NonNullable) -- FIXME this is 'unknown'
         (BoolLiteral _) -> return $ ELit p litVal (TypeInfo PgBoolean NonNullable)
     (ECol p colName _) -> do
-        envCol <- columnByName colName
-        -- FIXME NonNullable from colDef
-        return $ ECol p colName (TypeInfo envCol.typeName envCol.nullable)
+        getColumnByName colName >>= \case
+            [] ->
+                throwError $
+                    ColumnDoesNotExist
+                        (DiagnosticSpan p (p `movePby` identifierLength colName))
+                        ("column does not exist: " <> identifierPretty colName)
+            [envCol] ->
+                return $ ECol p colName (TypeInfo envCol.typeName envCol.nullable)
+            ts ->
+                throwError $
+                    ColumnNameIsAmbigious
+                        (DiagnosticSpan p (p `movePby` identifierLength colName))
+                        ("column name is ambigious: " <> identifierPretty colName)
     expr@(ENot p not innerExpr) -> do
         tyExpr <- tcExpr innerExpr
         let ty = exprType tyExpr
@@ -224,12 +234,12 @@ tcExpr = \cases
                 throwError $
                     OperatorDoesntExist
                         (DiagnosticSpan p (p `movePby` operatorLength op))
-                        ("operator does not exist: "
-                        <> pgTypePretty tyLhs
-                        <> " "
-                        <> operatorPretty op
-                        <> " "
-                        <> pgTypePretty tyRhs
+                        ( "operator does not exist: "
+                            <> pgTypePretty tyLhs
+                            <> " "
+                            <> operatorPretty op
+                            <> " "
+                            <> pgTypePretty tyRhs
                         )
     (EBetween p lhs between rhs1 and rhs2) -> do
         -- TODO typecheck `between` against <= >=
@@ -275,13 +285,6 @@ tcExpr = \cases
                 TypeError (toDiagnosticSpan tyLhs) $
                     "arguments of '" <> func <> "' must be of the same type"
         return (tyLhs, tyRhs)
-
-columnByName :: Identifier -> Tc Field
-columnByName name =
-    getColumnByName name >>= \case
-        [] -> throwError $ error ("column does not exist: " <> show name)
-        [t] -> return t
-        ts -> throwError $ error ("Column name is ambigious: " <> show name)
 
 tableByName :: Identifier -> Tc Table
 tableByName name =
