@@ -172,9 +172,12 @@ aliasedExprP = lexeme do
 parensExprP :: Parser (Expr ())
 parensExprP = lexeme do
     p1 <- getP
-    expr <- between (symbol "(") (symbol ")") exprP
-    p2 <- getP -- FIXME p2 is way off ')' symbol
-    return $ EParens p1 expr p2 ()
+    _ <- symbol "("
+    expr <- exprP
+    p2 <- lexeme getP
+    _ <- symbol ")"
+    -- \| Move p2 by one to match a position of ')'.
+    return $ EParens p1 expr (p2 `movePby` 1) ()
 
 termP :: Parser (Expr ())
 termP = lexeme do
@@ -314,7 +317,7 @@ exprP = makeExprParser termP operatorsTable
         , [InfixL do mkAnd <$> lexeme getP <*> andK]
         , [InfixL do mkOr <$> lexeme getP <*> orK]
         ]
-    mkCast p1 (p2,identifier) ty expr = EPgCast p1 expr p2 identifier ty
+    mkCast p1 (p2, identifier) ty expr = EPgCast p1 expr p2 identifier ty
     mkBetween p between rhs1 and rhs2 lhs =
         EBetween p lhs between rhs1 and rhs2
 
