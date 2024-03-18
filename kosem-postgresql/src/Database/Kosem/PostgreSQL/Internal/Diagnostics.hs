@@ -38,6 +38,7 @@ import GHC.Types.SrcLoc (SrcSpan, mkSrcLoc)
 import Language.Haskell.TH.Syntax (Exp, Loc (..), Q (Q), location)
 import Text.Megaparsec (PosState (..), TraversableStream (reachOffsetNoLine))
 import Text.Megaparsec.Pos (SourcePos (..), mkPos, unPos)
+import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 
 combineSpans
     :: DiagnosticSpan P
@@ -132,9 +133,9 @@ compileErrorMsg :: CompileError -> Text
 compileErrorMsg = \case
     ParseError _ msg -> msg
     ArgumentTypeError _ func ty ->
-        "argument of '" <> func <> "' must be type " <> pgTypePretty ty
+        "argument of ‘" <> func <> "’ must be type " <> pgTypePretty ty
     ConditionTypeError _ msg ->
-        "argument of '" <> msg <> "must be of type boolean"
+        "argument of ‘" <> msg <> "’ must be of type " <> pgTypePretty PgBoolean
     ParameterWithoutCastError _ _ ->
         "parameters without cast are not supported"
     MaybeParameterWithoutCastError _ _ ->

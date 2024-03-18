@@ -40,7 +40,7 @@ identifierToString :: Identifier -> String
 identifierToString = T.unpack . coerce
 
 identifierPretty :: Identifier -> Text
-identifierPretty = coerce
+identifierPretty identifier = "‘" <> coerce identifier <> "’"
 
 newtype Operator = Operator Text
     deriving (Show) via Text
@@ -52,7 +52,7 @@ operatorLength :: Operator -> Int
 operatorLength = T.length . coerce
 
 operatorPretty :: Operator -> Text
-operatorPretty = coerce
+operatorPretty operator = "‘" <> coerce operator <> "’"
 
 instance ToRawSql Operator where
     toRawSql :: Operator -> Builder
