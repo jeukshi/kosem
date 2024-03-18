@@ -14,7 +14,6 @@ import Database.Kosem.PostgreSQL.Internal.Diagnostics (
     DiagnosticSpan (..),
     P,
     combineSpans,
-    movePby,
  )
 import Database.Kosem.PostgreSQL.Internal.Env
 import Database.Kosem.PostgreSQL.Internal.Parser
@@ -41,7 +40,7 @@ tcWhereClause = \cases
     (Just (Where expr)) -> do
         tyExpr <- tcExpr expr
         when (exprType tyExpr ~/=~ TypeInfo PgBoolean Nullable) do
-            throwError $ TypeError (toDiagnosticSpan tyExpr) "argument of 'WHERE' must be type 'boolean'"
+            throwError $ ConditionTypeError tyExpr "WHERE"
         return $ Just $ Where tyExpr
 
 tcSelectExpr
@@ -62,19 +61,11 @@ tcFromItem :: FromItem () -> Tc (FromItem TypeInfo)
 tcFromItem = \cases
     (FiTableName p tableName) -> do
         getTableByName tableName >>= \case
-            [] ->
-                throwError $
-                    TableDoesNotExist
-                        (DiagnosticSpan p (p `movePby` identifierLength tableName))
-                        ("table does not exist: " <> identifierPretty tableName)
+            [] -> throwError $ TableDoesNotExist p tableName
             [table] -> do
                 addTableToEnv table
                 return $ FiTableName p tableName
-            ts ->
-                throwError $
-                    TableNameIsAmbigious
-                        (DiagnosticSpan p (p `movePby` identifierLength tableName))
-                        ("table name is ambigious: " <> identifierPretty tableName)
+            ts -> throwError $ TableNameIsAmbigious p tableName
     (FiJoin lhs joinType rhs joinCondition) -> do
         tyLhs <- tcFromItem lhs
         tyRhs <- tcFromItem rhs
@@ -87,60 +78,9 @@ tcJoinCondition = \cases
     (JcOn expr) -> do
         tyExpr <- tcExpr expr
         when (exprType tyExpr ~/=~ TypeInfo PgBoolean Nullable) do
-            throwError $ TypeError (toDiagnosticSpan tyExpr) "argument of 'JOIN/ON' must be type 'boolean'"
+            throwError $ ConditionTypeError tyExpr "JOIN/ON"
         return $ JcOn tyExpr
 
-toDiagnosticSpan :: Expr a -> DiagnosticSpan P
-toDiagnosticSpan = \cases
-    (EPgCast p1 _ p2 identifier _) ->
-        DiagnosticSpan
-            p1
-            (p2 `movePby` identifierLength identifier)
-    (EParens p1 _ p2 _) ->
-        DiagnosticSpan p1 p2
-    (EParam p _ identifier _) ->
-        DiagnosticSpan
-            p
-            -- \| +1 from ':' prefix.
-            (p `movePby` (identifierLength identifier + 1))
-    (EParamMaybe p _ identifier _) ->
-        DiagnosticSpan
-            p
-            -- \| +2 from ':?' prefix.
-            (p `movePby` (identifierLength identifier + 2))
-    (ELit p lit _) -> case lit of
-        NumericLiteral -> undefined -- TODO
-        BoolLiteral text ->
-            DiagnosticSpan
-                p
-                (p `movePby` T.length text)
-        TextLiteral text ->
-            DiagnosticSpan
-                p
-                -- \| +2 from single quote.
-                (p `movePby` (T.length text + 2))
-    (ECol p identifier _) ->
-        DiagnosticSpan
-            p
-            (p `movePby` identifierLength identifier)
-    (ENot p _ expr) ->
-        DiagnosticSpan p p
-            `combineSpans` toDiagnosticSpan expr
-    (EAnd _ lhs _ rhs) ->
-        toDiagnosticSpan lhs
-            `combineSpans` toDiagnosticSpan rhs
-    (EOr _ lhs _ rhs) ->
-        toDiagnosticSpan lhs
-            `combineSpans` toDiagnosticSpan rhs
-    (EBinOp _ lhs _ rhs _) ->
-        toDiagnosticSpan lhs
-            `combineSpans` toDiagnosticSpan rhs
-    (EBetween _ lhs _ _ _ rhs2) ->
-        toDiagnosticSpan lhs
-            `combineSpans` toDiagnosticSpan rhs2
-    (ENotBetween _ lhs _ _ _ _ rhs2) ->
-        toDiagnosticSpan lhs
-            `combineSpans` toDiagnosticSpan rhs2
 
 exprType :: Expr TypeInfo -> TypeInfo
 exprType = \cases
@@ -194,37 +134,25 @@ tcExpr = \cases
         tyExpr <- tcExpr expr
         let innerTy = exprType tyExpr
         return $ EParens p1 tyExpr p2 innerTy
-    expr@(EParam p _ name ()) ->
-        -- TODO
-        throwError $
-            ParametersWithoutCastError (toDiagnosticSpan expr) "parameters without cast are not supported"
-    expr@(EParamMaybe _ _ name ()) -> do
-        -- TODO
-        throwError $
-            ParametersWithoutCastError (toDiagnosticSpan expr) "parameters without cast are not supported"
+    (EParam p _ name ()) -> throwError $ ParameterWithoutCastError p name
+    (EParamMaybe p _ name ()) -> throwError $ MaybeParameterWithoutCastError p name
     (ELit p litVal _) -> case litVal of
         NumericLiteral -> return $ ELit p litVal (TypeInfo PgNumeric NonNullable)
         TextLiteral _ -> return $ ELit p litVal (TypeInfo PgText NonNullable) -- FIXME this is 'unknown'
         (BoolLiteral _) -> return $ ELit p litVal (TypeInfo PgBoolean NonNullable)
     (ECol p colName _) -> do
         getColumnByName colName >>= \case
-            [] ->
-                throwError $
-                    ColumnDoesNotExist
-                        (DiagnosticSpan p (p `movePby` identifierLength colName))
-                        ("column does not exist: " <> identifierPretty colName)
+            [] -> throwError $ ColumnDoesNotExist p colName
             [envCol] ->
-                return $ ECol p colName (TypeInfo envCol.typeName envCol.nullable)
+                return $
+                    ECol p colName (TypeInfo envCol.typeName envCol.nullable)
             ts ->
-                throwError $
-                    ColumnNameIsAmbigious
-                        (DiagnosticSpan p (p `movePby` identifierLength colName))
-                        ("column name is ambigious: " <> identifierPretty colName)
+                throwError $ ColumnNameIsAmbigious p colName
     expr@(ENot p not innerExpr) -> do
         tyExpr <- tcExpr innerExpr
         let ty = exprType tyExpr
         when (ty ~/=~ TypeInfo PgBoolean Nullable) do
-            throwError $ TypeError (toDiagnosticSpan expr) "argument of 'NOT' must be type 'boolean'"
+            throwError $ ConditionTypeError tyExpr "NOT"
         return $ ENot p not tyExpr
     (EAnd p lhs and rhs) -> do
         (tyLhs, tyRhs) <- tyMustBeBoolean "AND" lhs rhs
@@ -241,17 +169,7 @@ tcExpr = \cases
         getBinaryOpResult tyLhs op tyRhs >>= \case
             Just tyRes ->
                 return $ EBinOp p tcLhs op tcRhs (TypeInfo tyRes nullableRes)
-            Nothing ->
-                throwError $
-                    OperatorDoesntExist
-                        (DiagnosticSpan p (p `movePby` operatorLength op))
-                        ( "operator does not exist: "
-                            <> pgTypePretty tyLhs
-                            <> " "
-                            <> operatorPretty op
-                            <> " "
-                            <> pgTypePretty tyRhs
-                        )
+            Nothing -> throwError $ OperatorDoesntExist p tyLhs op tyRhs
     (EBetween p lhs between rhs1 and rhs2) -> do
         -- TODO typecheck `between` against <= >=
         tyLhs <- tcExpr lhs
@@ -277,24 +195,9 @@ tcExpr = \cases
         tyLhs <- tcExpr lhs
         tyRhs <- tcExpr rhs
         when (exprType tyLhs ~/=~ TypeInfo PgBoolean Nullable) do
-            throwError $
-                TypeError (toDiagnosticSpan tyLhs) $
-                    "argument of '" <> func <> "' must be type 'boolean'"
+            throwError $ ArgumentTypeError tyLhs func PgBoolean
         when (exprType tyRhs ~/=~ TypeInfo PgBoolean Nullable) do
-            throwError $
-                TypeError (toDiagnosticSpan tyRhs) $
-                    "argument of '" <> func <> "' must be type 'boolean'"
-        return (tyLhs, tyRhs)
-
-    tyMustBeEqual :: Text -> Expr () -> Expr () -> Tc (Expr TypeInfo, Expr TypeInfo)
-    tyMustBeEqual func lhs rhs = do
-        tyLhs <- tcExpr lhs
-        tyRhs <- tcExpr rhs
-        when (exprType tyLhs ~/=~ exprType tyRhs) do
-            -- TODO prolly not tyLhs
-            throwError $
-                TypeError (toDiagnosticSpan tyLhs) $
-                    "arguments of '" <> func <> "' must be of the same type"
+            throwError $ ArgumentTypeError tyRhs func PgBoolean
         return (tyLhs, tyRhs)
 
 addTableToEnv :: Table -> Tc ()

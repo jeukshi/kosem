@@ -11,7 +11,7 @@ import Data.Text qualified as T
 import Database.Kosem.PostgreSQL.Internal.Classes
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Types
-import Database.Kosem.PostgreSQL.Internal.Diagnostics (P)
+import Database.Kosem.PostgreSQL.Internal.P (P)
 
 astToRawSql :: STerm TypeInfo -> ByteString
 astToRawSql = toStrict . toLazyByteString . toRawSql

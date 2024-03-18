@@ -23,6 +23,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Debug (dbg)
 import Text.Pretty.Simple
 import Prelude hiding (takeWhile)
+import Database.Kosem.PostgreSQL.Internal.P
 
 parse
     :: Text
@@ -42,7 +43,7 @@ parse input = do
             let p = MkP $ errorOffset firstErr
             let errMsg = parseErrorTextPretty firstErr
             -- TODO maybe we can allow longer DiagnosticSpans
-            Left $ ParseError (DiagnosticSpan p p) (T.pack errMsg)
+            Left $ ParseError p (T.pack errMsg)
         Right r -> Right r
 
 symbol :: Text -> Parser Text

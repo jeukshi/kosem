@@ -2,9 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Database.Kosem.PostgreSQL.Internal.Diagnostics (
-    initPosState,
     P (..),
-    movePby,
     DiagnosticSpan (..),
     combineSpans,
     CompileError (..),
@@ -15,40 +13,31 @@ where
 import Data.Coerce (coerce)
 import Data.String (IsString (fromString))
 import Data.Text (Text)
+import Data.Text qualified as T
+import Database.Kosem.PostgreSQL.Internal.Ast (Expr (..), LiteralValue (..))
 import Database.Kosem.PostgreSQL.Internal.Diagnostics.GHC (
     DiagnosticSpan (..),
     SourcePoint (..),
     errorWithSpan,
  )
-import GHC (mkSrcSpan)
+import Database.Kosem.PostgreSQL.Internal.P (P (unP), initPosState, movePby)
+import Database.Kosem.PostgreSQL.Internal.Types (
+    Identifier,
+    Operator,
+    PgType,
+    TypeInfo,
+    identifierLength,
+    identifierPretty,
+    operatorLength,
+    operatorPretty,
+    pgTypePretty,
+ )
+import GHC.Data.FastString (FastString)
 import GHC.Tc.Types (TcM)
 import GHC.Types.SrcLoc (SrcSpan, mkSrcLoc)
 import Language.Haskell.TH.Syntax (Exp, Loc (..), Q (Q), location)
 import Text.Megaparsec (PosState (..), TraversableStream (reachOffsetNoLine))
 import Text.Megaparsec.Pos (SourcePos (..), mkPos, unPos)
-import GHC.Data.FastString (FastString)
-
-initPosState :: Text -> PosState Text
-initPosState input =
-    PosState
-        { pstateInput = input
-        , pstateOffset = 0
-        , pstateSourcePos =
-            SourcePos
-                { sourceName = ""
-                , sourceLine = mkPos 1
-                , sourceColumn = mkPos 1
-                }
-        , pstateTabWidth = mkPos 1
-        , pstateLinePrefix = ""
-        }
-
--- TODO explain P
-newtype P = MkP {unP :: Int}
-    deriving (Show, Eq, Ord)
-
-movePby :: P -> Int -> P
-movePby p int = coerce $ coerce p + int
 
 combineSpans
     :: DiagnosticSpan P
@@ -74,10 +63,10 @@ spanWithCodePoint
     (DiagnosticSpan pStart pEnd) = do
         let errSourcePosStart =
                 pstateSourcePos $
-                    reachOffsetNoLine (coerce pStart) (initPosState input)
+                    reachOffsetNoLine (unP pStart) (initPosState input)
             errSourcePosEnd =
                 pstateSourcePos $
-                    reachOffsetNoLine (coerce pEnd) (initPosState input)
+                    reachOffsetNoLine (unP pEnd) (initPosState input)
         DiagnosticSpan
             (toSourcePoint filename qqPoint errSourcePosStart)
             (toSourcePoint filename qqPoint errSourcePosEnd)
@@ -98,44 +87,126 @@ spanWithCodePoint
                 }
 
 data CompileError
-    = ParseError (DiagnosticSpan P) Text
-    | TypeError (DiagnosticSpan P) Text
-    | NoAliasError (DiagnosticSpan P) Text
-    | ParametersWithoutCastError (DiagnosticSpan P) Text
-    | ExprWithNoAlias (DiagnosticSpan P) Text
-    | OperatorDoesntExist (DiagnosticSpan P) Text
-    | ColumnDoesNotExist (DiagnosticSpan P) Text
-    | ColumnNameIsAmbigious (DiagnosticSpan P) Text
-    | TableDoesNotExist (DiagnosticSpan P) Text
-    | TableNameIsAmbigious (DiagnosticSpan P) Text
+    = ParseError P Text
+    | ArgumentTypeError (Expr TypeInfo) Text PgType
+    | ConditionTypeError (Expr TypeInfo) Text
+    | ParameterWithoutCastError P Identifier
+    | MaybeParameterWithoutCastError P Identifier
+    | ExprWithNoAlias (Expr TypeInfo)
+    | OperatorDoesntExist P PgType Operator PgType
+    | ColumnDoesNotExist P Identifier
+    | ColumnNameIsAmbigious P Identifier
+    | TableDoesNotExist P Identifier
+    | TableNameIsAmbigious P Identifier
     deriving (Show)
 
 compileErrorSpan :: CompileError -> DiagnosticSpan P
 compileErrorSpan = \case
-    ParseError span _ -> span
-    TypeError span _ -> span
-    NoAliasError span _ -> span
-    ParametersWithoutCastError span _ -> span
-    ExprWithNoAlias span _ -> span
-    OperatorDoesntExist span _ -> span
-    ColumnDoesNotExist span _ -> span
-    ColumnNameIsAmbigious span _ -> span
-    TableDoesNotExist span _ -> span
-    TableNameIsAmbigious span _ -> span
-
+    ParseError p _ ->
+        DiagnosticSpan p p
+    ArgumentTypeError expr _ _ -> toDiagnosticSpan expr
+    ConditionTypeError expr _ -> toDiagnosticSpan expr
+    ParameterWithoutCastError p identifier ->
+        DiagnosticSpan
+            p
+            -- \| +1 from ':' prefix.
+            (p `movePby` (identifierLength identifier + 1))
+    MaybeParameterWithoutCastError p identifier ->
+        DiagnosticSpan
+            p
+            -- \| +2 from ':?' prefix.
+            (p `movePby` (identifierLength identifier + 2))
+    ExprWithNoAlias expr -> toDiagnosticSpan expr
+    OperatorDoesntExist p _ operator _ ->
+        (DiagnosticSpan p (p `movePby` operatorLength operator))
+    ColumnDoesNotExist p identifier ->
+        DiagnosticSpan p (p `movePby` identifierLength identifier)
+    ColumnNameIsAmbigious p identifier ->
+        DiagnosticSpan p (p `movePby` identifierLength identifier)
+    TableDoesNotExist p identifier ->
+        DiagnosticSpan p (p `movePby` identifierLength identifier)
+    TableNameIsAmbigious p identifier ->
+        DiagnosticSpan p (p `movePby` identifierLength identifier)
 
 compileErrorMsg :: CompileError -> Text
 compileErrorMsg = \case
     ParseError _ msg -> msg
-    TypeError _ msg -> msg
-    NoAliasError _ msg -> msg
-    ParametersWithoutCastError _ msg -> msg
-    ExprWithNoAlias _ msg -> msg
-    OperatorDoesntExist _ msg -> msg
-    ColumnDoesNotExist _ msg -> msg
-    ColumnNameIsAmbigious _ msg -> msg
-    TableDoesNotExist _ msg -> msg
-    TableNameIsAmbigious _ msg -> msg
+    ArgumentTypeError _ func ty ->
+        "argument of '" <> func <> "' must be type " <> pgTypePretty ty
+    ConditionTypeError _ msg ->
+        "argument of '" <> msg <> "must be of type boolean"
+    ParameterWithoutCastError _ _ ->
+        "parameters without cast are not supported"
+    MaybeParameterWithoutCastError _ _ ->
+        "parameters without cast are not supported"
+    ExprWithNoAlias _ -> "expression does not have an alias"
+    OperatorDoesntExist _ lhs op rhs ->
+        "operator does not exist: "
+            <> pgTypePretty lhs
+            <> " "
+            <> operatorPretty op
+            <> " "
+            <> pgTypePretty rhs
+    ColumnDoesNotExist _ identifier ->
+        "table does not exist: " <> identifierPretty identifier
+    ColumnNameIsAmbigious _ identifier ->
+        "column name is ambigious: " <> identifierPretty identifier
+    TableDoesNotExist _ identifier ->
+        "table does not exist: " <> identifierPretty identifier
+    TableNameIsAmbigious p identifier ->
+        "table name is ambigious: " <> identifierPretty identifier
+
+toDiagnosticSpan :: Expr a -> DiagnosticSpan P
+toDiagnosticSpan = \cases
+    (EPgCast p1 _ p2 identifier _) ->
+        DiagnosticSpan
+            p1
+            (p2 `movePby` identifierLength identifier)
+    (EParens p1 _ p2 _) ->
+        DiagnosticSpan p1 p2
+    (EParam p _ identifier _) ->
+        DiagnosticSpan
+            p
+            -- \| +1 from ':' prefix.
+            (p `movePby` (identifierLength identifier + 1))
+    (EParamMaybe p _ identifier _) ->
+        DiagnosticSpan
+            p
+            -- \| +2 from ':?' prefix.
+            (p `movePby` (identifierLength identifier + 2))
+    (ELit p lit _) -> case lit of
+        NumericLiteral -> undefined -- TODO
+        BoolLiteral text ->
+            DiagnosticSpan
+                p
+                (p `movePby` T.length text)
+        TextLiteral text ->
+            DiagnosticSpan
+                p
+                -- \| +2 from single quote.
+                (p `movePby` (T.length text + 2))
+    (ECol p identifier _) ->
+        DiagnosticSpan
+            p
+            (p `movePby` identifierLength identifier)
+    (ENot p _ expr) ->
+        DiagnosticSpan p p
+            `combineSpans` toDiagnosticSpan expr
+    (EAnd _ lhs _ rhs) ->
+        toDiagnosticSpan lhs
+            `combineSpans` toDiagnosticSpan rhs
+    (EOr _ lhs _ rhs) ->
+        toDiagnosticSpan lhs
+            `combineSpans` toDiagnosticSpan rhs
+    (EBinOp _ lhs _ rhs _) ->
+        toDiagnosticSpan lhs
+            `combineSpans` toDiagnosticSpan rhs
+    (EBetween _ lhs _ _ _ rhs2) ->
+        toDiagnosticSpan lhs
+            `combineSpans` toDiagnosticSpan rhs2
+    (ENotBetween _ lhs _ _ _ _ rhs2) ->
+        toDiagnosticSpan lhs
+            `combineSpans` toDiagnosticSpan rhs2
 
 compileError :: Text -> CompileError -> Q Exp
 compileError input error = do
