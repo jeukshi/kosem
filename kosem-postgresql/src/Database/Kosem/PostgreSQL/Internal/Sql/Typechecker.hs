@@ -1,14 +1,14 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
-module Database.Kosem.PostgreSQL.Internal.Typechecker where
+module Database.Kosem.PostgreSQL.Internal.Sql.Typechecker where
 
 import Control.Monad (when)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Database.Kosem.PostgreSQL.Internal.Ast
+import Database.Kosem.PostgreSQL.Internal.Sql.Ast
 import Database.Kosem.PostgreSQL.Internal.Diagnostics (
     CompileError (..),
     DiagnosticSpan (..),
@@ -16,7 +16,7 @@ import Database.Kosem.PostgreSQL.Internal.Diagnostics (
     combineSpans,
  )
 import Database.Kosem.PostgreSQL.Internal.Env
-import Database.Kosem.PostgreSQL.Internal.Parser
+import Database.Kosem.PostgreSQL.Internal.Sql.Parser
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser

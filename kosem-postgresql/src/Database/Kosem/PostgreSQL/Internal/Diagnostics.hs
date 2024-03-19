@@ -14,7 +14,7 @@ import Data.Coerce (coerce)
 import Data.String (IsString (fromString))
 import Data.Text (Text)
 import Data.Text qualified as T
-import Database.Kosem.PostgreSQL.Internal.Ast (Expr (..), LiteralValue (..))
+import Database.Kosem.PostgreSQL.Internal.Sql.Ast (Expr (..), LiteralValue (..))
 import Database.Kosem.PostgreSQL.Internal.Diagnostics.GHC (
     DiagnosticSpan (..),
     SourcePoint (..),

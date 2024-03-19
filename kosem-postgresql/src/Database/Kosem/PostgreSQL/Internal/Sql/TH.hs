@@ -3,7 +3,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Database.Kosem.PostgreSQL.Internal.TH where
+module Database.Kosem.PostgreSQL.Internal.Sql.TH where
 
 import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.FromField

@@ -38,23 +38,22 @@ library
   exposed-modules:
     , Database.Kosem.PostgreSQL.Internal
     , Database.Kosem.PostgreSQL.Internal.Connection
-    , Database.Kosem.PostgreSQL.Internal.Parser
     , Database.Kosem.PostgreSQL.Internal.ParserUtils
     , Database.Kosem.PostgreSQL.Internal.PgBuiltin
     , Database.Kosem.PostgreSQL.Internal.Env
-    , Database.Kosem.PostgreSQL.Internal.Ast
-    , Database.Kosem.PostgreSQL.Internal.Typechecker
     , Database.Kosem.PostgreSQL.Internal.Types
     , Database.Kosem.PostgreSQL.Internal.Diagnostics
     , Database.Kosem.PostgreSQL.Internal.P
     , Database.Kosem.PostgreSQL.Internal.Diagnostics.GHC
     , Database.Kosem.PostgreSQL.Internal.Classes
     , Database.Kosem.PostgreSQL.Internal.Row
-    , Database.Kosem.PostgreSQL.Internal.TH
     , Database.Kosem.PostgreSQL.Internal.FromField
     , Database.Kosem.PostgreSQL.Internal.ToField
-    , Database.Kosem.PostgreSQL.Internal.Query
-    , Database.Kosem.PostgreSQL.Internal.Query.Internal
+    , Database.Kosem.PostgreSQL.Internal.Sql
+    , Database.Kosem.PostgreSQL.Internal.Sql.TH
+    , Database.Kosem.PostgreSQL.Internal.Sql.Ast
+    , Database.Kosem.PostgreSQL.Internal.Sql.Parser
+    , Database.Kosem.PostgreSQL.Internal.Sql.Typechecker
     , Database.Kosem.PostgreSQL.Schema.Internal.Parser
     , Database.Kosem.PostgreSQL.Schema.Internal
     , Database.Kosem.PostgreSQL.Schema.Internal.TH
@@ -92,7 +91,7 @@ test-suite spec
   default-language:
       GHC2021
   other-modules:
-    , Test.Database.Kosem.PostgreSQL.Internal.Parser
+    , Test.Database.Kosem.PostgreSQL.Internal.Sql.Parser
     , Test.Database.Kosem.PostgreSQL.Internal.ToFromField
     , Test.Database.Kosem.PostgreSQL.Schema.Internal.Parser
     , Test.Database.Kosem.PostgreSQL.Internal

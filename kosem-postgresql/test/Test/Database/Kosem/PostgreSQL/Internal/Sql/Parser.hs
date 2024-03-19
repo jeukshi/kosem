@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 
-module Test.Database.Kosem.PostgreSQL.Internal.Parser where
+module Test.Database.Kosem.PostgreSQL.Internal.Sql.Parser where
 
 import Data.Text (Text)
-import Database.Kosem.PostgreSQL.Internal.Parser
+import Database.Kosem.PostgreSQL.Internal.Sql.Parser
 import Database.Kosem.PostgreSQL.Internal.ParserUtils
 import Test.Hspec
 import Test.Hspec.Megaparsec

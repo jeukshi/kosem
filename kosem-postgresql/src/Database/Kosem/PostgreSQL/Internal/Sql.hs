@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NoDuplicateRecordFields #-}
 
-module Database.Kosem.PostgreSQL.Internal.Query where
+module Database.Kosem.PostgreSQL.Internal.Sql where
 
 import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
@@ -14,15 +14,15 @@ import Data.List.NonEmpty qualified as NonEmpty
 import Data.String (IsString (fromString))
 import Data.Text (Text)
 import Data.Text qualified as T
-import Database.Kosem.PostgreSQL.Internal.Ast
 import Database.Kosem.PostgreSQL.Internal.Diagnostics (CompileError (..), compileError)
 import Database.Kosem.PostgreSQL.Internal.Env (runProgram)
 import Database.Kosem.PostgreSQL.Internal.FromField
-import Database.Kosem.PostgreSQL.Internal.Parser (parse)
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
-import Database.Kosem.PostgreSQL.Internal.TH
-import Database.Kosem.PostgreSQL.Internal.Typechecker (exprType, typecheck)
+import Database.Kosem.PostgreSQL.Internal.Sql.Ast
+import Database.Kosem.PostgreSQL.Internal.Sql.Parser (parse)
+import Database.Kosem.PostgreSQL.Internal.Sql.TH
+import Database.Kosem.PostgreSQL.Internal.Sql.Typechecker (exprType, typecheck)
 import Database.Kosem.PostgreSQL.Internal.Types
 import GHC.Driver.Errors.Types (GhcMessage (..))
 import GHC.Exts (Any)
@@ -63,7 +63,8 @@ resultFromAst (Select resultColumns _ _) = do
     (WithoutAlias (ECol _ columnname ty)) -> Right (columnname, ty)
     (WithoutAlias (EPgCast _ (EParam _ _ name _) _ _ ty)) -> Right (name, ty)
     -- FIXME error msg
-    (WithoutAlias expr) -> Left $
+    (WithoutAlias expr) ->
+      Left $
         ExprWithNoAlias expr
 
 lookupTypes

@@ -5,7 +5,7 @@ module Database.Kosem.PostgreSQL.Schema.Internal.TH where
 
 import Data.Text (Text)
 import Data.Text qualified as T
-import Database.Kosem.PostgreSQL.Internal.Query
+import Database.Kosem.PostgreSQL.Internal.Sql
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Database.Kosem.PostgreSQL.Internal.Types
 import Language.Haskell.TH

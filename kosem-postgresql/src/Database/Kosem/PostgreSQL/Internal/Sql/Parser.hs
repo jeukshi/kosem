@@ -1,4 +1,4 @@
-module Database.Kosem.PostgreSQL.Internal.Parser where
+module Database.Kosem.PostgreSQL.Internal.Sql.Parser where
 
 import Control.Monad (void, when)
 import Control.Monad.Combinators.Expr (
@@ -13,7 +13,7 @@ import Data.List.NonEmpty qualified as NonEmpty
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Void (Void)
-import Database.Kosem.PostgreSQL.Internal.Ast
+import Database.Kosem.PostgreSQL.Internal.Sql.Ast
 import Database.Kosem.PostgreSQL.Internal.Diagnostics
 import Database.Kosem.PostgreSQL.Internal.ParserUtils
 import Database.Kosem.PostgreSQL.Internal.Types

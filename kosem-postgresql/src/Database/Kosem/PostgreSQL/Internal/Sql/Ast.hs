@@ -1,4 +1,4 @@
-module Database.Kosem.PostgreSQL.Internal.Ast where
+module Database.Kosem.PostgreSQL.Internal.Sql.Ast where
 
 import Data.ByteString (ByteString)
 import Data.ByteString.Builder
