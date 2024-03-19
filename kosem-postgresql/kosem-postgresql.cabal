@@ -43,7 +43,7 @@ library
     , Database.Kosem.PostgreSQL.Internal.PgBuiltin
     , Database.Kosem.PostgreSQL.Internal.Env
     , Database.Kosem.PostgreSQL.Internal.Ast
-    , Database.Kosem.PostgreSQL.Internal.Type
+    , Database.Kosem.PostgreSQL.Internal.Typechecker
     , Database.Kosem.PostgreSQL.Internal.Types
     , Database.Kosem.PostgreSQL.Internal.Diagnostics
     , Database.Kosem.PostgreSQL.Internal.P

@@ -1,7 +1,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
-module Database.Kosem.PostgreSQL.Internal.Type where
+module Database.Kosem.PostgreSQL.Internal.Typechecker where
 
 import Control.Monad (when)
 import Data.List.NonEmpty (NonEmpty)
