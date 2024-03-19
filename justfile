@@ -9,6 +9,9 @@ build kosem-name='all':
 test kosem-name='all':
   cabal test {{kosem-name}} --test-show-details=direct
 
+format:
+    fourmolu -i kosem-postgresql
+
 # run in ghcid
 dev:
 	ghcid --warnings --test "main"
