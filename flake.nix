@@ -13,7 +13,7 @@
       systems = nixpkgs.lib.systems.flakeExposed;
       imports = [ inputs.haskell-flake.flakeModule ];
 
-      perSystem = { self', inputs', pkgs, system, config, ... }: {
+      perSystem = { self', inputs', pkgs, system, config, lib, ... }: {
 
         haskellProjects.default = {
           devShell = {
@@ -24,6 +24,10 @@
           };
 
           autoWire = [ "packages" "apps" "checks" ];
+          settings.haskell-language-server.custom = with pkgs.haskell.lib.compose; lib.flip lib.pipe [
+            (disableCabalFlag "ormolu")
+            (drv: drv.override { hls-ormolu-plugin = null; })
+          ];
         };
         packages.default = self'.packages.kosem-postgresql;
 
