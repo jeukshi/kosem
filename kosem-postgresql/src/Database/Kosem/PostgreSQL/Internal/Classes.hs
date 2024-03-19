@@ -1,13 +1,11 @@
--- |
-
 module Database.Kosem.PostgreSQL.Internal.Classes where
 
 import Data.ByteString.Builder (Builder, stringUtf8)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 
 class ToRawSql a where
-  toRawSql :: a -> Builder
+    toRawSql :: a -> Builder
 
 -- TODO this prolly can be done better?
 -- Or maybe we will switch to parsing ByteString instead of Text

@@ -4,7 +4,7 @@ module TH where
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote
-import Language.Haskell.TH.Syntax (Quasi(..))
+import Language.Haskell.TH.Syntax (Quasi (..))
 
 checkType :: String -> Q Exp
 checkType varNameStr = do
@@ -21,14 +21,14 @@ checkType varNameStr = do
             return $ LitE $ StringL $ show info
         Nothing -> fail $ "Variable not found: " ++ varNameStr
 
-
 tc :: QuasiQuoter
-tc = QuasiQuoter
-    { quoteExp  = checkType
-    , quotePat  = undefined
-    , quoteType = undefined
-    , quoteDec  = undefined
-    }
+tc =
+    QuasiQuoter
+        { quoteExp = checkType
+        , quotePat = undefined
+        , quoteType = undefined
+        , quoteDec = undefined
+        }
 
 z :: Int
 z = 9
@@ -42,22 +42,23 @@ extractType varName = do
 
 -- Quasiquote to capture the type of a variable
 typeOf :: QuasiQuoter
-typeOf = QuasiQuoter
-    { quoteExp  = \varNameStr -> do
-                    let varName = mkName varNameStr
-                    varType <- extractType varName
-                    return $ LitE $ StringL $ pprint varType
-    , quotePat  = undefined
-    , quoteType = undefined
-    , quoteDec  = undefined
-    }
+typeOf =
+    QuasiQuoter
+        { quoteExp = \varNameStr -> do
+            let varName = mkName varNameStr
+            varType <- extractType varName
+            return $ LitE $ StringL $ pprint varType
+        , quotePat = undefined
+        , quoteType = undefined
+        , quoteDec = undefined
+        }
 
 class ToSql a where
-  toSql :: a -> String
+    toSql :: a -> String
 
 instance ToSql Int where
-  toSql :: Int -> String
-  toSql = show
+    toSql :: Int -> String
+    toSql = show
 
-instance ToSql a => ToSql [a] where
-  toSql _ = "abc"
+instance (ToSql a) => ToSql [a] where
+    toSql _ = "abc"

@@ -14,13 +14,14 @@ import Data.Coerce (coerce)
 import Data.String (IsString (fromString))
 import Data.Text (Text)
 import Data.Text qualified as T
-import Database.Kosem.PostgreSQL.Internal.Sql.Ast (Expr (..), LiteralValue (..))
 import Database.Kosem.PostgreSQL.Internal.Diagnostics.GHC (
     DiagnosticSpan (..),
     SourcePoint (..),
     errorWithSpan,
  )
 import Database.Kosem.PostgreSQL.Internal.P (P (unP), initPosState, movePby)
+import Database.Kosem.PostgreSQL.Internal.PgBuiltin
+import Database.Kosem.PostgreSQL.Internal.Sql.Ast (Expr (..), LiteralValue (..))
 import Database.Kosem.PostgreSQL.Internal.Types (
     Identifier,
     Operator,
@@ -38,7 +39,6 @@ import GHC.Types.SrcLoc (SrcSpan, mkSrcLoc)
 import Language.Haskell.TH.Syntax (Exp, Loc (..), Q (Q), location)
 import Text.Megaparsec (PosState (..), TraversableStream (reachOffsetNoLine))
 import Text.Megaparsec.Pos (SourcePos (..), mkPos, unPos)
-import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 
 combineSpans
     :: DiagnosticSpan P

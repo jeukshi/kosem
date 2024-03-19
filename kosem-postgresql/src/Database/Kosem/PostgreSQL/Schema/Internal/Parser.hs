@@ -19,7 +19,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 
 identifierS :: Parser Identifier
 identifierS = lexemeS do
-  Identifier <$> dbLabel
+    Identifier <$> dbLabel
 
 databaseK :: Parser ()
 databaseK = pKeyword "database"
@@ -29,46 +29,46 @@ tableK = pKeyword "table"
 
 tableNameP :: Parser Identifier
 tableNameP = do
-  tableK
-  tableName <- identifierS
-  return tableName
+    tableK
+    tableName <- identifierS
+    return tableName
 
 databaseNameP :: Parser Text
 databaseNameP = do
-  databaseK
-  databaseName <- labelP
-  return databaseName
+    databaseK
+    databaseName <- labelP
+    return databaseName
 
 -- TODO only for parser
 data TableItem
-  = TableColumn Identifier PgType
-  | TableConstraint
-  deriving (Show, Eq, Lift)
+    = TableColumn Identifier PgType
+    | TableConstraint
+    deriving (Show, Eq, Lift)
 
 tableP :: Parser Table -- header and list items
 tableP = L.nonIndented spaceNewlineP (L.indentBlock spaceNewlineP p)
- where
-  p = do
-    tableName <- tableNameP
+  where
+    p = do
+        tableName <- tableNameP
 
-    return (L.IndentSome Nothing (return . Table tableName) tableItemP)
+        return (L.IndentSome Nothing (return . Table tableName) tableItemP)
 
 tableItemP :: Parser Column
 tableItemP = lexemeS do
-  columnName <- identifierS <?> "column name"
-  -- FIXME assumes Scalar
-  pgType <- Scalar <$> identifierS <?> "column data type"
-  Column columnName pgType <$> isNullableP
+    columnName <- identifierS <?> "column name"
+    -- FIXME assumes Scalar
+    pgType <- Scalar <$> identifierS <?> "column data type"
+    Column columnName pgType <$> isNullableP
 
 isNullableP :: Parser IsNullable
 isNullableP = lexemeS do
-  optional (C.string "not null") >>= \case
-    Nothing -> return Nullable
-    Just _ -> return NonNullable
+    optional (C.string "not null") >>= \case
+        Nothing -> return Nullable
+        Just _ -> return NonNullable
 
 schemaP :: Parser Database
 schemaP = lexeme do
-  _ <- skipMany C.spaceChar
-  databaseName <- databaseNameP
-  tables <- some tableP
-  return $ Database databaseName [] [] tables
+    _ <- skipMany C.spaceChar
+    databaseName <- databaseNameP
+    tables <- some tableP
+    return $ Database databaseName [] [] tables

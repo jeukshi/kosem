@@ -19,18 +19,16 @@ import Database.Kosem.PostgreSQL.Internal.Row
 import Database.PostgreSQL.LibPQ qualified as LibPQ
 import Foreign.C (CInt)
 import GHC.Exts (Any)
-import PostgreSQL.Binary.Decoding
-import Unsafe.Coerce (unsafeCoerce)
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote
+import PostgreSQL.Binary.Decoding
 import TH
-
+import Unsafe.Coerce (unsafeCoerce)
 
 y :: Int
 y = 10
 
 data D = D
-
 
 -- Example usage
 main :: IO ()
@@ -40,5 +38,5 @@ main = do
 
     print $ toSql @Int x
 
-    -- putStrLn $ [tc|z|]
-    -- putStrLn $ $(checkType "x")
+-- putStrLn $ [tc|z|]
+-- putStrLn $ $(checkType "x")

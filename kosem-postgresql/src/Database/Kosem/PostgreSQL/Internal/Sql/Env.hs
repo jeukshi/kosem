@@ -11,10 +11,10 @@ import Control.Monad.State.Strict (MonadState (get, put), StateT (runStateT), ev
 import Control.Monad.Trans (MonadTrans, lift)
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
+import Database.Kosem.PostgreSQL.Internal.Diagnostics (CompileError)
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin (DatabaseConfig (binaryOperators))
 import Database.Kosem.PostgreSQL.Internal.Types
 import Language.Haskell.TH (Name)
-import Database.Kosem.PostgreSQL.Internal.Diagnostics (CompileError)
 
 data IntroType
     = Subquery
@@ -121,13 +121,14 @@ instance MonadTc TcM where
 
     getBinaryOpResult :: PgType -> Operator -> PgType -> TcM (Maybe PgType)
     getBinaryOpResult lhs op rhs = do
-        -- | Postgres converts '!=' to '<>', see note:
+        -- \| Postgres converts '!=' to '<>', see note:
         -- https://www.postgresql.org/docs/current/functions-comparison.html
         let realOp = if op == "!=" then "<>" else op
         binOpsMap <- asks (.binaryOps)
-        return $ listToMaybe
-                    . map (\(_, _, _, ty) -> ty)
-                    . filter (\(_, _, r, _) -> r == rhs)
-                    . filter (\(_, l, _, _) -> l == lhs)
-                    . filter (\(o, _, _, _) -> o == realOp)
-                    $ binOpsMap
+        return
+            $ listToMaybe
+                . map (\(_, _, _, ty) -> ty)
+                . filter (\(_, _, r, _) -> r == rhs)
+                . filter (\(_, l, _, _) -> l == lhs)
+                . filter (\(o, _, _, _) -> o == realOp)
+            $ binOpsMap

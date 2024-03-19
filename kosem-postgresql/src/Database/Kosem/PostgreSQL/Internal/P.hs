@@ -1,9 +1,9 @@
-
 module Database.Kosem.PostgreSQL.Internal.P where
-import Data.Text (Text)
-import Text.Megaparsec (PosState(..))
-import Text.Megaparsec.Pos (SourcePos(..), mkPos)
+
 import Data.Coerce (coerce)
+import Data.Text (Text)
+import Text.Megaparsec (PosState (..))
+import Text.Megaparsec.Pos (SourcePos (..), mkPos)
 
 initPosState :: Text -> PosState Text
 initPosState input =

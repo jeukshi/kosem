@@ -43,91 +43,91 @@ import Unsafe.Coerce (unsafeCoerce)
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
 data Query result = Query
-  { statement :: ByteString
-  , columnsNumber :: Int
-  , rowProto :: result
-  , rowParser :: [Maybe ByteString -> Any]
-  , params :: [Maybe ByteString]
-  }
+    { statement :: ByteString
+    , columnsNumber :: Int
+    , rowProto :: result
+    , rowParser :: [Maybe ByteString -> Any]
+    , params :: [Maybe ByteString]
+    }
 
 resultFromAst :: STerm TypeInfo -> Either CompileError [(Identifier, TypeInfo)]
 resultFromAst (Select resultColumns _ _) = do
-  let (errors, columns) = partitionEithers $ map columnName (toList resultColumns)
-  case errors of
-    [] -> Right columns
-    (x : xs) -> Left x
- where
-  columnName :: AliasedExpr TypeInfo -> Either CompileError (Identifier, TypeInfo)
-  columnName = \cases
-    (WithAlias expr alias _) -> Right (alias, exprType expr)
-    (WithoutAlias (ECol _ columnname ty)) -> Right (columnname, ty)
-    (WithoutAlias (EPgCast _ (EParam _ _ name _) _ _ ty)) -> Right (name, ty)
-    -- FIXME error msg
-    (WithoutAlias expr) ->
-      Left $
-        ExprWithNoAlias expr
+    let (errors, columns) = partitionEithers $ map columnName (toList resultColumns)
+    case errors of
+        [] -> Right columns
+        (x : xs) -> Left x
+  where
+    columnName :: AliasedExpr TypeInfo -> Either CompileError (Identifier, TypeInfo)
+    columnName = \cases
+        (WithAlias expr alias _) -> Right (alias, exprType expr)
+        (WithoutAlias (ECol _ columnname ty)) -> Right (columnname, ty)
+        (WithoutAlias (EPgCast _ (EParam _ _ name _) _ _ ty)) -> Right (name, ty)
+        -- FIXME error msg
+        (WithoutAlias expr) ->
+            Left $
+                ExprWithNoAlias expr
 
 lookupTypes
-  :: [(Identifier, TypeInfo)] -> [(Identifier, PgType, Name)] -> [(Identifier, Name, IsNullable)]
+    :: [(Identifier, TypeInfo)] -> [(Identifier, PgType, Name)] -> [(Identifier, Name, IsNullable)]
 lookupTypes = \cases
-  (x : xs) mappings -> fromMapping x mappings : lookupTypes xs mappings
-  [] _ -> []
- where
-  fromMapping
-    :: (Identifier, TypeInfo) -> [(Identifier, PgType, Name)] -> (Identifier, Name, IsNullable)
-  fromMapping (label, ty) mappings = case filter (isInMap ty) mappings of
-    [] -> error $ "no mapping for type: " <> show ty
-    [(_, pgType, name)] -> (label, name, isNullable ty)
-    (x : xs) ->
-      error $ "too many mapping for type: " <> show ty
-  isInMap :: TypeInfo -> (identifier, PgType, Name) -> Bool
-  isInMap sqlType (_, pgType, _) = case sqlType of
-    TypeInfo ty _ -> ty == pgType
-  toPgType :: TypeInfo -> PgType
-  toPgType = \cases
-    (TypeInfo ty _) -> ty
+    (x : xs) mappings -> fromMapping x mappings : lookupTypes xs mappings
+    [] _ -> []
+  where
+    fromMapping
+        :: (Identifier, TypeInfo) -> [(Identifier, PgType, Name)] -> (Identifier, Name, IsNullable)
+    fromMapping (label, ty) mappings = case filter (isInMap ty) mappings of
+        [] -> error $ "no mapping for type: " <> show ty
+        [(_, pgType, name)] -> (label, name, isNullable ty)
+        (x : xs) ->
+            error $ "too many mapping for type: " <> show ty
+    isInMap :: TypeInfo -> (identifier, PgType, Name) -> Bool
+    isInMap sqlType (_, pgType, _) = case sqlType of
+        TypeInfo ty _ -> ty == pgType
+    toPgType :: TypeInfo -> PgType
+    toPgType = \cases
+        (TypeInfo ty _) -> ty
 
 prepareQuery
-  :: Database
-  -> Text
-  -> Either
-      CompileError
-      ( ByteString
-      , Int
-      , [(Identifier, Name, IsNullable)]
-      , [(Identifier, Name, IsNullable)]
-      )
+    :: Database
+    -> Text
+    -> Either
+        CompileError
+        ( ByteString
+        , Int
+        , [(Identifier, Name, IsNullable)]
+        , [(Identifier, Name, IsNullable)]
+        )
 prepareQuery database input = do
-  ast <- parse input
-  let numberOfColumns = case ast of
-        Select resultColumns _ _ -> length resultColumns
-  typedAst <- runProgram database (typecheck ast)
-  resultColumns <- resultFromAst typedAst
-  let hsTypes = lookupTypes resultColumns (typesMap database)
-  let queryToRun = astToRawSql typedAst
-  let params =
-        map (\(_, l, t) -> (l, t))
-          . sortOn (\(n, _, _) -> n)
-          . collectAllVariables
-          $ typedAst
-  let hsParams = lookupTypes params (typesMap database)
-  let x = show ast
-  return (queryToRun, numberOfColumns, hsTypes, hsParams)
+    ast <- parse input
+    let numberOfColumns = case ast of
+            Select resultColumns _ _ -> length resultColumns
+    typedAst <- runProgram database (typecheck ast)
+    resultColumns <- resultFromAst typedAst
+    let hsTypes = lookupTypes resultColumns (typesMap database)
+    let queryToRun = astToRawSql typedAst
+    let params =
+            map (\(_, l, t) -> (l, t))
+                . sortOn (\(n, _, _) -> n)
+                . collectAllVariables
+                $ typedAst
+    let hsParams = lookupTypes params (typesMap database)
+    let x = show ast
+    return (queryToRun, numberOfColumns, hsTypes, hsParams)
 
 unsafeSql :: Database -> String -> Q Exp
 unsafeSql database userInputString = do
-  let userInput = T.pack userInputString
-  -- let parserResult = parse userInput
-  case prepareQuery database userInput of
-    Right (queryToRun, numberOfColumns, hsTypes, hsParams) -> do
-      [e|
-        Query
-          { statement = queryToRun
-          , columnsNumber = numberOfColumns
-          , rowProto = Row [] :: $(genRowType hsTypes)
-          , rowParser = $(genRowParser hsTypes)
-          , params = $(genParamsList hsParams)
-          }
-        |]
-    Left e -> do
-      compileError userInput e
+    let userInput = T.pack userInputString
+    -- let parserResult = parse userInput
+    case prepareQuery database userInput of
+        Right (queryToRun, numberOfColumns, hsTypes, hsParams) -> do
+            [e|
+                Query
+                    { statement = queryToRun
+                    , columnsNumber = numberOfColumns
+                    , rowProto = Row [] :: $(genRowType hsTypes)
+                    , rowParser = $(genRowParser hsTypes)
+                    , params = $(genParamsList hsParams)
+                    }
+                |]
+        Left e -> do
+            compileError userInput e

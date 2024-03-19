@@ -1,19 +1,19 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Database.Kosem.PostgreSQL.Schema.Internal.TH where
 
 import Data.Text (Text)
 import Data.Text qualified as T
+import Database.Kosem.PostgreSQL.Internal.PgBuiltin
+import Database.Kosem.PostgreSQL.Internal.PgBuiltin qualified
 import Database.Kosem.PostgreSQL.Internal.Sql
-import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Database.Kosem.PostgreSQL.Internal.Types
+import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (NameSpace (VarName))
 import Text.Megaparsec qualified as Megaparsec
-import Database.Kosem.PostgreSQL.Internal.PgBuiltin
-import qualified Database.Kosem.PostgreSQL.Internal.PgBuiltin
 
 database :: QuasiQuoter
 database =

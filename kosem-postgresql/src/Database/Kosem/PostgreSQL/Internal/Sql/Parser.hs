@@ -13,9 +13,10 @@ import Data.List.NonEmpty qualified as NonEmpty
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Void (Void)
-import Database.Kosem.PostgreSQL.Internal.Sql.Ast
 import Database.Kosem.PostgreSQL.Internal.Diagnostics
+import Database.Kosem.PostgreSQL.Internal.P
 import Database.Kosem.PostgreSQL.Internal.ParserUtils
+import Database.Kosem.PostgreSQL.Internal.Sql.Ast
 import Database.Kosem.PostgreSQL.Internal.Types
 import Text.Megaparsec hiding (parse)
 import Text.Megaparsec.Char qualified as C
@@ -23,7 +24,6 @@ import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Debug (dbg)
 import Text.Pretty.Simple
 import Prelude hiding (takeWhile)
-import Database.Kosem.PostgreSQL.Internal.P
 
 parse
     :: Text

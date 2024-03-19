@@ -9,7 +9,7 @@ import Database.Kosem.PostgreSQL.Internal.Connection (close, connectConnString)
 import Test.Db qualified as Tdb
 import Test.Hspec
 import Test.TH (text)
-import Test.Utils ( withDB )
+import Test.Utils (withDB)
 
 -- import Test.Utils
 
@@ -20,7 +20,7 @@ spec = around withDB $ do
             rows <-
                 execute
                     conn
-                        [Tdb.sql| select false field1
+                    [Tdb.sql| select false field1
                                    , true field2
                                    , 'xyz' field3
                                    |]
@@ -57,16 +57,17 @@ spec = around withDB $ do
         it "in output can have an alias" $ \conn -> do
             let abc = True
                 cba = "cba"
-            let _ = [Tdb.sql| select :abc::boolean abc
+            let _ =
+                    [Tdb.sql| select :abc::boolean abc
                                    , :cba::text as cba|]
             "it compiles" `shouldBe` "it compiles"
         it "maybe parameters" $ \conn -> do
             let abc = Just True
                 cba = Just "cba"
-            let _ = [Tdb.sql| select :?abc::boolean abc
+            let _ =
+                    [Tdb.sql| select :?abc::boolean abc
                                    , :?cba::text as cba|]
             "it compiles" `shouldBe` "it compiles"
-
 
     describe "selects for real" $ do
         it "selects postgresql simple datatypes" $ \conn -> do

@@ -1,14 +1,13 @@
 {-# LANGUAGE DefaultSignatures #-}
--- |
 
 module Database.Kosem.PostgreSQL.Internal.ToField where
 
-import Data.Text (Text)
 import Data.ByteString (ByteString)
-import PostgreSQL.Binary.Encoding
-import Language.Haskell.TH
-import qualified Data.ByteString as ByteString
+import Data.ByteString qualified as ByteString
+import Data.Text (Text)
 import Data.Word (Word32)
+import Language.Haskell.TH
+import PostgreSQL.Binary.Encoding
 
 -- TODO is ToField even a good name?
 -- maybe Serialize? ToParam? Param?
@@ -33,9 +32,9 @@ instance ToField Int where
     toField :: Int -> ByteString
     toField = encodingBytes . int8_int64 . fromIntegral
 
-instance ToField a => ToField (Maybe a) where
-    toField :: ToField a => Maybe a -> ByteString
+instance (ToField a) => ToField (Maybe a) where
+    toField :: (ToField a) => Maybe a -> ByteString
     toField = error "unexpected null"
 
-    toField'Internal :: ToField a => Maybe a -> Maybe ByteString
+    toField'Internal :: (ToField a) => Maybe a -> Maybe ByteString
     toField'Internal = fmap toField

@@ -8,7 +8,7 @@ import Data.String (IsString)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Database.Kosem.PostgreSQL.Internal.Classes
-import Language.Haskell.TH (Name, Extension (DuplicateRecordFields))
+import Language.Haskell.TH (Extension (DuplicateRecordFields), Name)
 import Language.Haskell.TH.Lift (Lift)
 
 data IsNullable
@@ -21,7 +21,7 @@ newtype PgType = Scalar Identifier
 
 pgTypePretty :: PgType -> Text
 pgTypePretty = \cases
-  (Scalar identifier) -> identifierPretty identifier
+    (Scalar identifier) -> identifierPretty identifier
 
 newtype Identifier = Identifier Text
     deriving (Show) via Text

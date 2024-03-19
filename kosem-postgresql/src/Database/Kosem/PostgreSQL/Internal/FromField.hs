@@ -2,10 +2,10 @@
 
 module Database.Kosem.PostgreSQL.Internal.FromField where
 
-import Data.Text (Text)
 import Data.ByteString (ByteString)
-import PostgreSQL.Binary.Decoding
+import Data.Text (Text)
 import GHC.Exts (Any)
+import PostgreSQL.Binary.Decoding
 import Unsafe.Coerce (unsafeCoerce)
 
 class FromField a where
@@ -14,11 +14,11 @@ class FromField a where
     parseField :: ByteString -> a
     {-# MINIMAL parseField #-}
 
-    parseField'Internal:: Maybe ByteString ->  a
+    parseField'Internal :: Maybe ByteString -> a
     default parseField'Internal :: Maybe ByteString -> a
     parseField'Internal = \cases
-      Nothing -> error "unexpected null"
-      (Just val) -> parseField val
+        Nothing -> error "unexpected null"
+        (Just val) -> parseField val
 
 instance FromField Text where
     parseField :: ByteString -> Text
@@ -38,11 +38,11 @@ instance FromField Int where
         Left e -> error "parse error"
         Right t -> t
 
-instance FromField a => FromField (Maybe a) where
+instance (FromField a) => FromField (Maybe a) where
     parseField :: ByteString -> Maybe a
     parseField = error "unexpected maybe"
 
-    parseField'Internal :: FromField a => Maybe ByteString -> Maybe a
+    parseField'Internal :: (FromField a) => Maybe ByteString -> Maybe a
     parseField'Internal = \cases
-      Nothing -> Nothing
-      (Just bs) -> Just $ parseField bs
+        Nothing -> Nothing
+        (Just bs) -> Just $ parseField bs

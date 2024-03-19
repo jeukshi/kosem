@@ -10,8 +10,8 @@ import Data.Vector (Vector)
 import Data.Vector qualified as V
 import Data.Vector.Mutable qualified as VM
 import Database.Kosem.PostgreSQL.Internal.Connection
-import Database.Kosem.PostgreSQL.Internal.Sql
 import Database.Kosem.PostgreSQL.Internal.Row
+import Database.Kosem.PostgreSQL.Internal.Sql
 import Database.Kosem.PostgreSQL.Schema.Internal.TH
 import Database.PostgreSQL.LibPQ qualified as LibPQ
 import Database.PostgreSQL.LibPQ qualified as LibPq
@@ -59,7 +59,7 @@ execute connection query = do
     getCols result rowNumber = map (LibPQ.getvalue' result rowNumber)
 
     toPgParam :: Maybe ByteString -> Maybe (LibPQ.Oid, ByteString, LibPQ.Format)
-    -- | We can use `invalidOid` because we apply type cast
+    -- \| We can use `invalidOid` because we apply type cast
     -- to every parameter ($1::text), so PostgreSQL doesn't neet it.
     toPgParam = fmap (\val -> (LibPQ.invalidOid, val, LibPQ.Binary))
 
