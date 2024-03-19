@@ -15,11 +15,11 @@ import Data.String (IsString (fromString))
 import Data.Text (Text)
 import Data.Text qualified as T
 import Database.Kosem.PostgreSQL.Internal.Diagnostics (CompileError (..), compileError)
-import Database.Kosem.PostgreSQL.Internal.Env (runProgram)
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast
+import Database.Kosem.PostgreSQL.Internal.Sql.Env (runProgram)
 import Database.Kosem.PostgreSQL.Internal.Sql.Parser (parse)
 import Database.Kosem.PostgreSQL.Internal.Sql.TH
 import Database.Kosem.PostgreSQL.Internal.Sql.Typechecker (exprType, typecheck)

@@ -15,7 +15,7 @@ import Database.Kosem.PostgreSQL.Internal.Diagnostics (
     P,
     combineSpans,
  )
-import Database.Kosem.PostgreSQL.Internal.Env
+import Database.Kosem.PostgreSQL.Internal.Sql.Env
 import Database.Kosem.PostgreSQL.Internal.Sql.Parser
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Types

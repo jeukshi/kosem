@@ -40,7 +40,6 @@ library
     , Database.Kosem.PostgreSQL.Internal.Connection
     , Database.Kosem.PostgreSQL.Internal.ParserUtils
     , Database.Kosem.PostgreSQL.Internal.PgBuiltin
-    , Database.Kosem.PostgreSQL.Internal.Env
     , Database.Kosem.PostgreSQL.Internal.Types
     , Database.Kosem.PostgreSQL.Internal.Diagnostics
     , Database.Kosem.PostgreSQL.Internal.P
@@ -54,6 +53,7 @@ library
     , Database.Kosem.PostgreSQL.Internal.Sql.Ast
     , Database.Kosem.PostgreSQL.Internal.Sql.Parser
     , Database.Kosem.PostgreSQL.Internal.Sql.Typechecker
+    , Database.Kosem.PostgreSQL.Internal.Sql.Env
     , Database.Kosem.PostgreSQL.Schema.Internal.Parser
     , Database.Kosem.PostgreSQL.Schema.Internal
     , Database.Kosem.PostgreSQL.Schema.Internal.TH

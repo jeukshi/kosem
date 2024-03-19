@@ -1,7 +1,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
-module Database.Kosem.PostgreSQL.Internal.Env where
+module Database.Kosem.PostgreSQL.Internal.Sql.Env where
 
 import Control.Applicative (Alternative)
 import Control.Monad.Except (ExceptT, MonadError (throwError), runExceptT)
