@@ -56,6 +56,7 @@ class (Monad m) => MonadTc m where
     getEnv :: m Env
     setEnv :: m Env
     getType :: Identifier -> m PgType
+    getHsType :: PgType -> m Name
     getBinaryOpResult :: PgType -> Operator -> PgType -> m (Maybe PgType)
     getTableByName :: Identifier -> m [Table]
     getColumnByName :: Identifier -> m [Field]
@@ -117,6 +118,20 @@ instance MonadTc TcM where
             ((i, t, _) : xs) ->
                 if i == identifier
                     then pure t
+                    else find identifier xs
+
+    getHsType :: PgType -> TcM Name
+    getHsType pgType = do
+        types <- asks (.typesMap)
+        name <- find pgType types
+        pure name
+      where
+        find :: PgType -> [(Identifier, PgType, Name)] -> TcM Name
+        find identifier = \cases
+            [] -> error $ "no type: " <> show identifier
+            ((_, t, n) : xs) ->
+                if t == pgType
+                    then pure n
                     else find identifier xs
 
     getBinaryOpResult :: PgType -> Operator -> PgType -> TcM (Maybe PgType)

@@ -175,20 +175,6 @@ instance ToRawSql (AliasedExpr TypeInfo) where
         (WithAlias expr alias (Just as)) ->
             toRawSql expr <-> toRawSql as <-> toRawSql alias
 
--- | Equals, ignoring IsNullable
-(~==~) :: TypeInfo -> TypeInfo -> Bool
-(~==~) = \cases
-    (TypeInfo lhs _) (TypeInfo rhs _) -> lhs == rhs
-
--- | Not equals, ignoring IsNullable
-(~/=~) :: TypeInfo -> TypeInfo -> Bool
-(~/=~) = \cases
-    (TypeInfo lhs _) (TypeInfo rhs _) -> lhs /= rhs
-
-isNullable :: TypeInfo -> IsNullable
-isNullable = \cases
-    (TypeInfo _ nullable) -> nullable
-
 instance ToRawSql TypeInfo where
     toRawSql _ = ""
 

@@ -1,5 +1,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Database.Kosem.PostgreSQL.Internal.Sql.Typechecker where
 
@@ -28,25 +29,35 @@ import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Language.Haskell.TH.Syntax (Name)
 import Text.Megaparsec (parseMaybe, parseTest)
 
-resultFromAst :: STerm TypeInfo -> Either CompileError [(Identifier, TypeInfo)]
+resultFromAst
+    :: STerm TypeInfo
+    -> Either CompileError [(Identifier, Name, IsNullable)]
 resultFromAst (Select resultColumns _ _) = do
-    let (errors, columns) = partitionEithers $ map columnName (NonEmpty.toList resultColumns)
+    let (errors, columns) =
+            partitionEithers $ map columnName (NonEmpty.toList resultColumns)
     case errors of
         [] -> Right columns
-        (x : xs) -> Left x
+        (err : errs) -> Left err
   where
-    columnName :: AliasedExpr TypeInfo -> Either CompileError (Identifier, TypeInfo)
+    columnName
+        :: AliasedExpr TypeInfo
+        -> Either CompileError (Identifier, Name, IsNullable)
     columnName = \cases
-        (WithAlias expr alias _) -> Right (alias, exprType expr)
-        (WithoutAlias (ECol _ columnname ty)) -> Right (columnname, ty)
-        (WithoutAlias (EPgCast _ (EParam _ _ name _) _ _ ty)) -> Right (name, ty)
-        -- FIXME error msg
-        (WithoutAlias expr) ->
-            Left $
-                ExprWithNoAlias expr
+        (WithAlias expr alias _) -> do
+            let typeInfo = exprType expr
+            Right (alias, typeInfo.hsType, typeInfo.nullable)
+        (WithoutAlias expr) -> do
+            let typeInfo = exprType expr
+            case typeInfo.identifier of
+                Just identifier ->
+                    Right
+                        (identifier, typeInfo.hsType, typeInfo.nullable)
+                Nothing -> Left $ ExprWithNoAlias expr
 
 lookupTypes
-    :: [(Identifier, TypeInfo)] -> [(Identifier, PgType, Name)] -> [(Identifier, Name, IsNullable)]
+    :: [(Identifier, TypeInfo)]
+    -> [(Identifier, PgType, Name)]
+    -> [(Identifier, Name, IsNullable)]
 lookupTypes = \cases
     (x : xs) mappings -> fromMapping x mappings : lookupTypes xs mappings
     [] _ -> []
@@ -55,15 +66,15 @@ lookupTypes = \cases
         :: (Identifier, TypeInfo) -> [(Identifier, PgType, Name)] -> (Identifier, Name, IsNullable)
     fromMapping (label, ty) mappings = case filter (isInMap ty) mappings of
         [] -> error $ "no mapping for type: " <> show ty
-        [(_, pgType, name)] -> (label, name, isNullable ty)
+        [(_, pgType, name)] -> (label, name, ty.nullable)
         (x : xs) ->
             error $ "too many mapping for type: " <> show ty
     isInMap :: TypeInfo -> (identifier, PgType, Name) -> Bool
     isInMap sqlType (_, pgType, _) = case sqlType of
-        TypeInfo ty _ -> ty == pgType
+        TypeInfo ty _ _ _ -> ty == pgType
     toPgType :: TypeInfo -> PgType
     toPgType = \cases
-        (TypeInfo ty _) -> ty
+        (TypeInfo ty _ _ _) -> ty
 
 run
     :: Database
@@ -76,8 +87,7 @@ run database input = do
     let numberOfColumns = case ast of
             Select resultColumns _ _ -> length resultColumns
     typedAst <- runProgram database (typecheck ast)
-    resultColumns <- resultFromAst typedAst
-    let hsTypes = lookupTypes resultColumns (typesMap database)
+    hsTypes <- resultFromAst typedAst
     let queryToRun = astToRawSql typedAst
     let params =
             map (\(_, l, t) -> (l, t))
@@ -110,7 +120,7 @@ tcWhereClause = \cases
     Nothing -> return Nothing
     (Just (Where expr)) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr ~/=~ TypeInfo PgBoolean Nullable) do
+        when ((exprType tyExpr).pgType /= PgBoolean) do
             throwError $ ConditionTypeError tyExpr "WHERE"
         return $ Just $ Where tyExpr
 
@@ -148,7 +158,7 @@ tcJoinCondition = \cases
     JcUsing -> return JcUsing
     (JcOn expr) -> do
         tyExpr <- tcExpr expr
-        when (exprType tyExpr ~/=~ TypeInfo PgBoolean Nullable) do
+        when ((exprType tyExpr).pgType /= PgBoolean) do
             throwError $ ConditionTypeError tyExpr "JOIN/ON"
         return $ JcOn tyExpr
 
@@ -160,12 +170,12 @@ exprType = \cases
     (EParamMaybe _ _ _ ty) -> ty
     (ELit _ _ ty) -> ty
     (ECol _ _ ty) -> ty
-    (ENot{}) -> TypeInfo PgBoolean Nullable
-    (EAnd{}) -> TypeInfo PgBoolean Nullable
-    (EOr{}) -> TypeInfo PgBoolean Nullable
+    (ENot{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
+    (EAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
+    (EOr{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
     (EBinOp _ _ _ _ ty) -> ty
-    (EBetween{}) -> TypeInfo PgBoolean Nullable
-    (ENotBetween{}) -> TypeInfo PgBoolean Nullable
+    (EBetween{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
+    (ENotBetween{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
 
 tcNullable :: IsNullable -> IsNullable -> IsNullable
 tcNullable = \cases
@@ -177,21 +187,23 @@ tcExpr = \cases
     (EPgCast p1 var@(EParam pParam _ name _) p2 identifier ()) -> do
         -- FIXME check if can be casted
         ty <- getType identifier
+        hsType <- getHsType ty
         paramNumber <-
             getParamNumber name >>= \case
                 Just ix -> return ix
                 Nothing -> addParam name
-        let typeInfo = TypeInfo ty NonNullable
+        let typeInfo = TypeInfo ty NonNullable (Just name) hsType
         let tyVar = EParam pParam paramNumber name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
     (EPgCast p1 var@(EParamMaybe pParam _ name _) p2 identifier ()) -> do
         -- FIXME check if can be casted
         ty <- getType identifier
+        hsType <- getHsType ty
         paramNumber <-
             getParamNumber name >>= \case
                 Just ix -> return ix
                 Nothing -> addParam name
-        let typeInfo = TypeInfo ty Nullable
+        let typeInfo = TypeInfo ty Nullable (Just name) hsType
         let tyVar = EParamMaybe pParam paramNumber name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
     (EPgCast p1 expr p2 identifier ()) -> do
@@ -199,7 +211,14 @@ tcExpr = \cases
         -- FIXME check text, check if can be casted
         -- FIXME preserve IsNullable from underlying type
         ty <- getType identifier
-        return $ EPgCast p1 tyExpr p2 identifier (TypeInfo ty Nullable)
+        hsType <- getHsType ty
+        return $
+            EPgCast
+                p1
+                tyExpr
+                p2
+                identifier
+                (TypeInfo ty Nullable (Just identifier) hsType)
     (EParens p1 expr p2 ()) -> do
         tyExpr <- tcExpr expr
         let innerTy = exprType tyExpr
@@ -207,21 +226,31 @@ tcExpr = \cases
     (EParam p _ name ()) -> throwError $ ParameterWithoutCastError p name
     (EParamMaybe p _ name ()) -> throwError $ MaybeParameterWithoutCastError p name
     (ELit p litVal _) -> case litVal of
-        NumericLiteral -> return $ ELit p litVal (TypeInfo PgNumeric NonNullable)
-        TextLiteral _ -> return $ ELit p litVal (TypeInfo PgText NonNullable) -- FIXME this is 'unknown'
-        (BoolLiteral _) -> return $ ELit p litVal (TypeInfo PgBoolean NonNullable)
+        NumericLiteral -> do
+            hsType <- getHsType PgNumeric
+            return $ ELit p litVal (TypeInfo PgNumeric NonNullable Nothing hsType)
+        TextLiteral _ -> do
+            hsType <- getHsType PgText
+            return $ ELit p litVal (TypeInfo PgText NonNullable Nothing hsType) -- FIXME this is 'unknown'
+        (BoolLiteral _) -> do
+            hsType <- getHsType PgBoolean
+            return $ ELit p litVal (TypeInfo PgBoolean NonNullable Nothing hsType)
     (ECol p colName _) -> do
         getColumnByName colName >>= \case
             [] -> throwError $ ColumnDoesNotExist p colName
-            [envCol] ->
+            [envCol] -> do
+                hsType <- getHsType envCol.typeName
                 return $
-                    ECol p colName (TypeInfo envCol.typeName envCol.nullable)
+                    ECol
+                        p
+                        colName
+                        (TypeInfo envCol.typeName envCol.nullable (Just envCol.label) hsType)
             ts ->
                 throwError $ ColumnNameIsAmbigious p colName
     expr@(ENot p not innerExpr) -> do
         tyExpr <- tcExpr innerExpr
         let ty = exprType tyExpr
-        when (ty ~/=~ TypeInfo PgBoolean Nullable) do
+        when (ty.pgType /= PgBoolean) do
             throwError $ ConditionTypeError tyExpr "NOT"
         return $ ENot p not tyExpr
     (EAnd p lhs and rhs) -> do
@@ -233,12 +262,13 @@ tcExpr = \cases
     (EBinOp p lhs op rhs ()) -> do
         tcLhs <- tcExpr lhs
         tcRhs <- tcExpr rhs
-        let (TypeInfo tyLhs nullableLhs) = exprType tcLhs
-        let (TypeInfo tyRhs nullableRhs) = exprType tcRhs
+        let (TypeInfo tyLhs nullableLhs _ _) = exprType tcLhs
+        let (TypeInfo tyRhs nullableRhs _ _) = exprType tcRhs
         let nullableRes = tcNullable nullableLhs nullableRhs
         getBinaryOpResult tyLhs op tyRhs >>= \case
-            Just tyRes ->
-                return $ EBinOp p tcLhs op tcRhs (TypeInfo tyRes nullableRes)
+            Just tyRes -> do
+                hsType <- getHsType tyRes
+                return $ EBinOp p tcLhs op tcRhs (TypeInfo tyRes nullableRes Nothing hsType)
             Nothing -> throwError $ OperatorDoesntExist p tyLhs op tyRhs
     (EBetween p lhs between rhs1 and rhs2) -> do
         -- TODO typecheck `between` against <= >=
@@ -264,9 +294,9 @@ tcExpr = \cases
     tyMustBeBoolean func lhs rhs = do
         tyLhs <- tcExpr lhs
         tyRhs <- tcExpr rhs
-        when (exprType tyLhs ~/=~ TypeInfo PgBoolean Nullable) do
+        when ((exprType tyLhs).pgType /= PgBoolean) do
             throwError $ ArgumentTypeError tyLhs func PgBoolean
-        when (exprType tyRhs ~/=~ TypeInfo PgBoolean Nullable) do
+        when ((exprType tyRhs).pgType /= PgBoolean) do
             throwError $ ArgumentTypeError tyRhs func PgBoolean
         return (tyLhs, tyRhs)
 

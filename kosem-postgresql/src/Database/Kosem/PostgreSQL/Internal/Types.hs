@@ -79,6 +79,10 @@ data Column = Column
     }
     deriving (Show, Eq, Lift)
 
-data TypeInfo
-    = TypeInfo PgType IsNullable
+data TypeInfo = TypeInfo
+    { pgType :: PgType
+    , nullable :: IsNullable
+    , identifier :: Maybe Identifier
+    , hsType :: Name
+    }
     deriving (Show, Eq)
