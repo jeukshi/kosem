@@ -49,6 +49,7 @@ library
     , Database.Kosem.PostgreSQL.Internal.FromField
     , Database.Kosem.PostgreSQL.Internal.ToField
     , Database.Kosem.PostgreSQL.Internal.Sql
+    , Database.Kosem.PostgreSQL.Internal.Sql.Types
     , Database.Kosem.PostgreSQL.Internal.Sql.TH
     , Database.Kosem.PostgreSQL.Internal.Sql.Ast
     , Database.Kosem.PostgreSQL.Internal.Sql.Parser

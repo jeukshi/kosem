@@ -4,7 +4,11 @@
 module Database.Kosem.PostgreSQL.Internal.Sql.Typechecker where
 
 import Control.Monad (when)
+import Data.ByteString (ByteString)
+import Data.Either (partitionEithers)
+import Data.List (sortOn)
 import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty qualified as NonEmpty
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -18,9 +22,76 @@ import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast
 import Database.Kosem.PostgreSQL.Internal.Sql.Env
 import Database.Kosem.PostgreSQL.Internal.Sql.Parser
+import Database.Kosem.PostgreSQL.Internal.Sql.Types (CommandInfo (..))
 import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
+import Language.Haskell.TH.Syntax (Name)
 import Text.Megaparsec (parseMaybe, parseTest)
+
+resultFromAst :: STerm TypeInfo -> Either CompileError [(Identifier, TypeInfo)]
+resultFromAst (Select resultColumns _ _) = do
+    let (errors, columns) = partitionEithers $ map columnName (NonEmpty.toList resultColumns)
+    case errors of
+        [] -> Right columns
+        (x : xs) -> Left x
+  where
+    columnName :: AliasedExpr TypeInfo -> Either CompileError (Identifier, TypeInfo)
+    columnName = \cases
+        (WithAlias expr alias _) -> Right (alias, exprType expr)
+        (WithoutAlias (ECol _ columnname ty)) -> Right (columnname, ty)
+        (WithoutAlias (EPgCast _ (EParam _ _ name _) _ _ ty)) -> Right (name, ty)
+        -- FIXME error msg
+        (WithoutAlias expr) ->
+            Left $
+                ExprWithNoAlias expr
+
+lookupTypes
+    :: [(Identifier, TypeInfo)] -> [(Identifier, PgType, Name)] -> [(Identifier, Name, IsNullable)]
+lookupTypes = \cases
+    (x : xs) mappings -> fromMapping x mappings : lookupTypes xs mappings
+    [] _ -> []
+  where
+    fromMapping
+        :: (Identifier, TypeInfo) -> [(Identifier, PgType, Name)] -> (Identifier, Name, IsNullable)
+    fromMapping (label, ty) mappings = case filter (isInMap ty) mappings of
+        [] -> error $ "no mapping for type: " <> show ty
+        [(_, pgType, name)] -> (label, name, isNullable ty)
+        (x : xs) ->
+            error $ "too many mapping for type: " <> show ty
+    isInMap :: TypeInfo -> (identifier, PgType, Name) -> Bool
+    isInMap sqlType (_, pgType, _) = case sqlType of
+        TypeInfo ty _ -> ty == pgType
+    toPgType :: TypeInfo -> PgType
+    toPgType = \cases
+        (TypeInfo ty _) -> ty
+
+run
+    :: Database
+    -> Text
+    -> Either
+        CompileError
+        CommandInfo
+run database input = do
+    ast <- parse input
+    let numberOfColumns = case ast of
+            Select resultColumns _ _ -> length resultColumns
+    typedAst <- runProgram database (typecheck ast)
+    resultColumns <- resultFromAst typedAst
+    let hsTypes = lookupTypes resultColumns (typesMap database)
+    let queryToRun = astToRawSql typedAst
+    let params =
+            map (\(_, l, t) -> (l, t))
+                . sortOn (\(n, _, _) -> n)
+                . collectAllVariables
+                $ typedAst
+    let hsParams = lookupTypes params (typesMap database)
+    let x = show ast
+    return $
+        CommandInfo
+            { input = hsParams
+            , output = hsTypes
+            , commandByteString = queryToRun
+            }
 
 typecheck :: STerm () -> Tc (STerm TypeInfo)
 typecheck = \cases

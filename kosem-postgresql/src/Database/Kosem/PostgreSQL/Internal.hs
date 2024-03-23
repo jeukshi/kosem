@@ -11,7 +11,7 @@ import Data.Vector qualified as V
 import Data.Vector.Mutable qualified as VM
 import Database.Kosem.PostgreSQL.Internal.Connection
 import Database.Kosem.PostgreSQL.Internal.Row
-import Database.Kosem.PostgreSQL.Internal.Sql
+import Database.Kosem.PostgreSQL.Internal.Sql.Types (SqlCommand (..))
 import Database.Kosem.PostgreSQL.Schema.Internal.TH
 import Database.PostgreSQL.LibPQ qualified as LibPQ
 import Database.PostgreSQL.LibPQ qualified as LibPq
@@ -22,7 +22,7 @@ execute
     :: forall t
      . (HasCallStack)
     => Connection
-    -> Query (Row t)
+    -> SqlCommand (Row t)
     -> IO (Vector (Row t))
 execute connection query = do
     withMVar (connectionHandle connection) $ \rawConnection -> do
