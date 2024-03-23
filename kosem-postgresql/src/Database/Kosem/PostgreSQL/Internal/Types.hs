@@ -86,3 +86,10 @@ data TypeInfo = TypeInfo
     , hsType :: Name
     }
     deriving (Show, Eq)
+
+data SqlMapping = SqlMapping
+    { identifier :: Identifier
+    , hsType :: Name
+    , nullable :: IsNullable
+    }
+    deriving (Show, Eq, Lift)

@@ -15,51 +15,51 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import Unsafe.Coerce (unsafeCoerce)
 
-genRowType :: [(Identifier, Name, IsNullable)] -> Q Type
+genRowType :: [SqlMapping] -> Q Type
 genRowType columns = return $ AppT (ConT ''Row) (go columns)
   where
     go = \cases
         (column : columns) -> AppT (makeTuple column) (go columns)
         [] -> PromotedNilT
-    makeTuple = \cases
+    makeTuple sqlMapping = case sqlMapping.nullable of
         -- \| `label := type`
-        (identifier, ty, NonNullable) ->
+        NonNullable ->
             AppT
                 PromotedConsT
                 ( AppT
                     ( AppT
                         (ConT ''(:=))
-                        (LitT (StrTyLit (identifierToString identifier)))
+                        (LitT (StrTyLit (identifierToString sqlMapping.identifier)))
                     )
-                    (ConT ty)
+                    (ConT sqlMapping.hsType)
                 )
         -- \| `label := (Maybe type)`
-        (identifier, ty, Nullable) ->
+        Nullable ->
             AppT
                 PromotedConsT
                 ( AppT
                     ( AppT
                         (ConT ''(:=))
-                        (LitT (StrTyLit (identifierToString identifier)))
+                        (LitT (StrTyLit (identifierToString sqlMapping.identifier)))
                     )
-                    (AppT (ConT ''Maybe) (ConT ty))
+                    (AppT (ConT ''Maybe) (ConT sqlMapping.hsType))
                 )
 
-genRowParser :: [(Identifier, Name, IsNullable)] -> Q Exp
-genRowParser names =
+genRowParser :: [SqlMapping] -> Q Exp
+genRowParser sqlMappings =
     return
         . ListE
-        $ map genParseField names
+        $ map genParseField sqlMappings
   where
-    genParseField :: (Identifier, Name, IsNullable) -> Exp
-    genParseField = \cases
-        (_, ty, NonNullable) ->
+    genParseField :: SqlMapping -> Exp
+    genParseField sqlMapping = case sqlMapping.nullable of
+        NonNullable ->
             -- \| `unsafeCoerce . parseField'Internal @Text`
             InfixE
                 (Just (VarE 'unsafeCoerce))
                 (VarE '(.))
-                (Just (AppTypeE (VarE 'parseField'Internal) (ConT ty)))
-        (_, ty, Nullable) ->
+                (Just (AppTypeE (VarE 'parseField'Internal) (ConT sqlMapping.hsType)))
+        Nullable ->
             -- \| `unsafeCoerce . parseField'Internal @(Maybe Text)`
             InfixE
                 (Just (VarE 'unsafeCoerce))
@@ -67,7 +67,7 @@ genRowParser names =
                 ( Just
                     ( AppTypeE
                         (VarE 'parseField'Internal)
-                        (AppT (ConT ''Maybe) (ConT ty))
+                        (AppT (ConT ''Maybe) (ConT sqlMapping.hsType))
                     )
                 )
 

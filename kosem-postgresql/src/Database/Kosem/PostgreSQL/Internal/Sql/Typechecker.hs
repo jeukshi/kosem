@@ -31,7 +31,7 @@ import Text.Megaparsec (parseMaybe, parseTest)
 
 resultFromAst
     :: STerm TypeInfo
-    -> Either CompileError [(Identifier, Name, IsNullable)]
+    -> Either CompileError [SqlMapping]
 resultFromAst (Select resultColumns _ _) = do
     let (errors, columns) =
             partitionEithers $ map columnName (NonEmpty.toList resultColumns)
@@ -41,17 +41,21 @@ resultFromAst (Select resultColumns _ _) = do
   where
     columnName
         :: AliasedExpr TypeInfo
-        -> Either CompileError (Identifier, Name, IsNullable)
+        -> Either CompileError SqlMapping
     columnName = \cases
         (WithAlias expr alias _) -> do
             let typeInfo = exprType expr
-            Right (alias, typeInfo.hsType, typeInfo.nullable)
+            Right $ SqlMapping alias typeInfo.hsType typeInfo.nullable
         (WithoutAlias expr) -> do
             let typeInfo = exprType expr
             case typeInfo.identifier of
                 Just identifier ->
-                    Right
-                        (identifier, typeInfo.hsType, typeInfo.nullable)
+                    Right $
+                        SqlMapping
+                            { identifier = identifier
+                            , hsType = typeInfo.hsType
+                            , nullable = typeInfo.nullable
+                            }
                 Nothing -> Left $ ExprWithNoAlias expr
 
 lookupTypes

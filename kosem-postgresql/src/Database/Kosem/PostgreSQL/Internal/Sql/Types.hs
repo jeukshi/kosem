@@ -1,10 +1,10 @@
 module Database.Kosem.PostgreSQL.Internal.Sql.Types where
 
 import Data.ByteString (ByteString)
-import Database.Kosem.PostgreSQL.Internal.Types (Identifier, IsNullable)
+import Database.Kosem.PostgreSQL.Internal.Types (Identifier, IsNullable, SqlMapping)
+import GHC.Exts (Any)
 import Language.Haskell.TH.Lift (Lift)
 import Language.Haskell.TH.Syntax (Name)
-import GHC.Exts (Any)
 
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
@@ -16,11 +16,10 @@ data SqlCommand result = SqlCommand
     , params :: [Maybe ByteString]
     }
 
-type CommandOutput = [(Identifier, Name, IsNullable)]
 type CommandInput = [(Identifier, Name, IsNullable)]
 
 data CommandInfo = CommandInfo
-    { output :: CommandOutput
+    { output :: [SqlMapping]
     , input :: CommandInput
     , commandByteString :: ByteString
     }
