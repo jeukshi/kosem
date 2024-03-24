@@ -23,7 +23,7 @@ import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast
 import Database.Kosem.PostgreSQL.Internal.Sql.Env
 import Database.Kosem.PostgreSQL.Internal.Sql.Parser
-import Database.Kosem.PostgreSQL.Internal.Sql.Types (CommandInfo (..))
+import Database.Kosem.PostgreSQL.Internal.Sql.Types (CommandInfo (..), ParameterType (..))
 import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Language.Haskell.TH.Syntax (Name)
@@ -189,10 +189,7 @@ tcExpr = \cases
         -- FIXME check if can be casted
         ty <- getType identifier
         hsType <- getHsType ty
-        paramNumber <-
-            getParamNumber name >>= \case
-                Just ix -> return ix
-                Nothing -> addParam name
+        paramNumber <- introduceParameter name ty hsType SimpleParameter
         let typeInfo = TypeInfo ty NonNullable (Just name) hsType
         let tyVar = EParam pParam paramNumber name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
@@ -200,10 +197,7 @@ tcExpr = \cases
         -- FIXME check if can be casted
         ty <- getType identifier
         hsType <- getHsType ty
-        paramNumber <-
-            getParamNumber name >>= \case
-                Just ix -> return ix
-                Nothing -> addParam name
+        paramNumber <- introduceParameter name ty hsType SimpleParameter
         let typeInfo = TypeInfo ty Nullable (Just name) hsType
         let tyVar = EParamMaybe pParam paramNumber name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo

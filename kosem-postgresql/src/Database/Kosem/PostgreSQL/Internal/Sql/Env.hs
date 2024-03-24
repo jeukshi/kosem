@@ -4,15 +4,19 @@
 module Database.Kosem.PostgreSQL.Internal.Sql.Env where
 
 import Control.Applicative (Alternative)
+import Control.Monad (when)
 import Control.Monad.Except (ExceptT, MonadError (throwError), runExceptT)
 import Control.Monad.Identity (Identity (runIdentity), IdentityT (runIdentityT))
 import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT), asks)
+import Control.Monad.State (gets)
 import Control.Monad.State.Strict (MonadState (get, put), StateT (runStateT), evalStateT)
 import Control.Monad.Trans (MonadTrans, lift)
+import Data.List (foldl')
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.Diagnostics (CompileError)
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin (DatabaseConfig (binaryOperators))
+import Database.Kosem.PostgreSQL.Internal.Sql.Types (Parameter (..), ParameterType (..))
 import Database.Kosem.PostgreSQL.Internal.Types
 import Language.Haskell.TH (Name)
 
@@ -31,7 +35,7 @@ data Field = Field
 
 data Env = Env
     { fields :: [Field]
-    , params :: [Identifier]
+    , params :: [Parameter]
     }
 
 emptyEnv :: Env
@@ -61,8 +65,8 @@ class (Monad m) => MonadTc m where
     getTableByName :: Identifier -> m [Table]
     getColumnByName :: Identifier -> m [Field]
     addFieldsToEnv :: [Field] -> m ()
-    getParamNumber :: Identifier -> m (Maybe Int)
-    addParam :: Identifier -> m Int
+    introduceParameter
+        :: Identifier -> PgType -> Name -> ParameterType -> m Int
 
     throwError :: CompileError -> m a
 
@@ -87,21 +91,6 @@ instance MonadTc TcM where
     getColumnByName name =
         filter (\e -> e.label == name)
             <$> fmap (.fields) get
-
-    getParamNumber :: Identifier -> TcM (Maybe Int)
-    getParamNumber name = do
-        params <- fmap (.params) get
-        case filter (\ixElem -> snd ixElem == name) (zip [1 ..] params) of
-            [] -> return Nothing
-            [(ix, _)] -> return $ Just ix
-            _ -> error "oops" -- FIXME
-
-    addParam :: Identifier -> TcM Int
-    addParam name = do
-        currentEnv <- get
-        put (currentEnv{params = currentEnv.params ++ [name]})
-        -- \| + 1 for new elemen we just added.
-        return $ length currentEnv.params + 1
 
     throwError :: CompileError -> TcM a
     throwError = Control.Monad.Except.throwError
@@ -147,3 +136,37 @@ instance MonadTc TcM where
                 . filter (\(_, l, _, _) -> l == lhs)
                 . filter (\(o, _, _, _) -> o == realOp)
             $ binOpsMap
+
+    introduceParameter
+        :: Identifier -> PgType -> Name -> ParameterType -> TcM Int
+    introduceParameter identifier pgType hsType paramType = do
+        state <- getEnv
+        let currentParams = state.params
+        case filter (\x -> x.identifier == identifier) currentParams of
+            [] -> do
+                let newNumber = getMaxParamNumber currentParams + 1
+                addParam newNumber identifier pgType hsType paramType
+                return newNumber
+            param : _ -> do
+                when (param.pgType /= pgType) do
+                    error "TODO"
+                when (param.hsType /= hsType) do
+                    error "TODO"
+                when (param.paramType /= paramType) do
+                    error "TODO"
+                addParam param.number identifier param.pgType param.hsType param.paramType
+                return param.number
+      where
+        getMaxParamNumber :: [Parameter] -> Int
+        getMaxParamNumber = foldl' max 0 . map (.number)
+        addParam number identifier pgType hsType paramType = do
+            state <- getEnv
+            let newParam =
+                    Parameter
+                        { number = number
+                        , identifier = identifier
+                        , pgType = pgType
+                        , hsType = hsType
+                        , paramType = paramType
+                        }
+            put state{params = state.params ++ [newParam]}

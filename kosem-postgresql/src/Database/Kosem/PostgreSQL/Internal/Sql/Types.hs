@@ -1,11 +1,12 @@
 module Database.Kosem.PostgreSQL.Internal.Sql.Types where
 
 import Data.ByteString (ByteString)
-import Database.Kosem.PostgreSQL.Internal.Types (Identifier, IsNullable, SqlMapping)
+import Data.List.NonEmpty (NonEmpty)
+import Database.Kosem.PostgreSQL.Internal.P (P)
+import Database.Kosem.PostgreSQL.Internal.Types (Identifier, IsNullable, PgType, SqlMapping)
 import GHC.Exts (Any)
 import Language.Haskell.TH.Lift (Lift)
 import Language.Haskell.TH.Syntax (Name)
-import Data.List.NonEmpty (NonEmpty)
 
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
@@ -25,3 +26,17 @@ data CommandInfo = CommandInfo
     , commandByteString :: ByteString
     }
     deriving (Lift)
+
+data ParameterType
+    = SimpleParameter
+    | SimpleMaybeParameter
+    deriving (Show, Eq)
+
+data Parameter = Parameter
+    { number :: Int
+    , identifier :: Identifier
+    , pgType :: PgType
+    , hsType :: Name
+    , paramType :: ParameterType
+    }
+    deriving (Show)
