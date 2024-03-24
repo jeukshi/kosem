@@ -5,6 +5,7 @@ import Database.Kosem.PostgreSQL.Internal.Types (Identifier, IsNullable, SqlMapp
 import GHC.Exts (Any)
 import Language.Haskell.TH.Lift (Lift)
 import Language.Haskell.TH.Syntax (Name)
+import Data.List.NonEmpty (NonEmpty)
 
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
@@ -19,7 +20,7 @@ data SqlCommand result = SqlCommand
 type CommandInput = [(Identifier, Name, IsNullable)]
 
 data CommandInfo = CommandInfo
-    { output :: [SqlMapping]
+    { output :: NonEmpty SqlMapping
     , input :: CommandInput
     , commandByteString :: ByteString
     }

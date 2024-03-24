@@ -43,7 +43,6 @@ import qualified Database.Kosem.PostgreSQL.Internal.Sql.Types
 unsafeSql :: Database -> String -> Q Exp
 unsafeSql database userInputString = do
     let userInput = T.pack userInputString
-    -- let parserResult = parse userInput
     case Typechecker.run database userInput of
         Right commandInfo -> do
             let numberOfColumns = length commandInfo.output

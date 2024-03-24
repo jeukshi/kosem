@@ -28,25 +28,22 @@ import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Language.Haskell.TH.Syntax (Name)
 import Text.Megaparsec (parseMaybe, parseTest)
+import Data.Traversable (traverse)
 
 resultFromAst
     :: STerm TypeInfo
-    -> Either CompileError [SqlMapping]
+    -> Either CompileError (NonEmpty SqlMapping)
 resultFromAst (Select resultColumns _ _) = do
-    let (errors, columns) =
-            partitionEithers $ map columnName (NonEmpty.toList resultColumns)
-    case errors of
-        [] -> Right columns
-        (err : errs) -> Left err
+    traverse resultToSqlMapping resultColumns
   where
-    columnName
+    resultToSqlMapping
         :: AliasedExpr TypeInfo
         -> Either CompileError SqlMapping
-    columnName = \cases
-        (WithAlias expr alias _) -> do
+    resultToSqlMapping = \case
+        WithAlias expr alias _ -> do
             let typeInfo = exprType expr
             Right $ SqlMapping alias typeInfo.hsType typeInfo.nullable
-        (WithoutAlias expr) -> do
+        WithoutAlias expr -> do
             let typeInfo = exprType expr
             case typeInfo.identifier of
                 Just identifier ->

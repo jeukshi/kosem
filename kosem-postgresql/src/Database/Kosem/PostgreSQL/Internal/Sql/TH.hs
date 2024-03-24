@@ -5,6 +5,8 @@
 
 module Database.Kosem.PostgreSQL.Internal.Sql.TH where
 
+import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty qualified as NonEmpty
 import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Row
@@ -15,8 +17,8 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import Unsafe.Coerce (unsafeCoerce)
 
-genRowType :: [SqlMapping] -> Q Type
-genRowType columns = return $ AppT (ConT ''Row) (go columns)
+genRowType :: NonEmpty SqlMapping -> Q Type
+genRowType columns = return $ AppT (ConT ''Row) (go $ NonEmpty.toList columns)
   where
     go = \cases
         (column : columns) -> AppT (makeTuple column) (go columns)
@@ -45,11 +47,12 @@ genRowType columns = return $ AppT (ConT ''Row) (go columns)
                     (AppT (ConT ''Maybe) (ConT sqlMapping.hsType))
                 )
 
-genRowParser :: [SqlMapping] -> Q Exp
+genRowParser :: NonEmpty SqlMapping -> Q Exp
 genRowParser sqlMappings =
     return
         . ListE
-        $ map genParseField sqlMappings
+        . map genParseField
+        $ NonEmpty.toList sqlMappings
   where
     genParseField :: SqlMapping -> Exp
     genParseField sqlMapping = case sqlMapping.nullable of
