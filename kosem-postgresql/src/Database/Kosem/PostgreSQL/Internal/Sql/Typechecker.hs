@@ -29,6 +29,7 @@ import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Language.Haskell.TH.Syntax (Name)
 import Text.Megaparsec (parseMaybe, parseTest)
 import Data.Traversable (traverse)
+import Database.Kosem.PostgreSQL.Internal.Sql.Types (Parameter(..))
 
 resultFromAst
     :: STerm TypeInfo
@@ -55,28 +56,6 @@ resultFromAst (Select resultColumns _ _) = do
                             }
                 Nothing -> Left $ ExprWithNoAlias expr
 
-lookupTypes
-    :: [(Identifier, TypeInfo)]
-    -> [(Identifier, PgType, Name)]
-    -> [(Identifier, Name, IsNullable)]
-lookupTypes = \cases
-    (x : xs) mappings -> fromMapping x mappings : lookupTypes xs mappings
-    [] _ -> []
-  where
-    fromMapping
-        :: (Identifier, TypeInfo) -> [(Identifier, PgType, Name)] -> (Identifier, Name, IsNullable)
-    fromMapping (label, ty) mappings = case filter (isInMap ty) mappings of
-        [] -> error $ "no mapping for type: " <> show ty
-        [(_, pgType, name)] -> (label, name, ty.nullable)
-        (x : xs) ->
-            error $ "too many mapping for type: " <> show ty
-    isInMap :: TypeInfo -> (identifier, PgType, Name) -> Bool
-    isInMap sqlType (_, pgType, _) = case sqlType of
-        TypeInfo ty _ _ _ -> ty == pgType
-    toPgType :: TypeInfo -> PgType
-    toPgType = \cases
-        (TypeInfo ty _ _ _) -> ty
-
 run
     :: Database
     -> Text
@@ -87,15 +66,13 @@ run database input = do
     ast <- parse input
     let numberOfColumns = case ast of
             Select resultColumns _ _ -> length resultColumns
-    typedAst <- runProgram database (typecheck ast)
+    (typedAst, env) <- runProgram database (typecheck ast)
     hsTypes <- resultFromAst typedAst
     let queryToRun = astToRawSql typedAst
-    let params =
-            map (\(_, l, t) -> (l, t))
-                . sortOn (\(n, _, _) -> n)
-                . collectAllVariables
-                $ typedAst
-    let hsParams = lookupTypes params (typesMap database)
+    let hsParams =
+            map (\p -> (p.identifier, p.hsType, p.nullable))
+                . sortOn (.number)
+                $ env.params
     let x = show ast
     return $
         CommandInfo
@@ -189,7 +166,7 @@ tcExpr = \cases
         -- FIXME check if can be casted
         ty <- getType identifier
         hsType <- getHsType ty
-        paramNumber <- introduceParameter name ty hsType SimpleParameter
+        paramNumber <- introduceParameter name ty hsType SimpleParameter NonNullable
         let typeInfo = TypeInfo ty NonNullable (Just name) hsType
         let tyVar = EParam pParam paramNumber name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
@@ -197,7 +174,7 @@ tcExpr = \cases
         -- FIXME check if can be casted
         ty <- getType identifier
         hsType <- getHsType ty
-        paramNumber <- introduceParameter name ty hsType SimpleParameter
+        paramNumber <- introduceParameter name ty hsType SimpleParameter Nullable
         let typeInfo = TypeInfo ty Nullable (Just name) hsType
         let tyVar = EParamMaybe pParam paramNumber name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo

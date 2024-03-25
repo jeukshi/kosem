@@ -48,11 +48,11 @@ newtype Tc a = Tc
     }
     deriving (Monad, Functor, Applicative, MonadTc)
 
-runProgram :: Database -> Tc a -> Either CompileError a
+runProgram :: Database -> Tc a -> Either CompileError (a, Env)
 runProgram schema prog =
     runIdentity
         . runExceptT
-        . flip evalStateT emptyEnv
+        . flip runStateT emptyEnv
         . flip runReaderT schema
         $ runTc prog
 
@@ -66,7 +66,7 @@ class (Monad m) => MonadTc m where
     getColumnByName :: Identifier -> m [Field]
     addFieldsToEnv :: [Field] -> m ()
     introduceParameter
-        :: Identifier -> PgType -> Name -> ParameterType -> m Int
+        :: Identifier -> PgType -> Name -> ParameterType -> IsNullable -> m Int
 
     throwError :: CompileError -> m a
 
@@ -138,14 +138,14 @@ instance MonadTc TcM where
             $ binOpsMap
 
     introduceParameter
-        :: Identifier -> PgType -> Name -> ParameterType -> TcM Int
-    introduceParameter identifier pgType hsType paramType = do
+        :: Identifier -> PgType -> Name -> ParameterType -> IsNullable -> TcM Int
+    introduceParameter identifier pgType hsType paramType nullable = do
         state <- getEnv
         let currentParams = state.params
         case filter (\x -> x.identifier == identifier) currentParams of
             [] -> do
                 let newNumber = getMaxParamNumber currentParams + 1
-                addParam newNumber identifier pgType hsType paramType
+                addParam newNumber identifier pgType hsType paramType nullable
                 return newNumber
             param : _ -> do
                 when (param.pgType /= pgType) do
@@ -154,12 +154,12 @@ instance MonadTc TcM where
                     error "TODO"
                 when (param.paramType /= paramType) do
                     error "TODO"
-                addParam param.number identifier param.pgType param.hsType param.paramType
+                addParam param.number identifier param.pgType param.hsType param.paramType param.nullable
                 return param.number
       where
         getMaxParamNumber :: [Parameter] -> Int
         getMaxParamNumber = foldl' max 0 . map (.number)
-        addParam number identifier pgType hsType paramType = do
+        addParam number identifier pgType hsType paramType nullable = do
             state <- getEnv
             let newParam =
                     Parameter
@@ -168,5 +168,6 @@ instance MonadTc TcM where
                         , pgType = pgType
                         , hsType = hsType
                         , paramType = paramType
+                        , nullable = nullable
                         }
             put state{params = state.params ++ [newParam]}

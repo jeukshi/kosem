@@ -38,5 +38,6 @@ data Parameter = Parameter
     , pgType :: PgType
     , hsType :: Name
     , paramType :: ParameterType
+    , nullable :: IsNullable
     }
     deriving (Show)

@@ -24,37 +24,6 @@ data STerm t
     = Select (NonEmpty (AliasedExpr t)) (Maybe (From t)) (Maybe (Where t))
     deriving (Show)
 
-collectExprs :: STerm TypeInfo -> [Expr TypeInfo]
-collectExprs = \cases
-    (Select output mbFrom mbWhere) ->
-        fromOutput output
-            ++ maybe [] fromFrom mbFrom
-            ++ maybe [] fromWhere mbWhere
-  where
-    fromOutput :: NonEmpty (AliasedExpr TypeInfo) -> [Expr TypeInfo]
-    fromOutput =
-        map
-            ( \case
-                WithoutAlias expr -> expr
-                WithAlias expr _ _ -> expr
-            )
-            . NE.toList
-    fromWhere :: Where TypeInfo -> [Expr TypeInfo]
-    fromWhere (Where expr) = [expr]
-    fromFrom :: From TypeInfo -> [Expr TypeInfo]
-    fromFrom (From fromItem) = fromFromItem fromItem
-    fromFromItem :: FromItem TypeInfo -> [Expr TypeInfo]
-    fromFromItem = \cases
-        (FiTableName _ _) -> []
-        (FiJoin lhs _ rhs joinCondition) ->
-            fromJoinCondition joinCondition
-                ++ fromFromItem lhs
-                ++ fromFromItem rhs
-    fromJoinCondition :: JoinCondition TypeInfo -> [Expr TypeInfo]
-    fromJoinCondition = \cases
-        JcUsing -> []
-        (JcOn expr) -> [expr]
-
 instance ToRawSql (STerm TypeInfo) where
     toRawSql = \cases
         (Select output from whereClause) ->
@@ -194,29 +163,6 @@ data Expr t
       EBetween P (Expr t) Between (Expr t) And (Expr t)
     | ENotBetween P (Expr t) Not Between (Expr t) And (Expr t)
     deriving (Show)
-
-collectAllVariables :: STerm TypeInfo -> [(Int, Identifier, TypeInfo)]
-collectAllVariables = concatMap collectVariables . collectExprs
-  where
-    collectVariables :: Expr TypeInfo -> [(Int, Identifier, TypeInfo)]
-    collectVariables expr = go expr []
-      where
-        go :: Expr TypeInfo -> [(Int, Identifier, TypeInfo)] -> [(Int, Identifier, TypeInfo)]
-        go expr acc = case expr of
-            (EParam _ n t ty) -> acc ++ [(n, t, ty)]
-            (EParamMaybe _ n t ty) -> acc ++ [(n, t, ty)]
-            (EParens _ expr _ _) -> go expr acc
-            (ELit _ lit _) -> acc
-            (ECol _ columnName _) -> acc
-            (EPgCast _ expr _ _ _) -> go expr acc
-            (ENot _ not expr) -> go expr acc
-            (EAnd _ lhs and rhs) -> go rhs (go lhs acc)
-            (EOr _ lhs or rhs) -> go rhs (go lhs acc)
-            (EBinOp _ lhs or rhs _) -> go rhs (go lhs acc)
-            (EBetween _ lhs between rhs1 and rhs2) ->
-                go rhs1 (go rhs2 (go lhs acc))
-            (ENotBetween _ lhs not between rhs1 and rhs2) ->
-                go rhs1 (go rhs2 (go lhs acc))
 
 instance ToRawSql (Expr TypeInfo) where
     toRawSql :: Expr TypeInfo -> Builder
