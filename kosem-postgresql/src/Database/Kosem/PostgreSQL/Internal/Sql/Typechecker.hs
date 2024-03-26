@@ -1,6 +1,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Database.Kosem.PostgreSQL.Internal.Sql.Typechecker where
 
@@ -13,6 +13,7 @@ import Data.List.NonEmpty qualified as NonEmpty
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Text (Text)
 import Data.Text qualified as T
+import Data.Traversable (traverse)
 import Database.Kosem.PostgreSQL.Internal.Diagnostics (
     CompileError (..),
     DiagnosticSpan (..),
@@ -23,13 +24,15 @@ import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast
 import Database.Kosem.PostgreSQL.Internal.Sql.Env
 import Database.Kosem.PostgreSQL.Internal.Sql.Parser
-import Database.Kosem.PostgreSQL.Internal.Sql.Types (CommandInfo (..), ParameterType (..))
+import Database.Kosem.PostgreSQL.Internal.Sql.Types (
+    CommandInfo (..),
+    Parameter (..),
+    ParameterType (..),
+ )
 import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Language.Haskell.TH.Syntax (Name)
 import Text.Megaparsec (parseMaybe, parseTest)
-import Data.Traversable (traverse)
-import Database.Kosem.PostgreSQL.Internal.Sql.Types (Parameter(..))
 
 resultFromAst
     :: STerm TypeInfo
