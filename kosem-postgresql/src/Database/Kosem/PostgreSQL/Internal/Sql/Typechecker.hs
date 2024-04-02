@@ -71,7 +71,6 @@ run database input = do
             Select resultColumns _ _ -> length resultColumns
     (typedAst, env) <- runProgram database (typecheck ast)
     hsTypes <- resultFromAst typedAst
-    let queryToRun = astToRawSql typedAst
     let hsParams =
             map (\p -> (p.identifier, p.hsType, p.nullable))
                 . sortOn (.number)
@@ -79,9 +78,9 @@ run database input = do
     let x = show ast
     return $
         CommandInfo
-            { input = hsParams
+            { input = env.params
             , output = hsTypes
-            , commandByteString = queryToRun
+            , rawCommand = input
             }
 
 typecheck :: STerm () -> Tc (STerm TypeInfo)
@@ -177,7 +176,7 @@ tcExpr = \cases
         -- FIXME check if can be casted
         ty <- getType identifier
         hsType <- getHsType ty
-        paramNumber <- introduceParameter name ty hsType SimpleParameter Nullable
+        paramNumber <- introduceParameter name ty hsType SimpleMaybeParameter Nullable
         let typeInfo = TypeInfo ty Nullable (Just name) hsType
         let tyVar = EParamMaybe pParam paramNumber name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo

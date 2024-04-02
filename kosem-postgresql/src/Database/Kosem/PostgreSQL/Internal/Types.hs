@@ -7,7 +7,6 @@ import Data.Coerce (coerce)
 import Data.String (IsString)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Database.Kosem.PostgreSQL.Internal.Classes
 import Language.Haskell.TH (Extension (DuplicateRecordFields), Name)
 import Language.Haskell.TH.Lift (Lift)
 
@@ -29,15 +28,14 @@ newtype Identifier = Identifier Text
     deriving (IsString) via Text
     deriving (Lift)
 
-instance ToRawSql Identifier where
-    toRawSql :: Identifier -> Builder
-    toRawSql = textToBuilder . coerce
-
 identifierLength :: Identifier -> Int
 identifierLength = T.length . coerce
 
 identifierToString :: Identifier -> String
 identifierToString = T.unpack . coerce
+
+identifierToText :: Identifier -> Text
+identifierToText = coerce
 
 identifierPretty :: Identifier -> Text
 identifierPretty identifier = "‘" <> coerce identifier <> "’"
@@ -53,10 +51,6 @@ operatorLength = T.length . coerce
 
 operatorPretty :: Operator -> Text
 operatorPretty operator = "‘" <> coerce operator <> "’"
-
-instance ToRawSql Operator where
-    toRawSql :: Operator -> Builder
-    toRawSql = textToBuilder . coerce
 
 data Database = Database
     { name :: Text

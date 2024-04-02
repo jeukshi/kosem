@@ -7,6 +7,7 @@ import Database.Kosem.PostgreSQL.Internal.Types (Identifier, IsNullable, PgType,
 import GHC.Exts (Any)
 import Language.Haskell.TH.Lift (Lift)
 import Language.Haskell.TH.Syntax (Name)
+import Data.Text (Text)
 
 -- TODO type param `fetch` (One/Many)
 -- TODO type para `database` - database token
@@ -22,15 +23,19 @@ type CommandInput = [(Identifier, Name, IsNullable)]
 
 data CommandInfo = CommandInfo
     { output :: NonEmpty SqlMapping
-    , input :: CommandInput
-    , commandByteString :: ByteString
+    , input :: [Parameter]
+    , rawCommand :: Text
     }
-    deriving (Lift)
 
 data ParameterType
     = SimpleParameter
     | SimpleMaybeParameter
     deriving (Show, Eq)
+
+parameterTypeToText :: ParameterType -> Text
+parameterTypeToText = \case
+  SimpleParameter -> ":"
+  SimpleMaybeParameter -> ":?"
 
 data Parameter = Parameter
     { number :: Int

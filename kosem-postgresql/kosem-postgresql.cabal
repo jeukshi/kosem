@@ -44,7 +44,6 @@ library
     , Database.Kosem.PostgreSQL.Internal.Diagnostics
     , Database.Kosem.PostgreSQL.Internal.P
     , Database.Kosem.PostgreSQL.Internal.Diagnostics.GHC
-    , Database.Kosem.PostgreSQL.Internal.Classes
     , Database.Kosem.PostgreSQL.Internal.Row
     , Database.Kosem.PostgreSQL.Internal.FromField
     , Database.Kosem.PostgreSQL.Internal.ToField
