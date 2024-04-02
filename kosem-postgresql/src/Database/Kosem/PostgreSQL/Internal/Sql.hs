@@ -47,7 +47,6 @@ import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import Language.Haskell.TH.Syntax (Loc (..), Q (Q), location)
 import Text.Megaparsec qualified as Megaparsec
 import Unsafe.Coerce (unsafeCoerce)
-import Debug.Trace (trace, traceShow)
 
 unsafeSql :: Database -> String -> Q Exp
 unsafeSql database userInputString = do
@@ -89,7 +88,7 @@ unsafeSql database userInputString = do
                     )
                     parameters
         -- FIXME this will replace in comments too
-        traceShow replacements foldl'
+        foldl'
             (\acc (old, new) -> T.replace old new acc)
             rawCommand
             replacements
