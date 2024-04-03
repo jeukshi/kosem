@@ -249,7 +249,7 @@ anyOperatorP = lexeme do
             , C.char '|'
             , C.char '`'
             , C.char '?'
-            ]
+            ] <?> "<operator>"
 
 binOpP :: Text -> Parser (Expr () -> Expr () -> Expr ())
 binOpP sym = mkBinOp <$> getP <*> operatorP sym
@@ -277,15 +277,15 @@ exprP = makeExprParser termP operatorsTable
                     <*> pgCastP
                     <*> pure ()
             ]
-        , [InfixL do binOpP "^"]
+        , [InfixL do binOpP "^" <?> "<operator>"]
         ,
-            [ InfixL do binOpP "*"
-            , InfixL do binOpP "/"
-            , InfixL do binOpP "%"
+            [ InfixL do binOpP "*" <?> "<operator>"
+            , InfixL do binOpP "/" <?> "<operator>"
+            , InfixL do binOpP "%" <?> "<operator>"
             ]
         ,
-            [ InfixL do binOpP "+"
-            , InfixL do binOpP "-"
+            [ InfixL do binOpP "+" <?> "<operator>"
+            , InfixL do binOpP "-" <?> "<operator>"
             ]
         , [InfixL do anyBinOpP]
         ,
@@ -306,13 +306,13 @@ exprP = makeExprParser termP operatorsTable
                     <*> termP
             ]
         ,
-            [ InfixL do binOpP "<>"
-            , InfixL do binOpP "!="
-            , InfixL do binOpP "<="
-            , InfixL do binOpP "<"
-            , InfixL do binOpP ">="
-            , InfixL do binOpP ">"
-            , InfixL do binOpP "="
+            [ InfixL do binOpP "<>" <?> "<operator>"
+            , InfixL do binOpP "!=" <?> "<operator>"
+            , InfixL do binOpP "<=" <?> "<operator>"
+            , InfixL do binOpP "<" <?> "<operator>"
+            , InfixL do binOpP ">=" <?> "<operator>"
+            , InfixL do binOpP ">" <?> "<operator>"
+            , InfixL do binOpP "=" <?> "<operator>"
             ]
         , [Prefix do ENot <$> lexeme getP <*> notK]
         , [InfixL do mkAnd <$> lexeme getP <*> andK]
