@@ -249,7 +249,8 @@ anyOperatorP = lexeme do
             , C.char '|'
             , C.char '`'
             , C.char '?'
-            ] <?> "<operator>"
+            ]
+            <?> "<operator>"
 
 binOpP :: Text -> Parser (Expr () -> Expr () -> Expr ())
 binOpP sym = mkBinOp <$> getP <*> operatorP sym
@@ -315,7 +316,10 @@ exprP = makeExprParser termP operatorsTable
             , InfixL do binOpP "=" <?> "<operator>"
             ]
         , [Prefix do ENot <$> lexeme getP <*> notK]
-        , [InfixL do mkAnd <$> lexeme getP <*> andK]
+        ,
+            [ InfixL do mkAnd <$> lexeme getP <*> andK
+            , Postfix do foldr1 (.) <$> some mkGuardedAnd
+            ]
         , [InfixL do mkOr <$> lexeme getP <*> orK]
         ]
     mkCast p1 (p2, identifier) ty expr = EPgCast p1 expr p2 identifier ty
@@ -325,6 +329,21 @@ exprP = makeExprParser termP operatorsTable
     mkNotBetween p not between rhs1 and rhs2 lhs =
         ENotBetween p lhs not between rhs1 and rhs2
     mkAnd p and lhs = EAnd p lhs and
+
+    mkGuardedAnd = lexeme do
+        p1 <- getP
+        symbol ":?"
+        identifier <- identifierP
+        _ <- symbol "{and"
+        innerExpr <- exprP
+        p2 <- lexeme getP
+        _ <- symbol "}"
+        -- \| Move p2 by one to match a position of '}'.
+        return $ mk p1 identifier innerExpr (p2 `movePby` 1)
+      where
+        mk p1 identifier innerExpr p2 lhs =
+            EGuardedAnd lhs p1 identifier innerExpr p2
+
     mkOr p and lhs = EOr p lhs and
 
 exprLitP :: Parser (Expr ())

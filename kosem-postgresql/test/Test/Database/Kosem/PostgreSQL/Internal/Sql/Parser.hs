@@ -126,3 +126,15 @@ spec = parallel do
              select :abc
               where :cba and :xyz or :zyx
                |]
+        it "guarded AND" do
+            parseOnly selectCore
+                `shouldSucceedOn` [text|
+             select :abc
+              where :cba=true = false
+        :?ident{and :xyz or :?ident and x = y}
+        :?ident{and :xyz }
+                and true
+        :?ident{and :xyz}
+                 or true
+        :?ident{and :xyz }
+               |]

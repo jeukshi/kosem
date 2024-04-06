@@ -148,6 +148,7 @@ exprType = \cases
     (EParens _ _ _ ty) -> ty
     (EParam _ _ _ ty) -> ty
     (EParamMaybe _ _ _ ty) -> ty
+    (EGuardedAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
     (ELit _ _ ty) -> ty
     (ECol _ _ ty) -> ty
     (ENot{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
@@ -227,6 +228,9 @@ tcExpr = \cases
         when (ty.pgType /= PgBoolean) do
             throwError $ ConditionTypeError tyExpr "NOT"
         return $ ENot p not tyExpr
+    (EGuardedAnd lhs p1 identifier rhs p2) -> do
+        (tyLhs, tyRhs) <- tyMustBeBoolean "AND" lhs rhs
+        return $ EGuardedAnd tyLhs p1 identifier tyRhs p2
     (EAnd p lhs and rhs) -> do
         (tyLhs, tyRhs) <- tyMustBeBoolean "AND" lhs rhs
         return $ EAnd p tyLhs and tyRhs
