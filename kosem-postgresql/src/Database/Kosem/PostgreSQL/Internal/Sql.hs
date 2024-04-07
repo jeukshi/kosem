@@ -9,7 +9,7 @@ module Database.Kosem.PostgreSQL.Internal.Sql where
 import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import Data.Either (partitionEithers)
-import Data.List (foldl', sortOn)
+import Data.List (foldl', nub, sortOn)
 import Data.String (IsString (fromString))
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -56,7 +56,8 @@ unsafeSql database userInputString = do
             let numberOfColumns = length commandInfo.output
                 result = commandInfo.output
                 params =
-                    map (\p -> (p.identifier, p.hsType, p.nullable))
+                    nub
+                        . map (\p -> (p.identifier, p.hsType, p.nullable))
                         . sortOn (.number)
                         $ commandInfo.input
                 command =

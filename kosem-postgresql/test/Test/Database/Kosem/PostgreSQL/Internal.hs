@@ -69,6 +69,14 @@ spec = around withDB $ do
                                    , :?cba::text as cba|]
             "it compiles" `shouldBe` "it compiles"
 
+        it "can be repeated" $ \conn -> do
+            let abc = True
+                cba = "cba"
+            _ <- execute conn do
+                [Tdb.sql| select :abc::boolean abc
+                               , :cba::text as cba
+                               , :abc::boolean as abc2 |]
+            "it compiles" `shouldBe` "it compiles"
     describe "selects for real" $ do
         it "selects postgresql simple datatypes" $ \conn -> do
             unsafeExecute_ conn do
