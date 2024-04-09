@@ -200,13 +200,13 @@ paramP :: Parser (Expr ())
 paramP = lexeme do
     p <- getP
     symbol ":"
-    (EParam p 0 <$> identifierP) <*> pure ()
+    (EParam p <$> identifierP) <*> pure ()
 
 paramMaybeP :: Parser (Expr ())
 paramMaybeP = lexeme do
     p <- getP
     symbol ":?"
-    (EParamMaybe p 0 <$> identifierP) <*> pure ()
+    (EParamMaybe p <$> identifierP) <*> pure ()
 
 pgCastP :: Parser (P, Identifier)
 pgCastP = lexeme do

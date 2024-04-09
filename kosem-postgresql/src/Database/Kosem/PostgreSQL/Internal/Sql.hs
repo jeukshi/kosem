@@ -10,6 +10,7 @@ import Data.Bifunctor (first)
 import Data.ByteString (ByteString)
 import Data.Either (partitionEithers)
 import Data.List (foldl', nub, sortOn)
+import Data.Maybe (fromJust)
 import Data.String (IsString (fromString))
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -57,8 +58,14 @@ unsafeSql database userInputString = do
                 result = commandInfo.output
                 params =
                     nub
-                        . map (\p -> (p.identifier, p.hsType, p.nullable))
-                        . sortOn (.number)
+                        . map
+                            ( \p ->
+                                ( p.identifier
+                                , (.hsType) . fromJust $ p.info
+                                , (.nullable) . fromJust $ p.info
+                                )
+                            )
+                        . sortOn (.position)
                         $ commandInfo.input
                 command =
                     T.encodeUtf8 $
@@ -84,7 +91,7 @@ unsafeSql database userInputString = do
                     ( \param ->
                         ( parameterTypeToText param.paramType
                             <> identifierToText param.identifier
-                        , T.pack ("$" <> show param.number)
+                        , T.pack ("$" <> show param.position)
                         )
                     )
                     parameters
