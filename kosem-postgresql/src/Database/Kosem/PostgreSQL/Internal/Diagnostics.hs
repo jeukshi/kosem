@@ -165,12 +165,12 @@ toDiagnosticSpan = \cases
             (p2 `movePby` identifierLength identifier)
     (EParens p1 _ p2 _) ->
         DiagnosticSpan p1 p2
-    (EParam p _ identifier _) ->
+    (EParam p identifier _) ->
         DiagnosticSpan
             p
             -- \| +1 from ':' prefix.
             (p `movePby` (identifierLength identifier + 1))
-    (EParamMaybe p _ identifier _) ->
+    (EParamMaybe p identifier _) ->
         DiagnosticSpan
             p
             -- \| +2 from ':?' prefix.

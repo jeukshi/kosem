@@ -5,6 +5,7 @@ import Data.Text (Text)
 import Data.Void (Void)
 import Database.Kosem.PostgreSQL.Internal.Connection
 import Database.Kosem.PostgreSQL.Internal.ParserUtils
+import Database.Kosem.PostgreSQL.Internal.Types (Database (Database))
 import Test.Hspec.Megaparsec (initialState)
 import Text.Megaparsec
 import Text.Megaparsec.Char qualified as C
