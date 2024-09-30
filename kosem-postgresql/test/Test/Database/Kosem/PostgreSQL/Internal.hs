@@ -107,3 +107,38 @@ spec = around withDB $ do
             row.type_integer `shouldBe` 9000
             row.type_bigint `shouldBe` 9001
             row.type_boolean `shouldBe` True
+    describe "selects with guards" $ do
+        it "and guard" $ \conn -> do
+            unsafeExecute_ conn do
+                T.encodeUtf8
+                    [text|
+                     insert
+                       into data_types
+                     values ('some text', 9000, 9001, True)
+                    |]
+            let someText = "some text"
+            let guardTrue = True
+            rowsZero <-
+                execute
+                    conn
+                    [Tdb.sql|
+                select type_text
+                  from data_types
+                 where true :?guardTrue{and type_text<>:someText::text}
+                 |]
+            let guardFalse = False
+            rowsOne <-
+                execute
+                    conn
+                    [Tdb.sql|
+                select type_text
+                  from data_types
+                 where true :?guardFalse{and type_text<>:someText::text}
+                 |]
+            unsafeExecute_ conn do
+                T.encodeUtf8
+                    [text|
+                     delete from data_types
+                    |]
+            length rowsZero `shouldBe` 0
+            length rowsOne `shouldBe` 1

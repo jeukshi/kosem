@@ -7,10 +7,11 @@ module Database.Kosem.PostgreSQL.Internal.Sql.Typechecker where
 import Control.Monad (when)
 import Data.ByteString (ByteString)
 import Data.Either (partitionEithers)
-import Data.List (sortOn)
+import Data.List (sortBy, sortOn)
 import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.Maybe (fromJust, fromMaybe)
+import Data.Ord (comparing)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Traversable (traverse)
@@ -27,6 +28,7 @@ import Database.Kosem.PostgreSQL.Internal.Sql.Parser
 import Database.Kosem.PostgreSQL.Internal.Sql.Types (
     CommandInfo (..),
     Parameter (..),
+    ParameterInfo (..),
     ParameterType (..),
  )
 import Database.Kosem.PostgreSQL.Internal.Types
@@ -71,14 +73,11 @@ run database input = do
             Select resultColumns _ _ -> length resultColumns
     (typedAst, env) <- runProgram database (typecheck ast)
     hsTypes <- resultFromAst typedAst
-    let hsParams =
-            map (\p -> (p.identifier, p.hsType, p.nullable))
-                . sortOn (.number)
-                $ env.params
     let x = show ast
+        paramsSorted = sortBy (comparing (.position)) env.params
     return $
         CommandInfo
-            { input = env.params
+            { input = paramsSorted
             , output = hsTypes
             , rawCommand = input
             }
@@ -146,8 +145,8 @@ exprType :: Expr TypeInfo -> TypeInfo
 exprType = \cases
     (EPgCast _ _ _ _ ty) -> ty
     (EParens _ _ _ ty) -> ty
-    (EParam _ _ _ ty) -> ty
-    (EParamMaybe _ _ _ ty) -> ty
+    (EParam _ _ ty) -> ty
+    (EParamMaybe _ _ ty) -> ty
     (EGuardedAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
     (ELit _ _ ty) -> ty
     (ECol _ _ ty) -> ty
@@ -165,21 +164,45 @@ tcNullable = \cases
 
 tcExpr :: Expr () -> Tc (Expr TypeInfo)
 tcExpr = \cases
-    (EPgCast p1 var@(EParam pParam _ name _) p2 identifier ()) -> do
+    (EPgCast p1 var@(EParam pParam name _) p2 identifier ()) -> do
         -- FIXME check if can be casted
         ty <- getType identifier
         hsType <- getHsType ty
-        paramNumber <- introduceParameter name ty hsType SimpleParameter NonNullable
+        introduceParameter $
+            Parameter
+                { position = pParam
+                , identifier = name
+                , paramType = SimpleParameter
+                , info =
+                    Just
+                        ParameterInfo
+                            { pgType = ty
+                            , hsType = hsType
+                            , nullable = NonNullable
+                            }
+                }
         let typeInfo = TypeInfo ty NonNullable (Just name) hsType
-        let tyVar = EParam pParam paramNumber name typeInfo
+        let tyVar = EParam pParam name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
-    (EPgCast p1 var@(EParamMaybe pParam _ name _) p2 identifier ()) -> do
+    (EPgCast p1 var@(EParamMaybe pParam name _) p2 identifier ()) -> do
         -- FIXME check if can be casted
         ty <- getType identifier
         hsType <- getHsType ty
-        paramNumber <- introduceParameter name ty hsType SimpleMaybeParameter Nullable
+        introduceParameter $
+            Parameter
+                { position = pParam
+                , identifier = name
+                , paramType = SimpleMaybeParameter
+                , info =
+                    Just
+                        ParameterInfo
+                            { pgType = ty
+                            , hsType = hsType
+                            , nullable = Nullable
+                            }
+                }
         let typeInfo = TypeInfo ty Nullable (Just name) hsType
-        let tyVar = EParamMaybe pParam paramNumber name typeInfo
+        let tyVar = EParamMaybe pParam name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
     (EPgCast p1 expr p2 identifier ()) -> do
         tyExpr <- tcExpr expr
@@ -198,8 +221,8 @@ tcExpr = \cases
         tyExpr <- tcExpr expr
         let innerTy = exprType tyExpr
         return $ EParens p1 tyExpr p2 innerTy
-    (EParam p _ name ()) -> throwError $ ParameterWithoutCastError p name
-    (EParamMaybe p _ name ()) -> throwError $ MaybeParameterWithoutCastError p name
+    (EParam p name ()) -> throwError $ ParameterWithoutCastError p name
+    (EParamMaybe p name ()) -> throwError $ MaybeParameterWithoutCastError p name
     (ELit p litVal _) -> case litVal of
         NumericLiteral -> do
             hsType <- getHsType PgNumeric
@@ -229,6 +252,13 @@ tcExpr = \cases
             throwError $ ConditionTypeError tyExpr "NOT"
         return $ ENot p not tyExpr
     (EGuardedAnd lhs p1 identifier rhs p2) -> do
+        introduceParameter $
+            Parameter
+                { position = p1
+                , identifier = identifier
+                , paramType = GuardParameter
+                , info = Nothing
+                }
         (tyLhs, tyRhs) <- tyMustBeBoolean "AND" lhs rhs
         return $ EGuardedAnd tyLhs p1 identifier tyRhs p2
     (EAnd p lhs and rhs) -> do

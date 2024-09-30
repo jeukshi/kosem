@@ -15,6 +15,7 @@ import Data.List (foldl')
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.Diagnostics (CompileError)
+import Database.Kosem.PostgreSQL.Internal.P (P)
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin (DatabaseConfig (binaryOperators))
 import Database.Kosem.PostgreSQL.Internal.Sql.Types (Parameter (..), ParameterType (..))
 import Database.Kosem.PostgreSQL.Internal.Types
@@ -66,7 +67,7 @@ class (Monad m) => MonadTc m where
     getColumnByName :: Identifier -> m [Field]
     addFieldsToEnv :: [Field] -> m ()
     introduceParameter
-        :: Identifier -> PgType -> Name -> ParameterType -> IsNullable -> m Int
+        :: Parameter -> m ()
 
     throwError :: CompileError -> m a
 
@@ -137,37 +138,7 @@ instance MonadTc TcM where
                 . filter (\(o, _, _, _) -> o == realOp)
             $ binOpsMap
 
-    introduceParameter
-        :: Identifier -> PgType -> Name -> ParameterType -> IsNullable -> TcM Int
-    introduceParameter identifier pgType hsType paramType nullable = do
+    introduceParameter :: Parameter -> TcM ()
+    introduceParameter parameter = do
         state <- getEnv
-        let currentParams = state.params
-        case filter (\x -> x.identifier == identifier) currentParams of
-            [] -> do
-                let newNumber = getMaxParamNumber currentParams + 1
-                addParam newNumber identifier pgType hsType paramType nullable
-                return newNumber
-            param : _ -> do
-                when (param.pgType /= pgType) do
-                    error "TODO"
-                when (param.hsType /= hsType) do
-                    error "TODO"
-                when (param.paramType /= paramType) do
-                    error "TODO"
-                addParam param.number identifier param.pgType param.hsType param.paramType param.nullable
-                return param.number
-      where
-        getMaxParamNumber :: [Parameter] -> Int
-        getMaxParamNumber = foldl' max 0 . map (.number)
-        addParam number identifier pgType hsType paramType nullable = do
-            state <- getEnv
-            let newParam =
-                    Parameter
-                        { number = number
-                        , identifier = identifier
-                        , pgType = pgType
-                        , hsType = hsType
-                        , paramType = paramType
-                        , nullable = nullable
-                        }
-            put state{params = state.params ++ [newParam]}
+        put state{params = state.params ++ [parameter]}

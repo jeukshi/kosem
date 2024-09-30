@@ -59,6 +59,7 @@ library
     , Database.Kosem.PostgreSQL.Schema.Internal.TH
   build-depends:
       base
+    , bluefin
     , megaparsec
     , parser-combinators
     , text
@@ -91,6 +92,7 @@ test-suite spec
   default-language:
       GHC2021
   other-modules:
+    , Test.Database.Kosem.PostgreSQL.Internal.Sql
     , Test.Database.Kosem.PostgreSQL.Internal.Sql.Parser
     , Test.Database.Kosem.PostgreSQL.Internal.ToFromField
     , Test.Database.Kosem.PostgreSQL.Schema.Internal.Parser
@@ -121,6 +123,10 @@ test-suite spec
     , hedgehog
     , megaparsec
     , text
+    , bytestring
     , vector
     , neat-interpolation
     , template-haskell
+    , bluefin
+    -- dbg
+    , pretty-simple

@@ -66,8 +66,8 @@ data AliasedExpr t
 
 data Expr t
     = EParens P (Expr t) P t
-    | EParam P Int Identifier t
-    | EParamMaybe P Int Identifier t
+    | EParam P Identifier t
+    | EParamMaybe P Identifier t
     | ELit P LiteralValue t
     | ECol P Identifier t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
     | EPgCast P (Expr t) P Identifier t -- TODO Identifi
