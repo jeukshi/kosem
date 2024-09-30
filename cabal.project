@@ -1,3 +1,5 @@
+multi-repl: True
+
 packages:
     ./kosem-core
     ./kosem-postgresql
