@@ -1,9 +1,7 @@
 {
   description = "Kosem - typed SQL and relational mapping for Haskell";
   inputs = {
-    # nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    # Use master for GHC 9.6 and HLS 2.6 this is temporary.
-    nixpkgs.url = "github:nixos/nixpkgs/master";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     systems.url = "github:nix-systems/default";
     flake-parts.url = "github:hercules-ci/flake-parts";
     haskell-flake.url = "github:srid/haskell-flake";
@@ -26,7 +24,7 @@
           autoWire = [ "packages" "apps" "checks" ];
           settings.haskell-language-server.custom = with pkgs.haskell.lib.compose; lib.flip lib.pipe [
             (disableCabalFlag "ormolu")
-            (drv: drv.override { hls-ormolu-plugin = null; })
+            # (drv: drv.override { hls-ormolu-plugin = null; })
           ];
         };
         packages.default = self'.packages.kosem-postgresql;
