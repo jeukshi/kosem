@@ -15,8 +15,8 @@ common runtime-opts
 library
   import:            runtime-opts
   exposed-modules:
-    ,  Database.Kosem.Record
-    ,  Database.Kosem.Record2
+    , Database.Kosem.Record
+    , Database.Kosem.Record2
   build-depends:    base
   hs-source-dirs:   src
   default-extensions:
@@ -29,3 +29,6 @@ library
     , TypeOperators
     , StandaloneKindSignatures
   default-language: GHC2021
+  build-depends:
+      base
+    , bluefin

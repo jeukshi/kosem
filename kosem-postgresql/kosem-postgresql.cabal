@@ -50,7 +50,6 @@ library
     , bytestring
     , vector
     , ghc
-    , mtl
     , template-haskell
     , th-lift
     , postgresql-binary
