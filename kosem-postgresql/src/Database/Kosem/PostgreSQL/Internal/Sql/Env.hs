@@ -1,16 +1,15 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Database.Kosem.PostgreSQL.Internal.Sql.Env where
 
+import Bluefin.Compound
+import Bluefin.Eff
+import Bluefin.Exception (Exception, throw, try)
+import Bluefin.State
 import Control.Applicative (Alternative)
 import Control.Monad (when)
-import Control.Monad.Except (ExceptT, MonadError (throwError), runExceptT)
-import Control.Monad.Identity (Identity (runIdentity), IdentityT (runIdentityT))
-import Control.Monad.Reader (MonadReader (ask), ReaderT (runReaderT), asks)
-import Control.Monad.State (gets)
-import Control.Monad.State.Strict (MonadState (get, put), StateT (runStateT), evalStateT)
-import Control.Monad.Trans (MonadTrans, lift)
 import Data.List (foldl')
 import Data.Maybe (listToMaybe)
 import Data.Text (Text)
@@ -19,6 +18,7 @@ import Database.Kosem.PostgreSQL.Internal.P (P)
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin (DatabaseConfig (binaryOperators))
 import Database.Kosem.PostgreSQL.Internal.Sql.Types (Parameter (..), ParameterType (..))
 import Database.Kosem.PostgreSQL.Internal.Types
+import GHC.Records (HasField)
 import Language.Haskell.TH (Name)
 
 data IntroType
@@ -34,111 +34,93 @@ data Field = Field
     }
     deriving (Show)
 
-data Env = Env
-    { fields :: [Field]
-    , params :: [Parameter]
+data EnvE e = MkEnvE
+    { database :: Database
+    , fields :: State [Field] e
+    , parameters :: State [Parameter] e
+    , compileError :: Exception CompileError e
     }
 
-emptyEnv :: Env
-emptyEnv = Env [] []
+runEnv
+    :: (e1 :> es)
+    => Database
+    -> Exception CompileError e1
+    -> [Field]
+    -> [Parameter]
+    -> (forall e. EnvE e -> Eff (e :& es) r)
+    -> Eff es r
+runEnv database ex fields params action =
+    evalState fields $ \fieldsS -> do
+        evalState params $ \paramsS -> do
+            useImplIn
+                action
+                MkEnvE
+                    { database = database
+                    , fields = mapHandle fieldsS
+                    , parameters = mapHandle paramsS
+                    , compileError = mapHandle ex
+                    }
 
-type TcM = ReaderT Database (StateT Env (ExceptT CompileError Identity))
+introduceParameter
+    :: (e :> es)
+    => EnvE e
+    -> Parameter
+    -> Eff es ()
+introduceParameter env parameter =
+    modify env.parameters (<> [parameter])
 
-newtype Tc a = Tc
-    { runTc :: TcM a
-    }
-    deriving (Monad, Functor, Applicative, MonadTc)
+getBinaryOpResult
+    :: Database
+    -> PgType
+    -> Operator
+    -> PgType
+    -> Maybe PgType
+getBinaryOpResult database lhs op rhs = do
+    -- \| Postgres converts '!=' to '<>', see note:
+    -- https://www.postgresql.org/docs/current/functions-comparison.html
+    let realOp = if op == "!=" then "<>" else op
+        binOpsMap = database.binaryOps
+    listToMaybe
+        . map (\(_, _, _, ty) -> ty)
+        . filter (\(_, _, r, _) -> r == rhs)
+        . filter (\(_, l, _, _) -> l == lhs)
+        . filter (\(o, _, _, _) -> o == realOp)
+        $ database.binaryOps
 
-runProgram :: Database -> Tc a -> Either CompileError (a, Env)
-runProgram schema prog =
-    runIdentity
-        . runExceptT
-        . flip runStateT emptyEnv
-        . flip runReaderT schema
-        $ runTc prog
+getPgType :: Database -> Identifier -> PgType
+getPgType database identifier = find identifier database.typesMap
+  where
+    find :: Identifier -> [(Identifier, PgType, Name)] -> PgType
+    find identifier = \cases
+        [] -> error $ "no type: " <> show identifier
+        ((i, t, _) : xs) ->
+            if i == identifier
+                then t
+                else find identifier xs
 
-class (Monad m) => MonadTc m where
-    getEnv :: m Env
-    setEnv :: m Env
-    getType :: Identifier -> m PgType
-    getHsType :: PgType -> m Name
-    getBinaryOpResult :: PgType -> Operator -> PgType -> m (Maybe PgType)
-    getTableByName :: Identifier -> m [Table]
-    getColumnByName :: Identifier -> m [Field]
-    addFieldsToEnv :: [Field] -> m ()
-    introduceParameter
-        :: Parameter -> m ()
+getHsType :: Database -> PgType -> Name
+getHsType database pgType = find pgType database.typesMap
+  where
+    find :: PgType -> [(Identifier, PgType, Name)] -> Name
+    find identifier = \cases
+        [] -> error $ "no type: " <> show identifier
+        ((_, t, n) : xs) ->
+            if t == pgType
+                then n
+                else find identifier xs
 
-    throwError :: CompileError -> m a
+addFieldsToEnv
+    :: (e :> es)
+    => State [Field] e
+    -> [Field]
+    -> Eff es ()
+addFieldsToEnv fieldsS fields =
+    modify fieldsS (<> fields)
 
-instance MonadTc TcM where
-    getEnv = do
-        x <- ask
-        get
-    setEnv :: TcM Env
-    setEnv = undefined
+getTableByName :: Database -> Identifier -> [Table]
+getTableByName database tableName =
+    (filter (\table -> table.name == tableName) . tables) database
 
-    addFieldsToEnv :: [Field] -> TcM ()
-    addFieldsToEnv newFields = do
-        currentEnv <- get
-        put (currentEnv{fields = currentEnv.fields ++ newFields})
-        return ()
-
-    getTableByName :: Identifier -> TcM [Table]
-    getTableByName tableName =
-        asks (filter (\table -> table.name == tableName) . tables)
-
-    getColumnByName :: Identifier -> TcM [Field]
-    getColumnByName name =
-        filter (\e -> e.label == name)
-            <$> fmap (.fields) get
-
-    throwError :: CompileError -> TcM a
-    throwError = Control.Monad.Except.throwError
-
-    getType :: Identifier -> TcM PgType
-    getType identifier = do
-        types <- asks (.typesMap)
-        pgType <- find identifier types
-        pure pgType
-      where
-        find :: Identifier -> [(Identifier, PgType, Name)] -> TcM PgType
-        find identifier = \cases
-            [] -> error $ "no type: " <> show identifier
-            ((i, t, _) : xs) ->
-                if i == identifier
-                    then pure t
-                    else find identifier xs
-
-    getHsType :: PgType -> TcM Name
-    getHsType pgType = do
-        types <- asks (.typesMap)
-        name <- find pgType types
-        pure name
-      where
-        find :: PgType -> [(Identifier, PgType, Name)] -> TcM Name
-        find identifier = \cases
-            [] -> error $ "no type: " <> show identifier
-            ((_, t, n) : xs) ->
-                if t == pgType
-                    then pure n
-                    else find identifier xs
-
-    getBinaryOpResult :: PgType -> Operator -> PgType -> TcM (Maybe PgType)
-    getBinaryOpResult lhs op rhs = do
-        -- \| Postgres converts '!=' to '<>', see note:
-        -- https://www.postgresql.org/docs/current/functions-comparison.html
-        let realOp = if op == "!=" then "<>" else op
-        binOpsMap <- asks (.binaryOps)
-        return
-            $ listToMaybe
-                . map (\(_, _, _, ty) -> ty)
-                . filter (\(_, _, r, _) -> r == rhs)
-                . filter (\(_, l, _, _) -> l == lhs)
-                . filter (\(o, _, _, _) -> o == realOp)
-            $ binOpsMap
-
-    introduceParameter :: Parameter -> TcM ()
-    introduceParameter parameter = do
-        state <- getEnv
-        put state{params = state.params ++ [parameter]}
+getColumnByName :: [Field] -> Identifier -> [Field]
+getColumnByName fields name =
+    filter (\e -> e.label == name) fields

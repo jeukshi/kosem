@@ -6,7 +6,7 @@ module Database.Kosem.PostgreSQL.Internal.Diagnostics (
     DiagnosticSpan (..),
     combineSpans,
     CompileError (..),
-    compileError,
+    compilationError,
 )
 where
 
@@ -211,8 +211,8 @@ toDiagnosticSpan = \cases
         toDiagnosticSpan lhs
             `combineSpans` toDiagnosticSpan rhs2
 
-compileError :: Text -> CompileError -> Q Exp
-compileError input error = do
+compilationError :: Text -> CompileError -> Q Exp
+compilationError input error = do
     let diagnosticSpan = compileErrorSpan error
     let msg = compileErrorMsg error
     qqLoc <- location

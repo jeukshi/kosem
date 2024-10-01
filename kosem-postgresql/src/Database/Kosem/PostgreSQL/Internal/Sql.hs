@@ -27,13 +27,13 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 import Data.Traversable (for)
-import Database.Kosem.PostgreSQL.Internal.Diagnostics (CompileError (..), compileError)
+import Database.Kosem.PostgreSQL.Internal.Diagnostics (CompileError (..), compilationError)
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.P (unP)
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast
-import Database.Kosem.PostgreSQL.Internal.Sql.Env (runProgram)
+import Database.Kosem.PostgreSQL.Internal.Sql.Env
 import Database.Kosem.PostgreSQL.Internal.Sql.Parser (parse)
 import Database.Kosem.PostgreSQL.Internal.Sql.TH
 import Database.Kosem.PostgreSQL.Internal.Sql.Typechecker as Typechecker
@@ -92,7 +92,7 @@ unsafeSql database userInputString = do
                     }
                 |]
         Left e -> do
-            compileError userInput e
+            compilationError userInput e
   where
     paramForTH :: Parameter -> (Identifier, Name, IsNullable)
     paramForTH p =

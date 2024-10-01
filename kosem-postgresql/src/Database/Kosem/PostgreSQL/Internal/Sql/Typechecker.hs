@@ -1,9 +1,14 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE NoMonoLocalBinds #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module Database.Kosem.PostgreSQL.Internal.Sql.Typechecker where
 
+import Bluefin.Eff
+import Bluefin.Exception
+import Bluefin.State
 import Control.Monad (when)
 import Data.ByteString (ByteString)
 import Data.Either (partitionEithers)
@@ -37,29 +42,34 @@ import Language.Haskell.TH.Syntax (Name)
 import Text.Megaparsec (parseMaybe, parseTest)
 
 resultFromAst
-    :: STerm TypeInfo
-    -> Either CompileError (NonEmpty SqlMapping)
-resultFromAst (Select resultColumns _ _) = do
-    traverse resultToSqlMapping resultColumns
+    :: (e :> es)
+    => EnvE e
+    -> STerm TypeInfo
+    -> Eff es (NonEmpty SqlMapping)
+resultFromAst env = \cases
+    (Select resultColumns _ _) ->
+        traverse (resultToSqlMapping env) resultColumns
   where
     resultToSqlMapping
-        :: AliasedExpr TypeInfo
-        -> Either CompileError SqlMapping
-    resultToSqlMapping = \case
+        :: (e :> es)
+        => EnvE e
+        -> AliasedExpr TypeInfo
+        -> Eff es SqlMapping
+    resultToSqlMapping env = \case
         WithAlias expr alias _ -> do
             let typeInfo = exprType expr
-            Right $ SqlMapping alias typeInfo.hsType typeInfo.nullable
+            return $ SqlMapping alias typeInfo.hsType typeInfo.nullable
         WithoutAlias expr -> do
             let typeInfo = exprType expr
             case typeInfo.identifier of
                 Just identifier ->
-                    Right $
+                    return $
                         SqlMapping
                             { identifier = identifier
                             , hsType = typeInfo.hsType
                             , nullable = typeInfo.nullable
                             }
-                Nothing -> Left $ ExprWithNoAlias expr
+                Nothing -> throw env.compileError $ ExprWithNoAlias expr
 
 run
     :: Database
@@ -71,74 +81,103 @@ run database input = do
     ast <- parse input
     let numberOfColumns = case ast of
             Select resultColumns _ _ -> length resultColumns
-    (typedAst, env) <- runProgram database (typecheck ast)
-    hsTypes <- resultFromAst typedAst
-    let x = show ast
-        paramsSorted = sortBy (comparing (.position)) env.params
-    return $
-        CommandInfo
-            { input = paramsSorted
-            , output = hsTypes
-            , rawCommand = input
-            }
+    runPureEff do
+        try \ex -> do
+            runEnv database ex [] [] \env -> do
+                typedAst <- typecheck env ast
+                let fieldsS = env.fields
+                fields <- get fieldsS
+                -- fields <- get env.fields -- TODO why this doesn't work?
+                let paramsS = env.parameters
+                parameters <- get paramsS
 
-typecheck :: STerm () -> Tc (STerm TypeInfo)
-typecheck = \cases
+                hsTypes <- resultFromAst env typedAst
+                let paramsSorted = sortBy (comparing (.position)) parameters
+
+                return $
+                    CommandInfo
+                        { input = paramsSorted
+                        , output = hsTypes
+                        , rawCommand = input
+                        }
+
+typecheck
+    :: (e :> es) => EnvE e -> STerm () -> Eff es (STerm TypeInfo)
+typecheck env = \cases
     (Select res (Just (From fromItem)) whereClause) -> do
-        tyFromItem <- tcFromItem fromItem
-        tcRes <- tcSelectExpr res
-        tyWhereClause <- tcWhereClause whereClause
+        tyFromItem <- tcFromItem env fromItem
+        tcRes <- tcSelectExpr env res
+        tyWhereClause <- tcWhereClause env whereClause
         return $ Select tcRes (Just (From tyFromItem)) tyWhereClause
     (Select res Nothing whereClause) -> do
-        tcRes <- tcSelectExpr res
-        tyWhereClause <- tcWhereClause whereClause
+        tcRes <- tcSelectExpr env res
+        tyWhereClause <- tcWhereClause env whereClause
         return $ Select tcRes Nothing tyWhereClause
 
-tcWhereClause :: Maybe (Where ()) -> Tc (Maybe (Where TypeInfo))
-tcWhereClause = \cases
+tcWhereClause
+    :: (e :> es)
+    => EnvE e
+    -> Maybe (Where ())
+    -> Eff es (Maybe (Where TypeInfo))
+tcWhereClause env = \cases
     Nothing -> return Nothing
     (Just (Where expr)) -> do
-        tyExpr <- tcExpr expr
+        tyExpr <- tcExpr env expr
         when ((exprType tyExpr).pgType /= PgBoolean) do
-            throwError $ ConditionTypeError tyExpr "WHERE"
+            throw env.compileError $ ConditionTypeError tyExpr "WHERE"
         return $ Just $ Where tyExpr
 
 tcSelectExpr
-    :: NonEmpty (AliasedExpr ())
-    -> Tc (NonEmpty (AliasedExpr TypeInfo))
-tcSelectExpr = mapM tc
+    :: (e :> es)
+    => EnvE e
+    -> NonEmpty (AliasedExpr ())
+    -> Eff es (NonEmpty (AliasedExpr TypeInfo))
+tcSelectExpr env = mapM (tc env)
   where
-    tc :: AliasedExpr () -> Tc (AliasedExpr TypeInfo)
-    tc = \cases
+    tc
+        :: (e :> es)
+        => EnvE e
+        -> AliasedExpr ()
+        -> Eff es (AliasedExpr TypeInfo)
+    tc env = \cases
         (WithAlias expr colAlias maybeAs) -> do
-            tcExpr <- tcExpr expr
+            tcExpr <- tcExpr env expr
             return $ WithAlias tcExpr colAlias maybeAs
         (WithoutAlias expr) -> do
-            tcExpr <- tcExpr expr
+            tcExpr <- tcExpr env expr
             return $ WithoutAlias tcExpr
 
-tcFromItem :: FromItem () -> Tc (FromItem TypeInfo)
-tcFromItem = \cases
+tcFromItem
+    :: (e :> es)
+    => EnvE e
+    -> FromItem ()
+    -> Eff es (FromItem TypeInfo)
+tcFromItem env = \cases
     (FiTableName p tableName) -> do
-        getTableByName tableName >>= \case
-            [] -> throwError $ TableDoesNotExist p tableName
+        fiTable <- case getTableByName env.database tableName of
+            [] -> throw env.compileError $ TableDoesNotExist p tableName
             [table] -> do
-                addTableToEnv table
+                addTableToEnv env.fields table
                 return $ FiTableName p tableName
-            ts -> throwError $ TableNameIsAmbigious p tableName
+            ts -> throw env.compileError $ TableNameIsAmbigious p tableName
+        return fiTable
     (FiJoin lhs joinType rhs joinCondition) -> do
-        tyLhs <- tcFromItem lhs
-        tyRhs <- tcFromItem rhs
-        tyJoinCondition <- tcJoinCondition joinCondition
+        tyLhs <- tcFromItem env lhs
+        tyRhs <- tcFromItem env rhs
+        tyJoinCondition <- tcJoinCondition env joinCondition
         return $ FiJoin tyLhs joinType tyRhs tyJoinCondition
 
-tcJoinCondition :: JoinCondition () -> Tc (JoinCondition TypeInfo)
-tcJoinCondition = \cases
+tcJoinCondition
+    :: (e :> es)
+    => EnvE e
+    -> JoinCondition ()
+    -> Eff es (JoinCondition TypeInfo)
+tcJoinCondition env = \cases
     JcUsing -> return JcUsing
     (JcOn expr) -> do
-        tyExpr <- tcExpr expr
+        tyExpr <- tcExpr env expr
         when ((exprType tyExpr).pgType /= PgBoolean) do
-            throwError $ ConditionTypeError tyExpr "JOIN/ON"
+            throw env.compileError $ ConditionTypeError tyExpr "JOIN/ON"
         return $ JcOn tyExpr
 
 exprType :: Expr TypeInfo -> TypeInfo
@@ -162,13 +201,17 @@ tcNullable = \cases
     NonNullable NonNullable -> NonNullable
     _ _ -> Nullable
 
-tcExpr :: Expr () -> Tc (Expr TypeInfo)
-tcExpr = \cases
+tcExpr
+    :: (e :> es)
+    => EnvE e
+    -> Expr ()
+    -> Eff es (Expr TypeInfo)
+tcExpr env = \cases
     (EPgCast p1 var@(EParam pParam name _) p2 identifier ()) -> do
         -- FIXME check if can be casted
-        ty <- getType identifier
-        hsType <- getHsType ty
-        introduceParameter $
+        let pgTy = getPgType env.database identifier
+        let hsType = getHsType env.database pgTy
+        introduceParameter env $
             Parameter
                 { position = pParam
                 , identifier = name
@@ -176,19 +219,19 @@ tcExpr = \cases
                 , info =
                     Just
                         ParameterInfo
-                            { pgType = ty
+                            { pgType = pgTy
                             , hsType = hsType
                             , nullable = NonNullable
                             }
                 }
-        let typeInfo = TypeInfo ty NonNullable (Just name) hsType
+        let typeInfo = TypeInfo pgTy NonNullable (Just name) hsType
         let tyVar = EParam pParam name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
     (EPgCast p1 var@(EParamMaybe pParam name _) p2 identifier ()) -> do
         -- FIXME check if can be casted
-        ty <- getType identifier
-        hsType <- getHsType ty
-        introduceParameter $
+        let pgTy = getPgType env.database identifier
+        let hsTy = getHsType env.database pgTy
+        introduceParameter env $
             Parameter
                 { position = pParam
                 , identifier = name
@@ -196,121 +239,131 @@ tcExpr = \cases
                 , info =
                     Just
                         ParameterInfo
-                            { pgType = ty
-                            , hsType = hsType
+                            { pgType = pgTy
+                            , hsType = hsTy
                             , nullable = Nullable
                             }
                 }
-        let typeInfo = TypeInfo ty Nullable (Just name) hsType
+        let typeInfo = TypeInfo pgTy Nullable (Just name) hsTy
         let tyVar = EParamMaybe pParam name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
     (EPgCast p1 expr p2 identifier ()) -> do
-        tyExpr <- tcExpr expr
+        tyExpr <- tcExpr env expr
         -- FIXME check text, check if can be casted
         -- FIXME preserve IsNullable from underlying type
-        ty <- getType identifier
-        hsType <- getHsType ty
+        let pgTy = getPgType env.database identifier
+        let hsTy = getHsType env.database pgTy
         return $
             EPgCast
                 p1
                 tyExpr
                 p2
                 identifier
-                (TypeInfo ty Nullable (Just identifier) hsType)
+                (TypeInfo pgTy Nullable (Just identifier) hsTy)
     (EParens p1 expr p2 ()) -> do
-        tyExpr <- tcExpr expr
+        tyExpr <- tcExpr env expr
         let innerTy = exprType tyExpr
         return $ EParens p1 tyExpr p2 innerTy
-    (EParam p name ()) -> throwError $ ParameterWithoutCastError p name
-    (EParamMaybe p name ()) -> throwError $ MaybeParameterWithoutCastError p name
+    (EParam p name ()) -> throw env.compileError $ ParameterWithoutCastError p name
+    (EParamMaybe p name ()) -> throw env.compileError $ MaybeParameterWithoutCastError p name
     (ELit p litVal _) -> case litVal of
         NumericLiteral -> do
-            hsType <- getHsType PgNumeric
-            return $ ELit p litVal (TypeInfo PgNumeric NonNullable Nothing hsType)
+            let hsTy = getHsType env.database PgNumeric
+            return $
+                ELit
+                    p
+                    litVal
+                    (TypeInfo PgNumeric NonNullable Nothing hsTy)
         TextLiteral _ -> do
-            hsType <- getHsType PgText
-            return $ ELit p litVal (TypeInfo PgText NonNullable Nothing hsType) -- FIXME this is 'unknown'
+            let hsTy = getHsType env.database PgText
+            return $ ELit p litVal (TypeInfo PgText NonNullable Nothing hsTy) -- FIXME this is 'unknown'
         (BoolLiteral _) -> do
-            hsType <- getHsType PgBoolean
-            return $ ELit p litVal (TypeInfo PgBoolean NonNullable Nothing hsType)
+            let hsTy = getHsType env.database PgBoolean
+            return $ ELit p litVal (TypeInfo PgBoolean NonNullable Nothing hsTy)
     (ECol p colName _) -> do
-        getColumnByName colName >>= \case
-            [] -> throwError $ ColumnDoesNotExist p colName
+        fields <- get env.fields
+        case getColumnByName fields colName of
+            [] -> throw env.compileError $ ColumnDoesNotExist p colName
             [envCol] -> do
-                hsType <- getHsType envCol.typeName
+                let hsTy = getHsType env.database envCol.typeName
                 return $
                     ECol
                         p
                         colName
-                        (TypeInfo envCol.typeName envCol.nullable (Just envCol.label) hsType)
-            ts ->
-                throwError $ ColumnNameIsAmbigious p colName
+                        (TypeInfo envCol.typeName envCol.nullable (Just envCol.label) hsTy)
+            ts -> throw env.compileError $ ColumnNameIsAmbigious p colName
     expr@(ENot p not innerExpr) -> do
-        tyExpr <- tcExpr innerExpr
+        tyExpr <- tcExpr env innerExpr
         let ty = exprType tyExpr
         when (ty.pgType /= PgBoolean) do
-            throwError $ ConditionTypeError tyExpr "NOT"
+            throw env.compileError $ ConditionTypeError tyExpr "NOT"
         return $ ENot p not tyExpr
     (EGuardedAnd lhs p1 identifier rhs p2) -> do
-        introduceParameter $
+        introduceParameter env $
             Parameter
                 { position = p1
                 , identifier = identifier
                 , paramType = GuardParameter
                 , info = Nothing
                 }
-        (tyLhs, tyRhs) <- tyMustBeBoolean "AND" lhs rhs
+        (tyLhs, tyRhs) <- tyMustBeBoolean env "AND" lhs rhs
         return $ EGuardedAnd tyLhs p1 identifier tyRhs p2
     (EAnd p lhs and rhs) -> do
-        (tyLhs, tyRhs) <- tyMustBeBoolean "AND" lhs rhs
+        (tyLhs, tyRhs) <- tyMustBeBoolean env "AND" lhs rhs
         return $ EAnd p tyLhs and tyRhs
     (EOr p lhs or rhs) -> do
-        (tyLhs, tyRhs) <- tyMustBeBoolean "OR" lhs rhs
+        (tyLhs, tyRhs) <- tyMustBeBoolean env "OR" lhs rhs
         return $ EOr p tyLhs or tyRhs
     (EBinOp p lhs op rhs ()) -> do
-        tcLhs <- tcExpr lhs
-        tcRhs <- tcExpr rhs
+        tcLhs <- tcExpr env lhs
+        tcRhs <- tcExpr env rhs
         let (TypeInfo tyLhs nullableLhs _ _) = exprType tcLhs
         let (TypeInfo tyRhs nullableRhs _ _) = exprType tcRhs
         let nullableRes = tcNullable nullableLhs nullableRhs
-        getBinaryOpResult tyLhs op tyRhs >>= \case
+        case getBinaryOpResult env.database tyLhs op tyRhs of
             Just tyRes -> do
-                hsType <- getHsType tyRes
-                return $ EBinOp p tcLhs op tcRhs (TypeInfo tyRes nullableRes Nothing hsType)
-            Nothing -> throwError $ OperatorDoesntExist p tyLhs op tyRhs
+                let hsTy = getHsType env.database tyRes
+                return $ EBinOp p tcLhs op tcRhs (TypeInfo tyRes nullableRes Nothing hsTy)
+            Nothing -> throw env.compileError $ OperatorDoesntExist p tyLhs op tyRhs
     (EBetween p lhs between rhs1 and rhs2) -> do
         -- TODO typecheck `between` against <= >=
-        tyLhs <- tcExpr lhs
-        tyRhs1 <- tcExpr rhs1
-        tyRhs2 <- tcExpr rhs2
+        tyLhs <- tcExpr env lhs
+        tyRhs1 <- tcExpr env rhs1
+        tyRhs2 <- tcExpr env rhs2
         EBetween p
-            <$> tcExpr lhs
+            <$> tcExpr env lhs
             <*> pure between
-            <*> tcExpr rhs1
+            <*> tcExpr env rhs1
             <*> pure and
-            <*> tcExpr rhs2
+            <*> tcExpr env rhs2
     (ENotBetween p lhs not between rhs1 and rhs2) ->
         ENotBetween p
-            <$> tcExpr lhs
+            <$> tcExpr env lhs
             <*> pure not
             <*> pure between
-            <*> tcExpr rhs1
+            <*> tcExpr env rhs1
             <*> pure and
-            <*> tcExpr rhs2
+            <*> tcExpr env rhs2
   where
-    tyMustBeBoolean :: Text -> Expr () -> Expr () -> Tc (Expr TypeInfo, Expr TypeInfo)
-    tyMustBeBoolean func lhs rhs = do
-        tyLhs <- tcExpr lhs
-        tyRhs <- tcExpr rhs
+    tyMustBeBoolean
+        :: (e :> es)
+        => EnvE e
+        -> Text
+        -> Expr ()
+        -> Expr ()
+        -> Eff es (Expr TypeInfo, Expr TypeInfo)
+    tyMustBeBoolean env func lhs rhs = do
+        tyLhs <- tcExpr env lhs
+        tyRhs <- tcExpr env rhs
         when ((exprType tyLhs).pgType /= PgBoolean) do
-            throwError $ ArgumentTypeError tyLhs func PgBoolean
+            throw env.compileError $ ArgumentTypeError tyLhs func PgBoolean
         when ((exprType tyRhs).pgType /= PgBoolean) do
-            throwError $ ArgumentTypeError tyRhs func PgBoolean
+            throw env.compileError $ ArgumentTypeError tyRhs func PgBoolean
         return (tyLhs, tyRhs)
 
-addTableToEnv :: Table -> Tc ()
-addTableToEnv table =
-    addFieldsToEnv . map (toEnvElem table.name) . columns $ table
+addTableToEnv :: (e :> es) => State [Field] e -> Table -> Eff es ()
+addTableToEnv fieldsS table =
+    addFieldsToEnv fieldsS . map (toEnvElem table.name) . columns $ table
   where
     toEnvElem :: Identifier -> Column -> Field
     toEnvElem alias column =
