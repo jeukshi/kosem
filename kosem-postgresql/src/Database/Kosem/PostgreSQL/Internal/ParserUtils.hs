@@ -9,15 +9,15 @@ import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
 import Prelude hiding (takeWhile)
 
-type Parser = Parsec Void Text
+type Parser = Parsec Void String
 
-takeWhile :: (Char -> Bool) -> Parser Text
+takeWhile :: (Char -> Bool) -> Parser String
 takeWhile = takeWhileP Nothing
 
-takeWhile1 :: (Char -> Bool) -> Parser Text
+takeWhile1 :: (Char -> Bool) -> Parser String
 takeWhile1 = takeWhile1P Nothing
 
-pKeyword :: Text -> Parser ()
+pKeyword :: String -> Parser ()
 pKeyword keyword = lexeme do
     void $ C.string' keyword
     notFollowedBy C.alphaNumChar
@@ -51,13 +51,13 @@ spaceP = L.space (void $ some (C.char ' ' <|> C.char '\t')) lineComment empty
 anyPred :: [a -> Bool] -> a -> Bool
 anyPred ps a = any (\p -> p a) ps
 
-dbLabel :: Parser Text
+dbLabel :: Parser String
 dbLabel = do
     first <- satisfy isAlpha
     rest <- takeWhile (anyPred [isAlpha, isDigit, isUnderscore])
-    return $ T.cons first rest
+    return $ first : rest
 
-labelP :: Parser Text
+labelP :: Parser String
 labelP = lexeme dbLabel
 
 isAlpha :: Char -> Bool

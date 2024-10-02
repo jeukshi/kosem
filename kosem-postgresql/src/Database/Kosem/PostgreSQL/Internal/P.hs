@@ -5,7 +5,7 @@ import Data.Text (Text)
 import Text.Megaparsec (PosState (..))
 import Text.Megaparsec.Pos (SourcePos (..), mkPos)
 
-initPosState :: Text -> PosState Text
+initPosState :: String -> PosState String
 initPosState input =
     PosState
         { pstateInput = input

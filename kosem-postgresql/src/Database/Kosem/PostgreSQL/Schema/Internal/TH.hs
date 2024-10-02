@@ -26,7 +26,7 @@ database =
 
 database' :: DatabaseConfig -> String -> Q [Dec]
 database' databaseConfig userInput = do
-    let parserResult = Megaparsec.parse schemaP "" (T.pack userInput)
+    let parserResult = Megaparsec.parse schemaP "" userInput
     let db = case parserResult of
             Left e -> error (Megaparsec.errorBundlePretty e)
             Right db -> db

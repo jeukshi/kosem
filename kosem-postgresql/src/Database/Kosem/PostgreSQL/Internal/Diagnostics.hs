@@ -54,7 +54,7 @@ combineSpans
 spanWithCodePoint
     :: String
     -> (Int, Int)
-    -> Text
+    -> String
     -> DiagnosticSpan P
     -> DiagnosticSpan SourcePoint
 spanWithCodePoint
@@ -88,9 +88,9 @@ spanWithCodePoint
                 }
 
 data CompileError
-    = ParseError P Text
-    | ArgumentTypeError (Expr TypeInfo) Text PgType
-    | ConditionTypeError (Expr TypeInfo) Text
+    = ParseError P String
+    | ArgumentTypeError (Expr TypeInfo) String PgType
+    | ConditionTypeError (Expr TypeInfo) String
     | ParameterWithoutCastError P Identifier
     | MaybeParameterWithoutCastError P Identifier
     | ExprWithNoAlias (Expr TypeInfo)
@@ -129,7 +129,7 @@ compileErrorSpan = \case
     TableNameIsAmbigious p identifier ->
         DiagnosticSpan p (p `movePby` identifierLength identifier)
 
-compileErrorMsg :: CompileError -> Text
+compileErrorMsg :: CompileError -> String
 compileErrorMsg = \case
     ParseError _ msg -> msg
     ArgumentTypeError _ func ty ->
@@ -180,12 +180,12 @@ toDiagnosticSpan = \cases
         BoolLiteral text ->
             DiagnosticSpan
                 p
-                (p `movePby` T.length text)
+                (p `movePby` length text)
         TextLiteral text ->
             DiagnosticSpan
                 p
                 -- \| +2 from single quote.
-                (p `movePby` (T.length text + 2))
+                (p `movePby` (length text + 2))
     (ECol p identifier _) ->
         DiagnosticSpan
             p
@@ -211,7 +211,7 @@ toDiagnosticSpan = \cases
         toDiagnosticSpan lhs
             `combineSpans` toDiagnosticSpan rhs2
 
-compilationError :: Text -> CompileError -> Q Exp
+compilationError :: String -> CompileError -> Q Exp
 compilationError input error = do
     let diagnosticSpan = compileErrorSpan error
     let msg = compileErrorMsg error

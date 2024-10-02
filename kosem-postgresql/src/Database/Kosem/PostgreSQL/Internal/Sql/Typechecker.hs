@@ -73,7 +73,7 @@ resultFromAst env = \cases
 
 run
     :: Database
-    -> Text
+    -> String
     -> Either
         CompileError
         CommandInfo
@@ -348,7 +348,7 @@ tcExpr env = \cases
     tyMustBeBoolean
         :: (e :> es)
         => EnvE e
-        -> Text
+        -> String
         -> Expr ()
         -> Expr ()
         -> Eff es (Expr TypeInfo, Expr TypeInfo)

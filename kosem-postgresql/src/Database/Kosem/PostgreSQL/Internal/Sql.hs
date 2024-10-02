@@ -62,37 +62,35 @@ import Text.Megaparsec qualified as Megaparsec
 import Unsafe.Coerce (unsafeCoerce)
 
 unsafeSql :: Database -> String -> Q Exp
-unsafeSql database userInputString = do
-    let userInput = T.pack userInputString
-    case Typechecker.run database userInput of
-        Right commandInfo -> do
-            let numberOfColumns = length commandInfo.output
-                gTT = guardsTruthTable commandInfo.input
-                allInputs =
-                    map
-                        ( ( \(q, ps, tt) ->
-                                (q, map paramForTH ps, tt)
-                          )
-                            . rewriteQuery commandInfo.input (T.unpack commandInfo.rawCommand)
-                        )
-                        gTT
-                tts = map (\(_, _, t) -> t) allInputs
-                commands = map (\(c, _, _) -> c) allInputs
-                parameters = map (\(_, p, _) -> p) allInputs
-            commandsExp <- traverse genCommand commands
-            parametersExp <- traverse genParamsList parameters
-            let result = commandInfo.output
-            [e|
-                SqlCommand
-                    { statement = $(genPatternMatch (zip commandsExp tts))
-                    , columnsNumber = numberOfColumns
-                    , rowProto = Row [] :: $(genRowType result)
-                    , rowParser = $(genRowParser result)
-                    , params = $(genPatternMatch (zip parametersExp tts))
-                    }
-                |]
-        Left e -> do
-            compilationError userInput e
+unsafeSql database userInput = case Typechecker.run database userInput of
+    Right commandInfo -> do
+        let numberOfColumns = length commandInfo.output
+            gTT = guardsTruthTable commandInfo.input
+            allInputs =
+                map
+                    ( ( \(q, ps, tt) ->
+                            (q, map paramForTH ps, tt)
+                      )
+                        . rewriteQuery commandInfo.input commandInfo.rawCommand
+                    )
+                    gTT
+            tts = map (\(_, _, t) -> t) allInputs
+            commands = map (\(c, _, _) -> c) allInputs
+            parameters = map (\(_, p, _) -> p) allInputs
+        commandsExp <- traverse genCommand commands
+        parametersExp <- traverse genParamsList parameters
+        let result = commandInfo.output
+        [e|
+            SqlCommand
+                { statement = $(genPatternMatch (zip commandsExp tts))
+                , columnsNumber = numberOfColumns
+                , rowProto = Row [] :: $(genRowType result)
+                , rowParser = $(genRowParser result)
+                , params = $(genPatternMatch (zip parametersExp tts))
+                }
+            |]
+    Left e -> do
+        compilationError userInput e
   where
     paramForTH :: Parameter -> (Identifier, Name, IsNullable)
     paramForTH p =

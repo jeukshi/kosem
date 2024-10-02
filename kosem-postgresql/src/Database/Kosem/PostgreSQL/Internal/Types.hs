@@ -18,42 +18,42 @@ data IsNullable
 newtype PgType = Scalar Identifier
     deriving (Show, Eq, Lift)
 
-pgTypePretty :: PgType -> Text
+pgTypePretty :: PgType -> String
 pgTypePretty = \cases
     (Scalar identifier) -> identifierPretty identifier
 
-newtype Identifier = Identifier Text
-    deriving (Show) via Text
-    deriving (Eq) via Text
-    deriving (IsString) via Text
+newtype Identifier = Identifier String
+    deriving (Show) via String
+    deriving (Eq) via String
+    deriving (IsString) via String
     deriving (Lift)
 
 identifierLength :: Identifier -> Int
-identifierLength = T.length . coerce
+identifierLength (Identifier t) = length t
 
 identifierToString :: Identifier -> String
-identifierToString = T.unpack . coerce
+identifierToString (Identifier t) = t
 
 identifierToText :: Identifier -> Text
-identifierToText = coerce
+identifierToText (Identifier t) = T.pack t
 
-identifierPretty :: Identifier -> Text
-identifierPretty identifier = "‘" <> coerce identifier <> "’"
+identifierPretty :: Identifier -> String
+identifierPretty (Identifier t) = "‘" <> t <> "’"
 
-newtype Operator = Operator Text
-    deriving (Show) via Text
-    deriving (Eq) via Text
-    deriving (IsString) via Text
+newtype Operator = Operator String
+    deriving (Show) via String
+    deriving (Eq) via String
+    deriving (IsString) via String
     deriving (Lift)
 
 operatorLength :: Operator -> Int
-operatorLength = T.length . coerce
+operatorLength (Operator o) = length o
 
-operatorPretty :: Operator -> Text
+operatorPretty :: Operator -> String
 operatorPretty operator = "‘" <> coerce operator <> "’"
 
 data Database = Database
-    { name :: Text
+    { name :: String
     , typesMap :: [(Identifier, PgType, Name)]
     , binaryOps :: [(Operator, PgType, PgType, PgType)]
     , tables :: [Table]

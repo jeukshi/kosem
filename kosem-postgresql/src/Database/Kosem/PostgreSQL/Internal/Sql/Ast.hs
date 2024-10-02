@@ -84,6 +84,6 @@ data Expr t
 
 data LiteralValue
     = NumericLiteral
-    | TextLiteral Text
-    | BoolLiteral Text
+    | TextLiteral String
+    | BoolLiteral String
     deriving (Show)

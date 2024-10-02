@@ -33,7 +33,7 @@ tableNameP = do
     tableName <- identifierS
     return tableName
 
-databaseNameP :: Parser Text
+databaseNameP :: Parser String
 databaseNameP = do
     databaseK
     databaseName <- labelP

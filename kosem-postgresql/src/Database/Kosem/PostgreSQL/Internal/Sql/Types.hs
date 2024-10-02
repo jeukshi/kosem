@@ -24,7 +24,7 @@ type CommandInput = [(Identifier, Name, IsNullable)]
 data CommandInfo = CommandInfo
     { output :: NonEmpty SqlMapping
     , input :: [Parameter]
-    , rawCommand :: Text
+    , rawCommand :: String
     }
 
 data ParameterType

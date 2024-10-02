@@ -26,7 +26,7 @@ import Text.Pretty.Simple
 import Prelude hiding (takeWhile)
 
 parse
-    :: Text
+    :: String
     -> Either CompileError (STerm ())
 parse input = do
     let state =
@@ -43,13 +43,13 @@ parse input = do
             let p = MkP $ errorOffset firstErr
             let errMsg = parseErrorTextPretty firstErr
             -- TODO maybe we can allow longer DiagnosticSpans
-            Left $ ParseError p (T.pack errMsg)
+            Left $ ParseError p errMsg
         Right r -> Right r
 
-symbol :: Text -> Parser Text
+symbol :: String -> Parser String
 symbol = L.symbol' skipWhitespace
 
-comma :: Parser Text
+comma :: Parser String
 comma = symbol ","
 
 select :: Parser ()
@@ -148,7 +148,7 @@ tableNameP = lexeme do
     rest <- takeWhile do
         anyPred [isAlpha, isDigit, isUnderscore]
 
-    return $ Identifier (T.cons first rest)
+    return $ Identifier (first : rest)
 
 reserved = ["from", "where", "and", "not", "or"]
 
@@ -216,13 +216,13 @@ pgCastP = lexeme do
         i <- identifierP
         pure (p, i)
 
-operatorP :: Text -> Parser Database.Kosem.PostgreSQL.Internal.Types.Operator
+operatorP :: String -> Parser Database.Kosem.PostgreSQL.Internal.Types.Operator
 operatorP sym = lexeme do
     Operator <$> symbol sym
 
 anyOperatorP :: Parser Database.Kosem.PostgreSQL.Internal.Types.Operator
 anyOperatorP = lexeme do
-    operator <- T.pack <$> some allowedSymbols
+    operator <- some allowedSymbols
     when (operator == "=>") do
         fail "=> cannot be used as an operator name"
     -- TODO implement other restictions
@@ -252,7 +252,7 @@ anyOperatorP = lexeme do
             ]
             <?> "<operator>"
 
-binOpP :: Text -> Parser (Expr () -> Expr () -> Expr ())
+binOpP :: String -> Parser (Expr () -> Expr () -> Expr ())
 binOpP sym = mkBinOp <$> getP <*> operatorP sym
   where
     mkBinOp p operator lhs rhs =
@@ -370,7 +370,7 @@ textLiteralP :: Parser LiteralValue
 textLiteralP = lexeme do
     -- FIXME only alphaNum literals
     s <- between (symbol "'") (symbol "'") (many C.alphaNumChar)
-    return $ TextLiteral (T.pack s)
+    return $ TextLiteral s
 
 resultColumnP :: Parser (NonEmpty (AliasedExpr ()))
 resultColumnP = lexeme do

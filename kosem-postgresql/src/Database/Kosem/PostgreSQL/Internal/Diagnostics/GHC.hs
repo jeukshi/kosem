@@ -26,7 +26,7 @@ data DiagnosticSpan a
     = DiagnosticSpan a a
     deriving (Show, Eq)
 
-errorWithSpan :: DiagnosticSpan SourcePoint -> Text -> Q ()
+errorWithSpan :: DiagnosticSpan SourcePoint -> String -> Q ()
 errorWithSpan span msg = unsafeRunTcM $ addErrAt (ghcSpan span) ghcMsg
   where
     ghcSpan (DiagnosticSpan start end) = do
@@ -43,7 +43,6 @@ errorWithSpan span msg = unsafeRunTcM $ addErrAt (ghcSpan span) ghcMsg
             . UnknownDiagnostic
             . mkPlainError noHints
             . text
-            . T.unpack
             $ msg
 
     -- \| Stolen from: https://github.com/guibou/PyF

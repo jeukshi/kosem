@@ -18,8 +18,8 @@ withDB =
 -- | Helper for parsing without file name.
 parseOnly
     :: Parser a
-    -> Text
-    -> Either (ParseErrorBundle Text Void) a
+    -> String
+    -> Either (ParseErrorBundle String Void) a
 parseOnly p = parse p ""
 
 {- | Helper for parsing without file name.
@@ -27,8 +27,8 @@ Consumes all input.
 -}
 parseAll
     :: Parser a
-    -> Text
-    -> Either (ParseErrorBundle Text Void) a
+    -> String
+    -> Either (ParseErrorBundle String Void) a
 parseAll p = parse (p <* eof) ""
 
 {- | Helper for incremental parsing.
