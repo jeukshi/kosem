@@ -83,17 +83,12 @@ run database input = do
             Select resultColumns _ _ -> length resultColumns
     runPureEff do
         try \ex -> do
-            runEnv database ex [] [] \env -> do
+            runEnv database ex [] [] \(env :: EnvE e) -> do
                 typedAst <- typecheck env ast
-                let fieldsS = env.fields
-                fields <- get fieldsS
-                -- fields <- get env.fields -- TODO why this doesn't work?
-                let paramsS = env.parameters
-                parameters <- get paramsS
-
+                fields <- get @e env.fields
+                parameters <- get @e env.parameters
                 hsTypes <- resultFromAst env typedAst
                 let paramsSorted = sortBy (comparing (.position)) parameters
-
                 return $
                     CommandInfo
                         { input = paramsSorted
