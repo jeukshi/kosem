@@ -16,7 +16,11 @@ import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.Diagnostics (CompileError)
 import Database.Kosem.PostgreSQL.Internal.P (P)
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin (DatabaseConfig (binaryOperators))
-import Database.Kosem.PostgreSQL.Internal.Sql.Types (Parameter (..), ParameterType (..))
+import Database.Kosem.PostgreSQL.Internal.Sql.Types (
+    CommandInput,
+    Parameter (..),
+    ParameterType (..),
+ )
 import Database.Kosem.PostgreSQL.Internal.Types
 import GHC.Records (HasField)
 import Language.Haskell.TH (Name)
@@ -37,7 +41,7 @@ data Field = Field
 data EnvE e = MkEnvE
     { database :: Database
     , fields :: State [Field] e
-    , parameters :: State [Parameter] e
+    , commandInput :: State [CommandInput] e
     , compileError :: Exception CompileError e
     }
 
@@ -46,28 +50,28 @@ runEnv
     => Database
     -> Exception CompileError e1
     -> [Field]
-    -> [Parameter]
+    -> [CommandInput]
     -> (forall e. EnvE e -> Eff (e :& es) r)
     -> Eff es r
-runEnv database ex fields params action =
+runEnv database ex fields cInput action =
     evalState fields $ \fieldsS -> do
-        evalState params $ \paramsS -> do
+        evalState cInput $ \cInputS -> do
             useImplIn
                 action
                 MkEnvE
                     { database = database
                     , fields = mapHandle fieldsS
-                    , parameters = mapHandle paramsS
+                    , commandInput = mapHandle cInputS
                     , compileError = mapHandle ex
                     }
 
-introduceParameter
+introduceCommandInput
     :: (e :> es)
     => EnvE e
-    -> Parameter
+    -> CommandInput
     -> Eff es ()
-introduceParameter env parameter =
-    modify env.parameters (<> [parameter])
+introduceCommandInput env commandInput =
+    modify env.commandInput (<> [commandInput])
 
 getBinaryOpResult
     :: Database

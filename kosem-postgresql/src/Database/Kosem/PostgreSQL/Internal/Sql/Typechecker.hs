@@ -30,12 +30,7 @@ import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast
 import Database.Kosem.PostgreSQL.Internal.Sql.Env
 import Database.Kosem.PostgreSQL.Internal.Sql.Parser
-import Database.Kosem.PostgreSQL.Internal.Sql.Types (
-    CommandInfo (..),
-    Parameter (..),
-    ParameterInfo (..),
-    ParameterType (..),
- )
+import Database.Kosem.PostgreSQL.Internal.Sql.Types
 import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Language.Haskell.TH.Syntax (Name)
@@ -86,12 +81,12 @@ run database input = do
             runEnv database ex [] [] \(env :: EnvE e) -> do
                 typedAst <- typecheck env ast
                 fields <- get @e env.fields
-                parameters <- get @e env.parameters
+                commandInput <- get @e env.commandInput
                 hsTypes <- resultFromAst env typedAst
-                let paramsSorted = sortBy (comparing (.position)) parameters
+                let commandInputSorted = sortBy (comparing commandInputPosition) commandInput
                 return $
                     CommandInfo
-                        { input = paramsSorted
+                        { input = commandInputSorted
                         , output = hsTypes
                         , rawCommand = input
                         }
@@ -181,7 +176,8 @@ exprType = \cases
     (EParens _ _ _ ty) -> ty
     (EParam _ _ ty) -> ty
     (EParamMaybe _ _ ty) -> ty
-    (EGuardedAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
+    (EGuardedBoolAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
+    (EGuardedMaybeAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
     (ELit _ _ ty) -> ty
     (ECol _ _ ty) -> ty
     (ENot{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
@@ -206,19 +202,20 @@ tcExpr env = \cases
         -- FIXME check if can be casted
         let pgTy = getPgType env.database identifier
         let hsType = getHsType env.database pgTy
-        introduceParameter env $
-            Parameter
-                { position = pParam
-                , identifier = name
-                , paramType = SimpleParameter
-                , info =
-                    Just
-                        ParameterInfo
-                            { pgType = pgTy
-                            , hsType = hsType
-                            , nullable = NonNullable
-                            }
-                }
+        introduceCommandInput env $
+            CommandParameter $
+                Parameter
+                    { position = pParam
+                    , pIdentifier = name
+                    , paramType = SimpleParameter
+                    , info =
+                        Just
+                            ParameterInfo
+                                { pgType = pgTy
+                                , hsType = hsType
+                                , nullable = NonNullable
+                                }
+                    }
         let typeInfo = TypeInfo pgTy NonNullable (Just name) hsType
         let tyVar = EParam pParam name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
@@ -226,19 +223,20 @@ tcExpr env = \cases
         -- FIXME check if can be casted
         let pgTy = getPgType env.database identifier
         let hsTy = getHsType env.database pgTy
-        introduceParameter env $
-            Parameter
-                { position = pParam
-                , identifier = name
-                , paramType = SimpleMaybeParameter
-                , info =
-                    Just
-                        ParameterInfo
-                            { pgType = pgTy
-                            , hsType = hsTy
-                            , nullable = Nullable
-                            }
-                }
+        introduceCommandInput env $
+            CommandParameter $
+                Parameter
+                    { position = pParam
+                    , pIdentifier = name
+                    , paramType = SimpleMaybeParameter
+                    , info =
+                        Just
+                            ParameterInfo
+                                { pgType = pgTy
+                                , hsType = hsTy
+                                , nullable = Nullable
+                                }
+                    }
         let typeInfo = TypeInfo pgTy Nullable (Just name) hsTy
         let tyVar = EParamMaybe pParam name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
@@ -293,16 +291,30 @@ tcExpr env = \cases
         when (ty.pgType /= PgBoolean) do
             throw env.compileError $ ConditionTypeError tyExpr "NOT"
         return $ ENot p not tyExpr
-    (EGuardedAnd lhs p1 identifier rhs p2) -> do
-        introduceParameter env $
-            Parameter
-                { position = p1
-                , identifier = identifier
-                , paramType = GuardParameter
-                , info = Nothing
-                }
+    (EGuardedBoolAnd lhs p1 identifier pOpen rhs pClose) -> do
+        introduceCommandInput env $
+            CommandGuard $
+                Guard
+                    { guardPos = p1
+                    , openBracketPos = pOpen
+                    , closeBracketPos = pClose
+                    , gIdentifier = identifier
+                    , guardType = BooleanGuard
+                    }
         (tyLhs, tyRhs) <- tyMustBeBoolean env "AND" lhs rhs
-        return $ EGuardedAnd tyLhs p1 identifier tyRhs p2
+        return $ EGuardedBoolAnd tyLhs p1 identifier pOpen tyRhs pClose
+    (EGuardedMaybeAnd lhs p1 identifier pOpen rhs pClose) -> do
+        introduceCommandInput env $
+            CommandGuard $
+                Guard
+                    { guardPos = p1
+                    , openBracketPos = pOpen
+                    , closeBracketPos = pClose
+                    , gIdentifier = identifier
+                    , guardType = MaybeGuard
+                    }
+        (tyLhs, tyRhs) <- tyMustBeBoolean env "AND" lhs rhs
+        return $ EGuardedMaybeAnd tyLhs p1 identifier pOpen tyRhs pClose
     (EAnd p lhs and rhs) -> do
         (tyLhs, tyRhs) <- tyMustBeBoolean env "AND" lhs rhs
         return $ EAnd p tyLhs and tyRhs

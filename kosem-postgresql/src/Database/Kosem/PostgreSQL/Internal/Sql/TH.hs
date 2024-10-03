@@ -5,14 +5,17 @@
 
 module Database.Kosem.PostgreSQL.Internal.Sql.TH where
 
+import Control.Monad (join)
 import Data.Bifunctor (second)
 import Data.ByteString (ByteString)
 import Data.List (nub)
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.Text (Text)
+import Data.Vector.Fusion.Bundle.Monadic (elements)
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Row
+import Database.Kosem.PostgreSQL.Internal.Sql.Types
 import Database.Kosem.PostgreSQL.Internal.ToField (ToField (toField'Internal))
 import Database.Kosem.PostgreSQL.Internal.Types
 import GHC.Records
@@ -114,47 +117,61 @@ This works under few assumptions:
   patterns are exhaustive.
 -}
 genPatternMatch
-    :: [(Exp, [(Identifier, Bool)])]
+    :: Either Exp (NonEmpty (Exp, NonEmpty Path))
     -> Q Exp
 genPatternMatch = \cases
-    [] -> error "can't be"
-    [(exp, [])] -> return exp
-    cs -> do
-        let is = nub . map fst . head . map snd $ cs
-            matchArgs = map (second (map snd)) cs
-        matchArgsQ <- traverse genCases matchArgs
-        return $ CaseE (genCaseArgs is) matchArgsQ
+    (Left exp) -> return exp
+    (Right es) -> do
+        -- FIXME this needs some different representation
+        -- as paths always come in pairs
+        if NonEmpty.length es == 2
+            then do
+                let varName =
+                        mkName
+                            . identifierToString
+                            . pathIdentifier
+                            -- \| Assume `paths` has two elements
+                            -- with the same `Identifier`.
+                            . NonEmpty.head
+                            . snd
+                            . NonEmpty.head
+                            $ es
+                let (matches :: [Match]) =
+                        NonEmpty.toList
+                            . NonEmpty.map
+                                ( \(exp, path) ->
+                                    Match
+                                        (pathOptionToPat . pathOption . NonEmpty.head $ path)
+                                        (NormalB exp)
+                                        []
+                                )
+                            $ es
+                return $ CaseE (VarE varName) matches
+            else do
+                let caseTuple =
+                        TupE
+                            . map (Just . VarE . mkName . identifierToString . pathIdentifier)
+                            . NonEmpty.toList
+                            . snd
+                            . NonEmpty.head
+                            $ es
+                -- TODO ok, fix this mess
+                let matchesTuple =
+                        map (\(e, p) -> Match p (NormalB e) [])
+                            . map (second TupP)
+                            . map (second (map (pathOptionToPat)))
+                            . map (second (map pathOption))
+                            . map (second NonEmpty.toList)
+                            . NonEmpty.toList
+                            $ es
+                return $ CaseE caseTuple matchesTuple
   where
-    genCaseArgs :: [Identifier] -> Exp
-    genCaseArgs = \cases
-        [] -> error "can't be"
-        [i] -> do
-            let iName = mkName (identifierToString i)
-            VarE iName
-        (i1 : i2 : is) -> do
-            let i1Name = mkName (identifierToString i1)
-                i2Name = mkName (identifierToString i2)
-                appE = AppE (VarE i1Name) (VarE i2Name)
-            go appE is
-          where
-            go :: Exp -> [Identifier] -> Exp
-            go exp [] = exp
-            go exp (i : is) = do
-                let iName = mkName (identifierToString i)
-                    appE = AppE exp (VarE iName)
-                go exp is
-    genCases
-        :: (Exp, [Bool])
-        -> Q Match
-    genCases (exp, matches) = do
-        let first = head matches
-            rest = tail matches
-            restQ = map (\x -> ConP (if x then 'True else 'False) [] []) rest
-        return $
-            Match
-                (ConP (if first then 'True else 'False) [] restQ)
-                (NormalB exp)
-                []
+    pathOptionToPat :: PathOption -> Pat
+    pathOptionToPat = \cases
+        PoFalse -> ConP 'False [] []
+        PoTrue -> ConP 'True [] []
+        PoJust -> ConP 'Just [] [WildP]
+        PoNothing -> ConP 'Nothing [] []
 
 genCommand :: ByteString -> Q Exp
 genCommand bs = [e|bs|]

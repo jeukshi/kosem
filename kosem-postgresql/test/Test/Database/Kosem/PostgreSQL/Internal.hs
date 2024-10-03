@@ -124,7 +124,7 @@ spec = around withDB $ do
                     [Tdb.sql|
                 select type_text
                   from data_types
-                 where true :?guardTrue{and type_text<>:someText::text}
+                 where true :guardTrue{and type_text <> :someText::text}
                  |]
             let guardFalse = False
             rowsOne <-
@@ -133,7 +133,46 @@ spec = around withDB $ do
                     [Tdb.sql|
                 select type_text
                   from data_types
-                 where true :?guardFalse{and type_text<>:someText::text}
+                 where true :guardFalse{and type_text<>:someText::text}
+                 |]
+            unsafeExecute_ conn do
+                T.encodeUtf8
+                    [text|
+                     delete from data_types
+                    |]
+            length rowsZero `shouldBe` 0
+            length rowsOne `shouldBe` 1
+
+        it "and double guard" $ \conn -> do
+            unsafeExecute_ conn do
+                T.encodeUtf8
+                    [text|
+                     insert
+                       into data_types
+                     values ('some text', 9000, 9001, True)
+                    |]
+            let someText = "some text"
+            let guardTrue = True
+            let guardTrue2 = True
+            rowsZero <-
+                execute
+                    conn
+                    [Tdb.sql|
+                select type_text
+                  from data_types
+                 where true :guardTrue{and type_text <> :someText::text}
+            :guardTrue2{and type_text <> :someText::text}
+                 |]
+            let guardFalse = False
+            let guardFalse2 = False
+            rowsOne <-
+                execute
+                    conn
+                    [Tdb.sql|
+                select type_text
+                  from data_types
+                 where true :guardFalse{and type_text<>:someText::text}
+                 :guardFalse2{and type_text <> :someText::text}
                  |]
             unsafeExecute_ conn do
                 T.encodeUtf8

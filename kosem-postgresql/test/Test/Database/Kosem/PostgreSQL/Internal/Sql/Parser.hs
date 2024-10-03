@@ -131,10 +131,10 @@ spec = parallel do
                 `shouldSucceedOn` [text|
              select :abc
               where :cba=true = false
-        :?ident{and :xyz or :?ident and x = y}
-        :?ident{and :xyz }
+        :ident{and :xyz or :ident and x = y}
+        :ident{and :xyz }
                 and true
-        :?ident{and :xyz}
+        :ident{and :xyz}
                  or true
-        :?ident{and :xyz }
+        :ident{and :xyz }
                |]
