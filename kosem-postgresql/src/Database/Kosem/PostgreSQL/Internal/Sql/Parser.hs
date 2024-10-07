@@ -318,7 +318,7 @@ exprP = makeExprParser termP operatorsTable
         , [Prefix do ENot <$> lexeme getP <*> notK]
         ,
             [ InfixL do mkAnd <$> lexeme getP <*> andK
-            , Postfix do foldr1 (.) <$> some mkGuardedAnd
+            , Postfix do foldr1 (.) <$> some mkGuardedBoolAnd
             ]
         , [InfixL do mkOr <$> lexeme getP <*> orK]
         ]
@@ -330,19 +330,33 @@ exprP = makeExprParser termP operatorsTable
         ENotBetween p lhs not between rhs1 and rhs2
     mkAnd p and lhs = EAnd p lhs and
 
-    mkGuardedAnd = lexeme do
+    mkGuardedBoolAnd = lexeme do
+        p1 <- getP
+        symbol ":"
+        identifier <- identifierP
+        pOpen <- lexeme getP
+        _ <- symbol "{and"
+        innerExpr <- exprP
+        pClose <- lexeme getP
+        _ <- symbol "}"
+        return $ mk p1 identifier pOpen innerExpr pClose
+      where
+        mk p1 identifier pOpen innerExpr pClose lhs =
+            EGuardedBoolAnd lhs p1 identifier pOpen innerExpr pClose
+
+    mkGuardedMaybeAnd = lexeme do
         p1 <- getP
         symbol ":?"
         identifier <- identifierP
+        pOpen <- lexeme getP
         _ <- symbol "{and"
         innerExpr <- exprP
-        p2 <- lexeme getP
+        pClose <- lexeme getP
         _ <- symbol "}"
-        -- \| Move p2 by one to match a position of '}'.
-        return $ mk p1 identifier innerExpr (p2 `movePby` 1)
+        return $ mk p1 identifier pOpen innerExpr pClose
       where
-        mk p1 identifier innerExpr p2 lhs =
-            EGuardedAnd lhs p1 identifier innerExpr p2
+        mk p1 identifier pOpen innerExpr pClose lhs =
+            EGuardedMaybeAnd lhs p1 identifier pOpen innerExpr pClose
 
     mkOr p and lhs = EOr p lhs and
 

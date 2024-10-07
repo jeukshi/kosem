@@ -193,7 +193,9 @@ toDiagnosticSpan = \cases
     (ENot p _ expr) ->
         DiagnosticSpan p p
             `combineSpans` toDiagnosticSpan expr
-    (EGuardedAnd _ p1 _ _ p2) ->
+    (EGuardedBoolAnd _ p1 _ _ _ p2) ->
+        DiagnosticSpan p1 p2
+    (EGuardedMaybeAnd _ p1 _ _ _ p2) ->
         DiagnosticSpan p1 p2
     (EAnd _ lhs _ rhs) ->
         toDiagnosticSpan lhs

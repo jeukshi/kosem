@@ -73,7 +73,8 @@ data Expr t
     | EPgCast P (Expr t) P Identifier t -- TODO Identifi
     | -- | expression::type
       ENot P Not (Expr t)
-    | EGuardedAnd (Expr t) P Identifier (Expr t) P
+    | EGuardedBoolAnd (Expr t) P Identifier P (Expr t) P
+    | EGuardedMaybeAnd (Expr t) P Identifier P (Expr t) P
     | EAnd P (Expr t) And (Expr t)
     | EOr P (Expr t) Or (Expr t)
     | EBinOp P (Expr t) Operator (Expr t) t
