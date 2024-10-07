@@ -42,7 +42,6 @@ import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast
 import Database.Kosem.PostgreSQL.Internal.Sql.CommandGen qualified as CommandGen
-import Database.Kosem.PostgreSQL.Internal.Sql.Env
 import Database.Kosem.PostgreSQL.Internal.Sql.Parser qualified as Parser
 import Database.Kosem.PostgreSQL.Internal.Sql.TH
 import Database.Kosem.PostgreSQL.Internal.Sql.Typechecker qualified as Typechecker

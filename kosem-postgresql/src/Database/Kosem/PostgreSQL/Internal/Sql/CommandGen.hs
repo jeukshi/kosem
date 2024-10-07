@@ -40,7 +40,6 @@ import Database.Kosem.PostgreSQL.Internal.PgBuiltin (DatabaseConfig (..), defaul
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast
-import Database.Kosem.PostgreSQL.Internal.Sql.Env
 import Database.Kosem.PostgreSQL.Internal.Sql.Parser (parse)
 import Database.Kosem.PostgreSQL.Internal.Sql.TH
 import Database.Kosem.PostgreSQL.Internal.Sql.Typechecker qualified as Typechecker

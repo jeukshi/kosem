@@ -6,6 +6,7 @@
 
 module Database.Kosem.PostgreSQL.Internal.Sql.Typechecker where
 
+import Bluefin.Compound
 import Bluefin.Eff
 import Bluefin.Exception
 import Bluefin.State
@@ -28,17 +29,60 @@ import Database.Kosem.PostgreSQL.Internal.Diagnostics (
  )
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast
-import Database.Kosem.PostgreSQL.Internal.Sql.Env
 import Database.Kosem.PostgreSQL.Internal.Sql.Parser
 import Database.Kosem.PostgreSQL.Internal.Sql.Types
 import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
+import GHC.Data.Maybe (listToMaybe)
 import Language.Haskell.TH.Syntax (Name)
 import Text.Megaparsec (parseMaybe, parseTest)
 
+data IntroType
+    = Subquery
+    | Join
+    deriving (Show)
+
+data Field = Field
+    { alias :: Identifier
+    , label :: Identifier
+    , typeName :: PgType
+    , nullable :: IsNullable
+    }
+    deriving (Show)
+
+data TypecheckerEnv e = MkTypecheckerEnv
+    { database :: Database
+    , fields :: State [Field] e
+    , commandInput :: State [CommandInput] e
+    , compileError :: Exception CompileError e
+    }
+
+run
+    :: (e :> es)
+    => Exception CompileError e
+    -> Database
+    -> STerm ()
+    -> String
+    -> Eff es CommandInfo
+run ex database ast input = do
+    let numberOfColumns = case ast of
+            Select resultColumns _ _ -> length resultColumns
+    runTypecheckerEnv database ex [] [] \(env :: TypecheckerEnv e) -> do
+        typedAst <- typecheck env ast
+        fields <- get @e env.fields
+        commandInput <- get @e env.commandInput
+        hsTypes <- resultFromAst env typedAst
+        let commandInputSorted = sortBy (comparing commandInputPosition) commandInput
+        return $
+            CommandInfo
+                { input = commandInputSorted
+                , output = hsTypes
+                , rawCommand = input
+                }
+
 resultFromAst
     :: (e :> es)
-    => EnvE e
+    => TypecheckerEnv e
     -> STerm TypeInfo
     -> Eff es (NonEmpty SqlMapping)
 resultFromAst env = \cases
@@ -47,7 +91,7 @@ resultFromAst env = \cases
   where
     resultToSqlMapping
         :: (e :> es)
-        => EnvE e
+        => TypecheckerEnv e
         -> AliasedExpr TypeInfo
         -> Eff es SqlMapping
     resultToSqlMapping env = \case
@@ -66,31 +110,28 @@ resultFromAst env = \cases
                             }
                 Nothing -> throw env.compileError $ ExprWithNoAlias expr
 
-run
-    :: (e :> es)
-    => Exception CompileError e
-    -> Database
-    -> STerm ()
-    -> String
-    -> Eff es CommandInfo
-run ex database ast input = do
-    let numberOfColumns = case ast of
-            Select resultColumns _ _ -> length resultColumns
-    runEnv database ex [] [] \(env :: EnvE e) -> do
-        typedAst <- typecheck env ast
-        fields <- get @e env.fields
-        commandInput <- get @e env.commandInput
-        hsTypes <- resultFromAst env typedAst
-        let commandInputSorted = sortBy (comparing commandInputPosition) commandInput
-        return $
-            CommandInfo
-                { input = commandInputSorted
-                , output = hsTypes
-                , rawCommand = input
-                }
+runTypecheckerEnv
+    :: (e1 :> es)
+    => Database
+    -> Exception CompileError e1
+    -> [Field]
+    -> [CommandInput]
+    -> (forall e. TypecheckerEnv e -> Eff (e :& es) r)
+    -> Eff es r
+runTypecheckerEnv database ex fields cInput action =
+    evalState fields $ \fieldsS -> do
+        evalState cInput $ \cInputS -> do
+            useImplIn
+                action
+                MkTypecheckerEnv
+                    { database = database
+                    , fields = mapHandle fieldsS
+                    , commandInput = mapHandle cInputS
+                    , compileError = mapHandle ex
+                    }
 
 typecheck
-    :: (e :> es) => EnvE e -> STerm () -> Eff es (STerm TypeInfo)
+    :: (e :> es) => TypecheckerEnv e -> STerm () -> Eff es (STerm TypeInfo)
 typecheck env = \cases
     (Select res (Just (From fromItem)) whereClause) -> do
         tyFromItem <- tcFromItem env fromItem
@@ -104,7 +145,7 @@ typecheck env = \cases
 
 tcWhereClause
     :: (e :> es)
-    => EnvE e
+    => TypecheckerEnv e
     -> Maybe (Where ())
     -> Eff es (Maybe (Where TypeInfo))
 tcWhereClause env = \cases
@@ -117,14 +158,14 @@ tcWhereClause env = \cases
 
 tcSelectExpr
     :: (e :> es)
-    => EnvE e
+    => TypecheckerEnv e
     -> NonEmpty (AliasedExpr ())
     -> Eff es (NonEmpty (AliasedExpr TypeInfo))
 tcSelectExpr env = mapM (tc env)
   where
     tc
         :: (e :> es)
-        => EnvE e
+        => TypecheckerEnv e
         -> AliasedExpr ()
         -> Eff es (AliasedExpr TypeInfo)
     tc env = \cases
@@ -137,7 +178,7 @@ tcSelectExpr env = mapM (tc env)
 
 tcFromItem
     :: (e :> es)
-    => EnvE e
+    => TypecheckerEnv e
     -> FromItem ()
     -> Eff es (FromItem TypeInfo)
 tcFromItem env = \cases
@@ -157,7 +198,7 @@ tcFromItem env = \cases
 
 tcJoinCondition
     :: (e :> es)
-    => EnvE e
+    => TypecheckerEnv e
     -> JoinCondition ()
     -> Eff es (JoinCondition TypeInfo)
 tcJoinCondition env = \cases
@@ -192,7 +233,7 @@ tcNullable = \cases
 
 tcExpr
     :: (e :> es)
-    => EnvE e
+    => TypecheckerEnv e
     -> Expr ()
     -> Eff es (Expr TypeInfo)
 tcExpr env = \cases
@@ -352,7 +393,7 @@ tcExpr env = \cases
   where
     tyMustBeBoolean
         :: (e :> es)
-        => EnvE e
+        => TypecheckerEnv e
         -> String
         -> Expr ()
         -> Expr ()
@@ -368,13 +409,77 @@ tcExpr env = \cases
 
 addTableToEnv :: (e :> es) => State [Field] e -> Table -> Eff es ()
 addTableToEnv fieldsS table =
-    addFieldsToEnv fieldsS . map (toEnvElem table.name) . columns $ table
+    addFieldsToEnv fieldsS . map (toTypecheckerEnvlem table.name) . columns $ table
   where
-    toEnvElem :: Identifier -> Column -> Field
-    toEnvElem alias column =
+    toTypecheckerEnvlem :: Identifier -> Column -> Field
+    toTypecheckerEnvlem alias column =
         Field
             { alias = alias
             , label = column.name
             , typeName = column.typeName
             , nullable = column.nullable
             }
+
+introduceCommandInput
+    :: (e :> es)
+    => TypecheckerEnv e
+    -> CommandInput
+    -> Eff es ()
+introduceCommandInput env commandInput =
+    modify env.commandInput (<> [commandInput])
+
+getBinaryOpResult
+    :: Database
+    -> PgType
+    -> Operator
+    -> PgType
+    -> Maybe PgType
+getBinaryOpResult database lhs op rhs = do
+    -- \| Postgres converts '!=' to '<>', see note:
+    -- https://www.postgresql.org/docs/current/functions-comparison.html
+    let realOp = if op == "!=" then "<>" else op
+        binOpsMap = database.binaryOps
+    listToMaybe
+        . map (\(_, _, _, ty) -> ty)
+        . filter (\(_, _, r, _) -> r == rhs)
+        . filter (\(_, l, _, _) -> l == lhs)
+        . filter (\(o, _, _, _) -> o == realOp)
+        $ database.binaryOps
+
+getPgType :: Database -> Identifier -> PgType
+getPgType database identifier = find identifier database.typesMap
+  where
+    find :: Identifier -> [(Identifier, PgType, Name)] -> PgType
+    find identifier = \cases
+        [] -> error $ "no type: " <> show identifier
+        ((i, t, _) : xs) ->
+            if i == identifier
+                then t
+                else find identifier xs
+
+getHsType :: Database -> PgType -> Name
+getHsType database pgType = find pgType database.typesMap
+  where
+    find :: PgType -> [(Identifier, PgType, Name)] -> Name
+    find identifier = \cases
+        [] -> error $ "no type: " <> show identifier
+        ((_, t, n) : xs) ->
+            if t == pgType
+                then n
+                else find identifier xs
+
+addFieldsToEnv
+    :: (e :> es)
+    => State [Field] e
+    -> [Field]
+    -> Eff es ()
+addFieldsToEnv fieldsS fields =
+    modify fieldsS (<> fields)
+
+getTableByName :: Database -> Identifier -> [Table]
+getTableByName database tableName =
+    (filter (\table -> table.name == tableName) . tables) database
+
+getColumnByName :: [Field] -> Identifier -> [Field]
+getColumnByName fields name =
+    filter (\e -> e.label == name) fields
