@@ -9,6 +9,7 @@ module Database.Kosem.PostgreSQL.Internal.Sql where
 import Bluefin.Compound
 import Bluefin.Coroutine
 import Bluefin.Eff (Eff, runEff, runPureEff, (:&), (:>))
+import Bluefin.Exception
 import Bluefin.IO (effIO)
 import Bluefin.Jump (jumpTo, withJump)
 import Bluefin.State (State, get, modify, put)
@@ -40,10 +41,11 @@ import Database.Kosem.PostgreSQL.Internal.PgBuiltin (DatabaseConfig (..), defaul
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Row qualified
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast
+import Database.Kosem.PostgreSQL.Internal.Sql.CommandGen qualified as CommandGen
 import Database.Kosem.PostgreSQL.Internal.Sql.Env
-import Database.Kosem.PostgreSQL.Internal.Sql.Parser (parse)
+import Database.Kosem.PostgreSQL.Internal.Sql.Parser qualified as Parser
 import Database.Kosem.PostgreSQL.Internal.Sql.TH
-import Database.Kosem.PostgreSQL.Internal.Sql.Typechecker as Typechecker
+import Database.Kosem.PostgreSQL.Internal.Sql.Typechecker qualified as Typechecker
 import Database.Kosem.PostgreSQL.Internal.Sql.Types
 import Database.Kosem.PostgreSQL.Internal.Sql.Types qualified
 import Database.Kosem.PostgreSQL.Internal.Types
@@ -65,18 +67,28 @@ import Text.Pretty.Simple (pPrint, pShow)
 import Unsafe.Coerce (unsafeCoerce)
 
 unsafeSql :: Database -> String -> Q Exp
-unsafeSql database userInput = case Typechecker.run database userInput of
-    Right commandInfo -> do
-        let numberOfColumns = length commandInfo.output
-            allInputs =
-                rewriteQuery
-                    (splitCommand commandInfo.rawCommand commandInfo.input)
-            tts = map (\(_, _, t) -> t) allInputs
-            commands = map (\(c, _, _) -> c) allInputs
-            parameters = map (\(_, p, _) -> p) allInputs
+unsafeSql database userInput = do
+    let res = runPureEff do
+            try \ex -> do
+                ast <- Parser.run ex userInput
+                commandInfo <-
+                    Typechecker.run ex database ast userInput
+                -- TODO make this a proper record
+                stuff <- CommandGen.run ex commandInfo
+                return (stuff, commandInfo)
+    case res of
+        Right (stuff, ci) -> gen stuff ci
+        Left err -> do
+            compilationError userInput err
+  where
+    gen allInputs commandInfo = do
+        let tts = map (\(_, _, t) -> t) allInputs
+        let commands = map (\(c, _, _) -> c) allInputs
+        let parameters = map (\(_, p, _) -> p) allInputs
         commandsExp <- traverse genCommand commands
         parametersExp <- traverse genParamsList parameters
         let result = commandInfo.output
+        let numberOfColumns = length commandInfo.output
         [e|
             SqlCommand
                 { statement = $(genPatternMatch (toPattern (zip commandsExp tts)))
@@ -86,9 +98,7 @@ unsafeSql database userInput = case Typechecker.run database userInput of
                 , params = $(genPatternMatch (toPattern (zip parametersExp tts)))
                 }
             |]
-    Left e -> do
-        compilationError userInput e
-  where
+
     toPattern
         :: [(Exp, Maybe (NonEmpty Path))]
         -> Either Exp (NonEmpty (Exp, NonEmpty Path))
@@ -98,216 +108,3 @@ unsafeSql database userInput = case Typechecker.run database userInput of
         [(e, Nothing)] -> Left e
         -- TODO add some errors here
         (e : es) -> Right $ second fromJust e :| map (second fromJust) es
-
--- \$ Right $ (e, p) :| (es, ps)
-
-data BuildQueryEnv e = BuildQueryEnv
-    { commandPartsS :: State [Lazy.ByteString] e
-    , usedParametersS :: State [Parameter] e
-    , pathTakenS :: State [Path] e
-    , underGuardS :: State (Maybe Guard) e
-    }
-
-runBuildQuery
-    :: [Lazy.ByteString]
-    -> [Parameter]
-    -> [Path]
-    -> Maybe Guard
-    -> (forall e. BuildQueryEnv e -> Eff (e :& es) r)
-    -> Eff es r
-runBuildQuery commandParts parameters pathTaken mbGuard action = do
-    withStateSource \stateSource -> do
-        commandPartsS <- newState stateSource commandParts
-        usedParametersS <- newState stateSource parameters
-        pathTakenS <- newState stateSource pathTaken
-        underGuardS <- newState stateSource mbGuard
-        useImplIn
-            action
-            BuildQueryEnv
-                { commandPartsS = mapHandle commandPartsS
-                , usedParametersS = mapHandle usedParametersS
-                , pathTakenS = mapHandle pathTakenS
-                , underGuardS = mapHandle underGuardS
-                }
-
-data CommandFragment
-    = CfString Lazy.ByteString
-    | CfParam Parameter
-    | CfGuard Guard
-    | CfGuardEnd Guard
-    deriving (Show)
-
-splitCommand
-    :: String
-    -> [CommandInput]
-    -> [CommandFragment]
-splitCommand command inputs = runPureEff do
-    (res, _) <- yieldToReverseList \y -> do
-        go y command 0 inputs
-    return $ map snd . sortOn fst $ res
-  where
-    go
-        :: (e :> es)
-        => Stream (Int, CommandFragment) e
-        -> String
-        -> Int
-        -> [CommandInput]
-        -> Eff es ()
-    go y command offset = \cases
-        ((CommandParameter parameter) : cs) -> do
-            let start = unP parameter.position
-            let paramLen = parameterLength parameter
-            let (keep, end) = splitAt (start - offset) command
-            let remaining = drop paramLen end
-            unless (null keep) do yield y (offset, CfString $ stringToBs keep)
-            yield y (start, CfParam parameter)
-            go y remaining (start + paramLen) cs
-        ((CommandGuard guard) : cs) -> do
-            let (keep, end) = splitAt (unP guard.guardPos - offset) command
-            let offsetKeep =
-                    offset + (unP guard.guardPos - offset)
-            -- \| We use + 1 to remove the opening bracket `{`.
-            let remaining = drop (unP guard.openBracketPos - offsetKeep + 1) end
-            let offsetRemaining =
-                    offsetKeep + (unP guard.openBracketPos - offsetKeep + 1)
-            let (underGuardCommand, pastGuardCommand) =
-                    splitAt (unP guard.closeBracketPos - offsetRemaining) remaining
-            let offsetPast =
-                    offsetRemaining + (unP guard.closeBracketPos - offsetRemaining)
-            let (underGuardCi, pastGuardCi) =
-                    splitByPos cs offsetPast
-            unless (null keep) do yield y (offset, CfString $ stringToBs keep)
-            yield y (unP guard.guardPos, CfGuard guard)
-            yield y (unP guard.closeBracketPos, CfGuardEnd guard)
-            go y underGuardCommand offsetRemaining underGuardCi
-            -- \| We drop first char, which is closing bracket `}`
-            -- and move offset by + 1 for that reason.
-            go y (drop 1 pastGuardCommand) (offsetPast + 1) pastGuardCi
-        [] -> do
-            unless (null command) do yield y (offset, CfString $ stringToBs command)
-    stringToBs :: String -> Lazy.ByteString
-    stringToBs = Builder.toLazyByteString . Builder.stringUtf8
-    parameterLength :: Parameter -> Int
-    parameterLength parameter =
-        identifierLength parameter.pIdentifier + T.length (parameterTypeToText parameter.paramType)
-    guardLength :: Guard -> Int
-    guardLength guard =
-        identifierLength guard.gIdentifier + T.length (guardTypeToText guard.guardType)
-    splitByPos :: [CommandInput] -> Int -> ([CommandInput], [CommandInput])
-    splitByPos ci pos = do
-        let less = filter (\c -> unP (commandInputPosition c) < pos) ci
-        let greater = filter (\c -> unP (commandInputPosition c) >= pos) ci
-        (less, greater)
-
-rewriteQuery
-    :: [CommandFragment]
-    -> [(ByteString, [(Identifier, Name, IsNullable)], Maybe (NonEmpty Path))]
-rewriteQuery commandFragments = runPureEff do
-    runBuildQuery [] [] [] Nothing \(env :: BuildQueryEnv e) -> do
-        (res, _) <- yieldToReverseList \y -> do
-            go env y commandFragments
-        return res
-  where
-    go
-        :: (e1 :> es, e2 :> es)
-        => BuildQueryEnv e1
-        -> Stream (ByteString, [(Identifier, Name, IsNullable)], Maybe (NonEmpty Path)) e2
-        -> [CommandFragment]
-        -> Eff es ()
-    go env y = \cases
-        ((CfString bs) : cs) -> do
-            modify env.commandPartsS (<> [bs])
-            go env y cs
-        ((CfParam parameter) : cs) -> do
-            paramNo <- getParamNumber env.usedParametersS parameter
-            modify env.commandPartsS (<> [LBS.pack ("$" <> show paramNo)])
-            go env y cs
-        ((CfGuard guard) : cs) -> do
-            pathTaken <- get env.pathTakenS
-            case pathAlreadyTaken guard.gIdentifier pathTaken of
-                (Just PoTrue) -> do
-                    put env.underGuardS $ Just guard
-                    go env y cs
-                (Just PoJust) -> do
-                    put env.underGuardS $ Just guard
-                    go env y cs
-                (Just PoFalse) -> go env y (skipGuard cs)
-                (Just PoNothing) -> go env y (skipGuard cs)
-                Nothing -> do
-                    commandParts <- get env.commandPartsS
-                    usedParameters <- get env.usedParametersS
-                    runBuildQuery
-                        commandParts
-                        usedParameters
-                        pathTaken
-                        (Just guard)
-                        \(newEnv :: BuildQueryEnv eN) -> do
-                            modify @eN newEnv.pathTakenS (<> [guardToPath guard True])
-                            go newEnv y cs
-                    modify env.pathTakenS (<> [guardToPath guard False])
-                    go env y (skipGuard cs)
-        ((CfGuardEnd guard) : cs) -> do
-            put env.underGuardS Nothing
-            go env y cs
-        [] -> do
-            commandParts <- get env.commandPartsS
-            let commandBuilder = foldMap Builder.lazyByteString commandParts
-            let commandBs = toStrict $ Builder.toLazyByteString commandBuilder
-            parameters <- map paramForTH <$> get env.usedParametersS
-            pathTaken <- get env.pathTakenS
-            let paths = case pathTaken of
-                    [] -> Nothing
-                    (p : ps) -> Just $ p :| ps
-            yield y (commandBs, parameters, paths)
-      where
-        skipGuard :: [CommandFragment] -> [CommandFragment]
-        skipGuard =
-            drop 1 . dropWhile \case
-                (CfGuardEnd _) -> False
-                _ -> True
-
-        pathAlreadyTaken :: Identifier -> [Path] -> Maybe PathOption
-        pathAlreadyTaken identifier paths =
-            case find (\p -> p.pathIdentifier == identifier) paths of
-                Nothing -> Nothing
-                (Just p) -> Just p.pathOption
-
-        getParamNumber
-            :: (e :> es)
-            => State [Parameter] e
-            -> Parameter
-            -> Eff es Int
-        getParamNumber usedParamsS param = do
-            usedParams <- get usedParamsS
-            case find Nothing usedParams param of
-                Nothing -> do
-                    put usedParamsS $ usedParams <> [param]
-                    return $ length usedParams + 1
-                Just n -> return n
-          where
-            find :: Maybe Int -> [Parameter] -> Parameter -> Maybe Int
-            find Nothing (p : ps) parameter =
-                if p.pIdentifier /= parameter.pIdentifier
-                    then find (Just 2) ps parameter
-                    else Just 1
-            find (Just i) (p : ps) parameter =
-                if p.pIdentifier /= parameter.pIdentifier
-                    then find (Just $ i + 1) ps parameter
-                    else Just i
-            find _ [] _ = Nothing
-
-        paramForTH :: Parameter -> (Identifier, Name, IsNullable)
-        paramForTH p =
-            ( p.pIdentifier
-            , (.hsType) . fromJust $ p.info
-            , (.nullable) . fromJust $ p.info
-            )
-
-        guardToPath :: Guard -> Bool -> Path
-        guardToPath guard = \cases
-            False -> Path guard.gIdentifier $ case guard.guardType of
-                BooleanGuard -> PoFalse
-                MaybeGuard -> PoNothing
-            True -> Path guard.gIdentifier $ case guard.guardType of
-                BooleanGuard -> PoTrue
-                MaybeGuard -> PoJust

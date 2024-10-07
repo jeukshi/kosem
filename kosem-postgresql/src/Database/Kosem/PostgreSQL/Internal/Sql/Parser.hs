@@ -1,5 +1,7 @@
 module Database.Kosem.PostgreSQL.Internal.Sql.Parser where
 
+import Bluefin.Eff
+import Bluefin.Exception
 import Control.Monad (void, when)
 import Control.Monad.Combinators.Expr (
     Operator (..),
@@ -24,6 +26,15 @@ import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Debug (dbg)
 import Text.Pretty.Simple
 import Prelude hiding (takeWhile)
+
+run
+    :: (e :> es)
+    => Exception CompileError e
+    -> String
+    -> Eff es (STerm ())
+run ex input = case parse input of
+    (Left e) -> throw ex e
+    (Right ast) -> return ast
 
 parse
     :: String

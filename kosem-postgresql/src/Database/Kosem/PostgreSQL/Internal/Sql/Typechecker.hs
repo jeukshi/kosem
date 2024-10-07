@@ -67,29 +67,27 @@ resultFromAst env = \cases
                 Nothing -> throw env.compileError $ ExprWithNoAlias expr
 
 run
-    :: Database
+    :: (e :> es)
+    => Exception CompileError e
+    -> Database
+    -> STerm ()
     -> String
-    -> Either
-        CompileError
-        CommandInfo
-run database input = do
-    ast <- parse input
+    -> Eff es CommandInfo
+run ex database ast input = do
     let numberOfColumns = case ast of
             Select resultColumns _ _ -> length resultColumns
-    runPureEff do
-        try \ex -> do
-            runEnv database ex [] [] \(env :: EnvE e) -> do
-                typedAst <- typecheck env ast
-                fields <- get @e env.fields
-                commandInput <- get @e env.commandInput
-                hsTypes <- resultFromAst env typedAst
-                let commandInputSorted = sortBy (comparing commandInputPosition) commandInput
-                return $
-                    CommandInfo
-                        { input = commandInputSorted
-                        , output = hsTypes
-                        , rawCommand = input
-                        }
+    runEnv database ex [] [] \(env :: EnvE e) -> do
+        typedAst <- typecheck env ast
+        fields <- get @e env.fields
+        commandInput <- get @e env.commandInput
+        hsTypes <- resultFromAst env typedAst
+        let commandInputSorted = sortBy (comparing commandInputPosition) commandInput
+        return $
+            CommandInfo
+                { input = commandInputSorted
+                , output = hsTypes
+                , rawCommand = input
+                }
 
 typecheck
     :: (e :> es) => EnvE e -> STerm () -> Eff es (STerm TypeInfo)

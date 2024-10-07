@@ -37,6 +37,7 @@ library
     , Database.Kosem.PostgreSQL.Internal.Sql.Ast
     , Database.Kosem.PostgreSQL.Internal.Sql.Parser
     , Database.Kosem.PostgreSQL.Internal.Sql.Typechecker
+    , Database.Kosem.PostgreSQL.Internal.Sql.CommandGen
     , Database.Kosem.PostgreSQL.Internal.Sql.Env
     , Database.Kosem.PostgreSQL.Schema.Internal.Parser
     , Database.Kosem.PostgreSQL.Schema.Internal
