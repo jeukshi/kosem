@@ -1,8 +1,10 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE NoDuplicateRecordFields #-}
 
 module Database.Kosem.PostgreSQL.Internal.Sql.Types where
 
+import Data.Bifunctor (Bifunctor (..))
 import Data.ByteString (ByteString)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
@@ -78,6 +80,13 @@ data ParameterType
     | SimpleMaybeParameter
     deriving (Show, Eq)
 
+data CommandParameter = MkCommandParameter
+    { cpIdentifier :: Identifier
+    , cpHsType :: Name
+    , cpIsNullable :: IsNullable
+    }
+    deriving (Show)
+
 data ParameterInfo = ParameterInfo
     { pgType :: PgType
     , hsType :: Name
@@ -85,25 +94,42 @@ data ParameterInfo = ParameterInfo
     }
     deriving (Show)
 
-data Path = Path
-    { pathIdentifier :: Identifier
-    , pathOption :: PathOption
+data Choice = Choice
+    { choiceIdentifier :: Identifier
+    , choiceOption :: ChoiceOption
     }
     deriving (Show)
 
-data PathOption
-    = PoFalse
-    | PoTrue
-    | PoJust
-    | PoNothing
+data ChoiceOption
+    = VcBool Bool
+    | VcMaybe Bool
     deriving (Show)
 
-x = do
-    let x = True
-    let y = Just 0
-    let z = True
-    case (y, x) of
-        (Just _, False) -> undefined
-        (Just _, True) -> undefined
-        (Nothing, True) -> undefined
-        (Nothing, False) -> undefined
+data Command a b = MkCommand
+    { cParams :: a
+    , cCommand :: b
+    }
+    deriving (Show, Functor, Foldable, Traversable)
+
+instance Bifunctor Command where
+    bimap f g (MkCommand a b) =
+        MkCommand (f a) (g b)
+
+data CommandVariant a b
+    = SingleCommand (Command a b)
+    | TwoCommands
+        Identifier
+        ChoiceOption
+        (Command a b)
+        ChoiceOption
+        (Command a b)
+    | MultipleCommands [([Choice], Command a b)]
+    deriving (Show, Functor, Foldable, Traversable)
+
+instance Bifunctor CommandVariant where
+    bimap f g (SingleCommand command) =
+        SingleCommand (bimap f g command)
+    bimap f g (TwoCommands identifier opt1 cmd1 opt2 cmd2) =
+        TwoCommands identifier opt1 (bimap f g cmd1) opt2 (bimap f g cmd2)
+    bimap f g (MultipleCommands commands) =
+        MultipleCommands (map (second (bimap f g)) commands)

@@ -65,8 +65,6 @@ run
     -> String
     -> Eff es CommandInfo
 run ex database ast input = do
-    let numberOfColumns = case ast of
-            Select resultColumns _ _ -> length resultColumns
     runTypecheckerEnv database ex [] [] \(env :: TypecheckerEnv e) -> do
         typedAst <- typecheck env ast
         fields <- get @e env.fields

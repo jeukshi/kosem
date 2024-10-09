@@ -66,7 +66,7 @@ import Unsafe.Coerce (unsafeCoerce)
 data CommandGenEnv e = CommandGenEnv
     { commandPartsS :: State [Lazy.ByteString] e
     , usedParametersS :: State [Parameter] e
-    , pathTakenS :: State [Path] e
+    , choicesS :: State [Choice] e
     , underGuardS :: State (Maybe Guard) e
     , compileException :: Exception CompileError e
     }
@@ -82,7 +82,7 @@ run
     :: (e :> es)
     => Exception CompileError e
     -> CommandInfo
-    -> Eff es [(ByteString, [(Identifier, Name, IsNullable)], Maybe (NonEmpty Path))]
+    -> Eff es (CommandVariant [CommandParameter] ByteString)
 run ex commandInfo = do
     let commandFragments =
             splitCommand commandInfo.rawCommand commandInfo.input
@@ -93,22 +93,22 @@ runCommandGenEnv
     => Exception CompileError e
     -> [Lazy.ByteString]
     -> [Parameter]
-    -> [Path]
+    -> [Choice]
     -> Maybe Guard
     -> (forall e. CommandGenEnv e -> Eff (e :& es) r)
     -> Eff es r
-runCommandGenEnv ex commandParts parameters pathTaken mbGuard action = do
+runCommandGenEnv ex commandParts parameters choices mbGuard action = do
     withStateSource \stateSource -> do
         commandPartsS <- newState stateSource commandParts
         usedParametersS <- newState stateSource parameters
-        pathTakenS <- newState stateSource pathTaken
+        choicesS <- newState stateSource choices
         underGuardS <- newState stateSource mbGuard
         useImplIn
             action
             CommandGenEnv
                 { commandPartsS = mapHandle commandPartsS
                 , usedParametersS = mapHandle usedParametersS
-                , pathTakenS = mapHandle pathTakenS
+                , choicesS = mapHandle choicesS
                 , underGuardS = mapHandle underGuardS
                 , compileException = mapHandle ex
                 }
@@ -117,17 +117,17 @@ rewriteQuery
     :: (e :> es)
     => Exception CompileError e
     -> [CommandFragment]
-    -> Eff es [(ByteString, [(Identifier, Name, IsNullable)], Maybe (NonEmpty Path))]
+    -> Eff es (CommandVariant [CommandParameter] ByteString)
 rewriteQuery ex commandFragments =
     runCommandGenEnv ex [] [] [] Nothing \(env :: CommandGenEnv e) -> do
         (res, _) <- yieldToReverseList \y -> do
             go env y commandFragments
-        return res
+        toCommandVariant ex res
   where
     go
         :: (e1 :> es, e2 :> es)
         => CommandGenEnv e1
-        -> Stream (ByteString, [(Identifier, Name, IsNullable)], Maybe (NonEmpty Path)) e2
+        -> Stream (ByteString, [CommandParameter], [Choice]) e2
         -> [CommandFragment]
         -> Eff es ()
     go env y = \cases
@@ -139,16 +139,16 @@ rewriteQuery ex commandFragments =
             modify env.commandPartsS (<> [LBS.pack ("$" <> show paramNo)])
             go env y cs
         ((CfGuard guard) : cs) -> do
-            pathTaken <- get env.pathTakenS
-            case pathAlreadyTaken guard.gIdentifier pathTaken of
-                (Just PoTrue) -> do
+            choices <- get env.choicesS
+            case choiceAlreadyMade guard.gIdentifier choices of
+                (Just (VcBool True)) -> do
                     put env.underGuardS $ Just guard
                     go env y cs
-                (Just PoJust) -> do
+                (Just (VcMaybe True)) -> do
                     put env.underGuardS $ Just guard
                     go env y cs
-                (Just PoFalse) -> go env y (skipGuard cs)
-                (Just PoNothing) -> go env y (skipGuard cs)
+                (Just (VcBool False)) -> go env y (skipGuard cs)
+                (Just (VcMaybe False)) -> go env y (skipGuard cs)
                 Nothing -> do
                     commandParts <- get env.commandPartsS
                     usedParameters <- get env.usedParametersS
@@ -156,12 +156,12 @@ rewriteQuery ex commandFragments =
                         env.compileException
                         commandParts
                         usedParameters
-                        pathTaken
+                        choices
                         (Just guard)
                         \(newEnv :: CommandGenEnv eN) -> do
-                            modify @eN newEnv.pathTakenS (<> [guardToPath guard True])
+                            modify @eN newEnv.choicesS (<> [guardToChoice guard True])
                             go newEnv y cs
-                    modify env.pathTakenS (<> [guardToPath guard False])
+                    modify env.choicesS (<> [guardToChoice guard False])
                     go env y (skipGuard cs)
         ((CfGuardEnd guard) : cs) -> do
             put env.underGuardS Nothing
@@ -171,11 +171,8 @@ rewriteQuery ex commandFragments =
             let commandBuilder = foldMap Builder.lazyByteString commandParts
             let commandBs = toStrict $ Builder.toLazyByteString commandBuilder
             parameters <- map paramForTH <$> get env.usedParametersS
-            pathTaken <- get env.pathTakenS
-            let paths = case pathTaken of
-                    [] -> Nothing
-                    (p : ps) -> Just $ p :| ps
-            yield y (commandBs, parameters, paths)
+            choices <- get env.choicesS
+            yield y (commandBs, parameters, choices)
       where
         skipGuard :: [CommandFragment] -> [CommandFragment]
         skipGuard =
@@ -183,11 +180,14 @@ rewriteQuery ex commandFragments =
                 (CfGuardEnd _) -> False
                 _ -> True
 
-        pathAlreadyTaken :: Identifier -> [Path] -> Maybe PathOption
-        pathAlreadyTaken identifier paths =
-            case find (\p -> p.pathIdentifier == identifier) paths of
+        choiceAlreadyMade
+            :: Identifier
+            -> [Choice]
+            -> Maybe ChoiceOption
+        choiceAlreadyMade identifier choices =
+            case find ((== identifier) . choiceIdentifier) choices of
                 Nothing -> Nothing
-                (Just p) -> Just p.pathOption
+                (Just choice) -> Just choice.choiceOption
 
         getParamNumber
             :: (e :> es)
@@ -213,21 +213,57 @@ rewriteQuery ex commandFragments =
                     else Just i
             find _ [] _ = Nothing
 
-        paramForTH :: Parameter -> (Identifier, Name, IsNullable)
+        paramForTH :: Parameter -> CommandParameter
         paramForTH p =
-            ( p.pIdentifier
-            , (.hsType) . fromJust $ p.info
-            , (.nullable) . fromJust $ p.info
-            )
+            MkCommandParameter
+                { cpIdentifier = p.pIdentifier
+                , cpHsType = (.hsType) . fromJust $ p.info
+                , cpIsNullable = (.nullable) . fromJust $ p.info
+                }
 
-        guardToPath :: Guard -> Bool -> Path
-        guardToPath guard = \cases
-            False -> Path guard.gIdentifier $ case guard.guardType of
-                BooleanGuard -> PoFalse
-                MaybeGuard -> PoNothing
-            True -> Path guard.gIdentifier $ case guard.guardType of
-                BooleanGuard -> PoTrue
-                MaybeGuard -> PoJust
+        guardToChoice :: Guard -> Bool -> Choice
+        guardToChoice guard bool = case guard.guardType of
+            BooleanGuard -> Choice guard.gIdentifier (VcBool bool)
+            MaybeGuard -> Choice guard.gIdentifier (VcMaybe bool)
+
+toCommandVariant
+    :: (e :> es)
+    => Exception CompileError e
+    -> [(ByteString, [CommandParameter], [Choice])]
+    -> Eff es (CommandVariant [CommandParameter] ByteString)
+toCommandVariant ex = \cases
+    [] -> throw ex (AssertionError "TODO no command")
+    [(bs, cps, choices)] -> do
+        unless (null choices) do
+            throw ex (AssertionError "TODO choices in single command")
+        return $ SingleCommand (MkCommand cps bs)
+    [(bs, cps, [choice]), (bs2, cps2, [choice2])] -> do
+        unless (choice.choiceIdentifier == choice2.choiceIdentifier) do
+            throw ex (AssertionError "TODO both choices dont have the same id")
+        unless (choicesOptionsMatch choice.choiceOption choice2.choiceOption) do
+            throw ex (AssertionError "TODO both choices don't have the same constructor or different values")
+        return $
+            TwoCommands
+                choice.choiceIdentifier
+                choice.choiceOption
+                (MkCommand cps bs)
+                choice2.choiceOption
+                (MkCommand cps2 bs2)
+    xs ->
+        return $
+            MultipleCommands $
+                map
+                    ( \(bs, cps, choices) ->
+                        (choices, MkCommand cps bs)
+                    )
+                    xs
+
+choicesOptionsMatch :: ChoiceOption -> ChoiceOption -> Bool
+choicesOptionsMatch = \cases
+    (VcBool b1) (VcBool b2) -> not b1 == b2
+    (VcMaybe b1) (VcMaybe b2) -> not b1 == b2
+    (VcMaybe _) (VcBool _) -> False
+    (VcBool _) (VcMaybe _) -> False
 
 splitCommand
     :: String

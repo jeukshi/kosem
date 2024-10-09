@@ -16,7 +16,7 @@ import Bluefin.State (State, get, modify, put)
 import Bluefin.StateSource (newState, withStateSource)
 import Bluefin.Stream (Stream, inFoldable, yield, yieldToList, yieldToReverseList)
 import Control.Monad (replicateM, unless, when)
-import Data.Bifunctor (first, second)
+import Data.Bifunctor (Bifunctor (bimap), first, second)
 import Data.ByteString (ByteString)
 import Data.ByteString.Builder (Builder)
 import Data.ByteString.Builder qualified as Builder
@@ -80,30 +80,20 @@ unsafeSql database userInput = do
         Left err -> do
             compilationError userInput err
   where
-    gen allInputs commandInfo = do
-        let tts = map (\(_, _, t) -> t) allInputs
-        let commands = map (\(c, _, _) -> c) allInputs
-        let parameters = map (\(_, p, _) -> p) allInputs
-        commandsExp <- traverse genCommand commands
-        parametersExp <- traverse genParamsList parameters
+    gen :: CommandVariant [CommandParameter] ByteString -> CommandInfo -> Q Exp
+    gen commands commandInfo = do
+        commandsQ <-
+            traverse genCommand
+                . first genParamsList
+                $ commands
         let result = commandInfo.output
         let numberOfColumns = length commandInfo.output
         [e|
             SqlCommand
-                { statement = $(genPatternMatch (toPattern (zip commandsExp tts)))
+                { statement = $(genPatternMatch cCommand commandsQ)
                 , columnsNumber = numberOfColumns
                 , rowProto = Row [] :: $(genRowType result)
                 , rowParser = $(genRowParser result)
-                , params = $(genPatternMatch (toPattern (zip parametersExp tts)))
+                , params = $(genPatternMatch cParams commandsQ)
                 }
             |]
-
-    toPattern
-        :: [(Exp, Maybe (NonEmpty Path))]
-        -> Either Exp (NonEmpty (Exp, NonEmpty Path))
-    toPattern = \cases
-        [] -> error "TODO"
-        [(e, Just _)] -> error "TODO"
-        [(e, Nothing)] -> Left e
-        -- TODO add some errors here
-        (e : es) -> Right $ second fromJust e :| map (second fromJust) es

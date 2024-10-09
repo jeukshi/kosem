@@ -19,7 +19,7 @@ import Database.Kosem.PostgreSQL.Internal.Diagnostics.GHC (
     SourcePoint (..),
     errorWithSpan,
  )
-import Database.Kosem.PostgreSQL.Internal.P (P (unP), initPosState, movePby)
+import Database.Kosem.PostgreSQL.Internal.P (P (MkP, unP), initPosState, movePby)
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast (Expr (..), LiteralValue (..))
 import Database.Kosem.PostgreSQL.Internal.Types (
@@ -88,7 +88,8 @@ spanWithCodePoint
                 }
 
 data CompileError
-    = ParseError P String
+    = AssertionError String
+    | ParseError P String
     | ArgumentTypeError (Expr TypeInfo) String PgType
     | ConditionTypeError (Expr TypeInfo) String
     | ParameterWithoutCastError P Identifier
@@ -103,6 +104,7 @@ data CompileError
 
 compileErrorSpan :: CompileError -> DiagnosticSpan P
 compileErrorSpan = \case
+    AssertionError s -> DiagnosticSpan (MkP 0) (MkP 1) -- FIXME ??
     ParseError p _ ->
         DiagnosticSpan p p
     ArgumentTypeError expr _ _ -> toDiagnosticSpan expr
@@ -131,6 +133,7 @@ compileErrorSpan = \case
 
 compileErrorMsg :: CompileError -> String
 compileErrorMsg = \case
+    AssertionError msg -> msg
     ParseError _ msg -> msg
     ArgumentTypeError _ func ty ->
         "argument of ‘" <> func <> "’ must be type " <> pgTypePretty ty
