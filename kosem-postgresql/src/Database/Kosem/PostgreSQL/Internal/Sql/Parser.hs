@@ -84,19 +84,6 @@ on = pKeyword "on"
 as :: Parser ()
 as = pKeyword "as"
 
-andK :: Parser And
-andK = And <$ pKeyword "and"
-
-orK :: Parser Or
-orK = Or <$ pKeyword "or"
-
-notK :: Parser Not
-notK = Not <$ pKeyword "not"
-
--- TODO `between symmetric`
-betweenK :: Parser Between
-betweenK = Between <$ pKeyword "between"
-
 allPred :: [a -> Bool] -> a -> Bool
 allPred ps a = all (\p -> p a) ps
 
@@ -304,17 +291,17 @@ exprP = makeExprParser termP operatorsTable
             [ Postfix do
                 mkBetween
                     <$> lexeme getP
-                    <*> betweenK
+                    <* pKeyword "between"
                     <*> termP
-                    <*> andK
+                    <* pKeyword "and"
                     <*> termP
             , Postfix do
                 mkNotBetween
                     <$> lexeme getP
-                    <*> notK
-                    <*> betweenK
+                    <* pKeyword "not"
+                    <* pKeyword "between"
                     <*> termP
-                    <*> andK
+                    <* pKeyword "and"
                     <*> termP
             ]
         ,
@@ -326,20 +313,19 @@ exprP = makeExprParser termP operatorsTable
             , InfixL do binOpP ">" <?> "<operator>"
             , InfixL do binOpP "=" <?> "<operator>"
             ]
-        , [Prefix do ENot <$> lexeme getP <*> notK]
+        , [Prefix do ENot <$> lexeme getP <* pKeyword "not"]
         ,
-            [ InfixL do mkAnd <$> lexeme getP <*> andK
+            [ InfixL do EAnd <$> lexeme getP <* pKeyword "and"
             , Postfix do foldr1 (.) <$> some mkGuardedBoolAnd
             ]
-        , [InfixL do mkOr <$> lexeme getP <*> orK]
+        , [InfixL do EOr <$> lexeme getP <* pKeyword "or"]
         ]
     mkCast p1 (p2, identifier) ty expr = EPgCast p1 expr p2 identifier ty
-    mkBetween p between rhs1 and rhs2 lhs =
-        EBetween p lhs between rhs1 and rhs2
+    mkBetween p rhs1 rhs2 lhs =
+        EBetween p lhs rhs1 rhs2
 
-    mkNotBetween p not between rhs1 and rhs2 lhs =
-        ENotBetween p lhs not between rhs1 and rhs2
-    mkAnd p and lhs = EAnd p lhs and
+    mkNotBetween p rhs1 rhs2 lhs =
+        ENotBetween p lhs rhs1 rhs2
 
     mkGuardedBoolAnd = lexeme do
         p1 <- getP
@@ -368,8 +354,6 @@ exprP = makeExprParser termP operatorsTable
       where
         mk p1 identifier pOpen innerExpr pClose lhs =
             EGuardedMaybeAnd lhs p1 identifier pOpen innerExpr pClose
-
-    mkOr p and lhs = EOr p lhs and
 
 exprLitP :: Parser (Expr ())
 exprLitP = lexeme do

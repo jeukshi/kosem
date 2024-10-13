@@ -322,12 +322,12 @@ tcExpr env = \cases
                         colName
                         (TypeInfo envCol.typeName envCol.nullable (Just envCol.label) hsTy)
             ts -> throw env.compileError $ ColumnNameIsAmbigious p colName
-    expr@(ENot p not innerExpr) -> do
+    expr@(ENot p innerExpr) -> do
         tyExpr <- tcExpr env innerExpr
         let ty = exprType tyExpr
         when (ty.pgType /= PgBoolean) do
             throw env.compileError $ ConditionTypeError tyExpr "NOT"
-        return $ ENot p not tyExpr
+        return $ ENot p tyExpr
     (EGuardedBoolAnd lhs p1 identifier pOpen rhs pClose) -> do
         introduceCommandInput env $
             CommandGuard $
@@ -352,12 +352,12 @@ tcExpr env = \cases
                     }
         (tyLhs, tyRhs) <- tyMustBeBoolean env "AND" lhs rhs
         return $ EGuardedMaybeAnd tyLhs p1 identifier pOpen tyRhs pClose
-    (EAnd p lhs and rhs) -> do
+    (EAnd p lhs rhs) -> do
         (tyLhs, tyRhs) <- tyMustBeBoolean env "AND" lhs rhs
-        return $ EAnd p tyLhs and tyRhs
-    (EOr p lhs or rhs) -> do
+        return $ EAnd p tyLhs tyRhs
+    (EOr p lhs rhs) -> do
         (tyLhs, tyRhs) <- tyMustBeBoolean env "OR" lhs rhs
-        return $ EOr p tyLhs or tyRhs
+        return $ EOr p tyLhs tyRhs
     (EBinOp p lhs op rhs ()) -> do
         tcLhs <- tcExpr env lhs
         tcRhs <- tcExpr env rhs
@@ -369,24 +369,19 @@ tcExpr env = \cases
                 let hsTy = getHsType env.database tyRes
                 return $ EBinOp p tcLhs op tcRhs (TypeInfo tyRes nullableRes Nothing hsTy)
             Nothing -> throw env.compileError $ OperatorDoesntExist p tyLhs op tyRhs
-    (EBetween p lhs between rhs1 and rhs2) -> do
+    (EBetween p lhs rhs1 rhs2) -> do
         -- TODO typecheck `between` against <= >=
         tyLhs <- tcExpr env lhs
         tyRhs1 <- tcExpr env rhs1
         tyRhs2 <- tcExpr env rhs2
         EBetween p
             <$> tcExpr env lhs
-            <*> pure between
             <*> tcExpr env rhs1
-            <*> pure and
             <*> tcExpr env rhs2
-    (ENotBetween p lhs not between rhs1 and rhs2) ->
+    (ENotBetween p lhs rhs1 rhs2) ->
         ENotBetween p
             <$> tcExpr env lhs
-            <*> pure not
-            <*> pure between
             <*> tcExpr env rhs1
-            <*> pure and
             <*> tcExpr env rhs2
   where
     tyMustBeBoolean

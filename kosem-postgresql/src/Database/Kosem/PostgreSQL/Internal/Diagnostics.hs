@@ -193,26 +193,26 @@ toDiagnosticSpan = \cases
         DiagnosticSpan
             p
             (p `movePby` identifierLength identifier)
-    (ENot p _ expr) ->
+    (ENot p expr) ->
         DiagnosticSpan p p
             `combineSpans` toDiagnosticSpan expr
     (EGuardedBoolAnd _ p1 _ _ _ p2) ->
         DiagnosticSpan p1 p2
     (EGuardedMaybeAnd _ p1 _ _ _ p2) ->
         DiagnosticSpan p1 p2
-    (EAnd _ lhs _ rhs) ->
+    (EAnd _ lhs rhs) ->
         toDiagnosticSpan lhs
             `combineSpans` toDiagnosticSpan rhs
-    (EOr _ lhs _ rhs) ->
+    (EOr _ lhs rhs) ->
         toDiagnosticSpan lhs
             `combineSpans` toDiagnosticSpan rhs
     (EBinOp _ lhs _ rhs _) ->
         toDiagnosticSpan lhs
             `combineSpans` toDiagnosticSpan rhs
-    (EBetween _ lhs _ _ _ rhs2) ->
+    (EBetween _ lhs _ rhs2) ->
         toDiagnosticSpan lhs
             `combineSpans` toDiagnosticSpan rhs2
-    (ENotBetween _ lhs _ _ _ _ rhs2) ->
+    (ENotBetween _ lhs _ rhs2) ->
         toDiagnosticSpan lhs
             `combineSpans` toDiagnosticSpan rhs2
 

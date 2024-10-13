@@ -47,18 +47,6 @@ data Outer = Outer
 data As = As
     deriving (Show)
 
-data And = And
-    deriving (Show)
-
-data Or = Or
-    deriving (Show)
-
-data Not = Not
-    deriving (Show)
-
-data Between = Between
-    deriving (Show)
-
 data AliasedExpr t
     = WithAlias (Expr t) Identifier (Maybe As)
     | WithoutAlias (Expr t)
@@ -69,18 +57,18 @@ data Expr t
     | EParam P Identifier t
     | EParamMaybe P Identifier t
     | ELit P LiteralValue t
-    | ECol P Identifier t -- TODO rename to identifier https://www.postgresql.org/docs/current/sql-syntax-lexical.html
-    | EPgCast P (Expr t) P Identifier t -- TODO Identifi
+    | ECol P Identifier t
+    | EPgCast P (Expr t) P Identifier t
     | -- | expression::type
-      ENot P Not (Expr t)
+      ENot P (Expr t)
     | EGuardedBoolAnd (Expr t) P Identifier P (Expr t) P
     | EGuardedMaybeAnd (Expr t) P Identifier P (Expr t) P
-    | EAnd P (Expr t) And (Expr t)
-    | EOr P (Expr t) Or (Expr t)
+    | EAnd P (Expr t) (Expr t)
+    | EOr P (Expr t) (Expr t)
     | EBinOp P (Expr t) Operator (Expr t) t
     | -- Comparsion predicates
-      EBetween P (Expr t) Between (Expr t) And (Expr t)
-    | ENotBetween P (Expr t) Not Between (Expr t) And (Expr t)
+      EBetween P (Expr t) (Expr t) (Expr t)
+    | ENotBetween P (Expr t) (Expr t) (Expr t)
     deriving (Show)
 
 data LiteralValue
