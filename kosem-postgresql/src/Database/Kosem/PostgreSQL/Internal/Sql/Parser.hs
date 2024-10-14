@@ -1,7 +1,7 @@
 module Database.Kosem.PostgreSQL.Internal.Sql.Parser where
 
 import Bluefin.Eff
-import Bluefin.Exception
+import Bluefin.Exception (Exception, throw)
 import Control.Monad (void, when)
 import Control.Monad.Combinators.Expr (
     Operator (..),
@@ -178,10 +178,21 @@ parensExprP = lexeme do
     -- \| Move p2 by one to match a position of ')'.
     return $ EParens p1 expr (p2 `movePby` 1) ()
 
+functionExprP :: Parser (Expr ())
+functionExprP = lexeme do
+    p <- getP
+    identifier <- identifierP
+    _ <- symbol "("
+    args <- (lexeme do exprP) `sepBy1` lexeme do ","
+    p2 <- lexeme getP
+    _ <- symbol ")"
+    return $ EFunction p identifier args ()
+
 termP :: Parser (Expr ())
 termP = lexeme do
     choice
         [ parensExprP
+        , try functionExprP
         , exprLitP
         , exprColP
         , paramMaybeP

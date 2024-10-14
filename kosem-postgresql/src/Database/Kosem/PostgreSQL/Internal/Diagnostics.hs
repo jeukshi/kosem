@@ -178,6 +178,10 @@ toDiagnosticSpan = \cases
             p
             -- \| +2 from ':?' prefix.
             (p `movePby` (identifierLength identifier + 2))
+    (EFunction p identifier _ _) ->
+        DiagnosticSpan
+            p
+            (p `movePby` identifierLength identifier)
     (ELit p lit _) -> case lit of
         NumericLiteral -> undefined -- TODO
         BoolLiteral text ->

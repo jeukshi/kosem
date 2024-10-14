@@ -56,6 +56,7 @@ data Expr t
     = EParens P (Expr t) P t
     | EParam P Identifier t
     | EParamMaybe P Identifier t
+    | EFunction P Identifier [Expr t] t
     | ELit P LiteralValue t
     | ECol P Identifier t
     | EPgCast P (Expr t) P Identifier t

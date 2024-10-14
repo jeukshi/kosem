@@ -138,3 +138,9 @@ spec = parallel do
                  or true
         :ident{and :xyz }
                |]
+
+        it "simple function" do
+            parseOnly selectCore
+                `shouldSucceedOn` [text|
+             select concat('abc','cba', 'xxx')
+               |]

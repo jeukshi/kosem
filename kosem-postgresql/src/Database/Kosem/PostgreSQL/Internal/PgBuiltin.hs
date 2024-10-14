@@ -192,3 +192,6 @@ pgbinaryOperators =
     , (">>", PgInteger, PgInteger, PgInteger)
     , ("^", PgNumeric, PgNumeric, PgNumeric)
     ]
+
+pgFunctions :: [(Identifier, [PgType], PgType)]
+pgFunctions = [("length", [PgText], PgInteger)]
