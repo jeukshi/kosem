@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Database.Kosem.PostgreSQL.Internal.Diagnostics (
     P (..),
