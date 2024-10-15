@@ -96,7 +96,7 @@ data CompileError
     | ConditionTypeError (Expr TypeInfo) String
     | ParameterWithoutCastError P Identifier
     | MaybeParameterWithoutCastError P Identifier
-    | NoFunctionError P Identifier [PgType]
+    | FunctionDoesNotExist P Identifier [PgType]
     | ExprWithNoAlias (Expr TypeInfo)
     | OperatorDoesntExist P PgType Operator PgType
     | ColumnDoesNotExist P Identifier
@@ -122,7 +122,7 @@ compileErrorSpan = \case
             p
             -- \| +2 from ':?' prefix.
             (p `movePby` (identifierLength identifier + 2))
-    NoFunctionError p identifier _ ->
+    FunctionDoesNotExist p identifier _ ->
         DiagnosticSpan
             p
             (p `movePby` identifierLength identifier)
@@ -150,7 +150,7 @@ compileErrorMsg = \case
         "parameters without cast are not supported"
     MaybeParameterWithoutCastError _ _ ->
         "parameters without cast are not supported"
-    NoFunctionError _ name argTys ->
+    FunctionDoesNotExist _ name argTys ->
         "function "
             <> identifierToString name
             <> "("

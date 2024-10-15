@@ -314,7 +314,7 @@ tcExpr env = \cases
                     then Nullable
                     else NonNullable
         case mbFuncTy of
-            Nothing -> throw env.compileError $ NoFunctionError p name argsPgTypes
+            Nothing -> throw env.compileError $ FunctionDoesNotExist p name argsPgTypes
             Just ty -> do
                 let hsTy = getHsType env.database ty
                 return $ EFunction p name tyExprs (TypeInfo ty resNullable Nothing hsTy)
