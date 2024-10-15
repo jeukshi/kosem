@@ -56,6 +56,7 @@ data Database = Database
     { name :: String
     , typesMap :: [(Identifier, PgType, Name)]
     , binaryOps :: [(Operator, PgType, PgType, PgType)]
+    , functions :: [(Identifier, [PgType], PgType)]
     , tables :: [Table]
     }
     deriving (Show, Eq, Lift)

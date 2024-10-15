@@ -2,7 +2,7 @@
 
 module Test.Db where
 
-import Database.Kosem.PostgreSQL.Internal.PgBuiltin (binaryOperators, defaultDatabaseConfig, types)
+import Database.Kosem.PostgreSQL.Internal.PgBuiltin (DatabaseConfig (..), defaultDatabaseConfig)
 import Database.Kosem.PostgreSQL.Internal.Types (Database (..))
 import Database.Kosem.PostgreSQL.Schema.Internal.TH
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
@@ -13,6 +13,7 @@ emptyDatabase =
         { name = "test-empty"
         , typesMap = defaultDatabaseConfig.types
         , binaryOps = defaultDatabaseConfig.binaryOperators
+        , functions = defaultDatabaseConfig.confFunctions
         , tables = []
         }
 

@@ -11,6 +11,7 @@ module Database.Kosem.PostgreSQL.Internal.Diagnostics (
 where
 
 import Data.Coerce (coerce)
+import Data.List (intercalate, intersperse)
 import Data.String (IsString (fromString))
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -29,6 +30,7 @@ import Database.Kosem.PostgreSQL.Internal.Types (
     TypeInfo,
     identifierLength,
     identifierPretty,
+    identifierToString,
     operatorLength,
     operatorPretty,
     pgTypePretty,
@@ -94,6 +96,7 @@ data CompileError
     | ConditionTypeError (Expr TypeInfo) String
     | ParameterWithoutCastError P Identifier
     | MaybeParameterWithoutCastError P Identifier
+    | NoFunctionError P Identifier [PgType]
     | ExprWithNoAlias (Expr TypeInfo)
     | OperatorDoesntExist P PgType Operator PgType
     | ColumnDoesNotExist P Identifier
@@ -119,6 +122,10 @@ compileErrorSpan = \case
             p
             -- \| +2 from ':?' prefix.
             (p `movePby` (identifierLength identifier + 2))
+    NoFunctionError p identifier _ ->
+        DiagnosticSpan
+            p
+            (p `movePby` identifierLength identifier)
     ExprWithNoAlias expr -> toDiagnosticSpan expr
     OperatorDoesntExist p _ operator _ ->
         (DiagnosticSpan p (p `movePby` operatorLength operator))
@@ -143,6 +150,13 @@ compileErrorMsg = \case
         "parameters without cast are not supported"
     MaybeParameterWithoutCastError _ _ ->
         "parameters without cast are not supported"
+    NoFunctionError _ name argTys ->
+        "function "
+            <> identifierToString name
+            <> "("
+            <> (intercalate ", " . map pgTypePretty $ argTys)
+            <> ")"
+            <> " does not exist"
     ExprWithNoAlias _ -> "expression does not have an alias"
     OperatorDoesntExist _ lhs op rhs ->
         "operator does not exist: "

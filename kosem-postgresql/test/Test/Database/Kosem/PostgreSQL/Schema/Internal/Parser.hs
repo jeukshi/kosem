@@ -50,6 +50,7 @@ table abc2
                         "MyDatabase"
                         []
                         []
+                        []
                         [ Table
                             "abc"
                             [ Column "col1" (Scalar "text") Nullable

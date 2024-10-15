@@ -300,6 +300,24 @@ tcExpr env = \cases
         return $ EParens p1 tyExpr p2 innerTy
     (EParam p name ()) -> throw env.compileError $ ParameterWithoutCastError p name
     (EParamMaybe p name ()) -> throw env.compileError $ MaybeParameterWithoutCastError p name
+    (EFunction p name exprs ()) -> do
+        tyExprs <- traverse (tcExpr env) exprs
+        let tyInfos = map exprType tyExprs
+        let argsPgTypes = map (.pgType) tyInfos
+        let mbFuncTy =
+                getFunctionTy env.database name argsPgTypes
+        -- \ FIXME there are exceptions to this tho
+        -- `concat(null)` returns text always
+        -- maybe some functions return error on null arg?
+        let resNullable =
+                if any (\x -> x.nullable == Nullable) tyInfos
+                    then Nullable
+                    else NonNullable
+        case mbFuncTy of
+            Nothing -> throw env.compileError $ NoFunctionError p name argsPgTypes
+            Just ty -> do
+                let hsTy = getHsType env.database ty
+                return $ EFunction p name tyExprs (TypeInfo ty resNullable Nothing hsTy)
     (ELit p litVal _) -> case litVal of
         NumericLiteral -> do
             let hsTy = getHsType env.database PgNumeric
@@ -443,11 +461,24 @@ getBinaryOpResult database lhs op rhs = do
         . filter (\(o, _, _, _) -> o == realOp)
         $ database.binaryOps
 
+getFunctionTy
+    :: Database
+    -> Identifier
+    -> [PgType]
+    -> Maybe PgType
+getFunctionTy database functionId argsTy =
+    listToMaybe
+        . map (\(_, _, ty) -> ty)
+        . filter (\(_, a, _) -> a == argsTy)
+        . filter (\(o, _, _) -> o == functionId)
+        $ database.functions
+
 getPgType :: Database -> Identifier -> PgType
 getPgType database identifier = find identifier database.typesMap
   where
     find :: Identifier -> [(Identifier, PgType, Name)] -> PgType
     find identifier = \cases
+        -- TODO proper error
         [] -> error $ "no type: " <> show identifier
         ((i, t, _) : xs) ->
             if i == identifier
@@ -459,6 +490,7 @@ getHsType database pgType = find pgType database.typesMap
   where
     find :: PgType -> [(Identifier, PgType, Name)] -> Name
     find identifier = \cases
+        -- TODO proper error
         [] -> error $ "no type: " <> show identifier
         ((_, t, n) : xs) ->
             if t == pgType

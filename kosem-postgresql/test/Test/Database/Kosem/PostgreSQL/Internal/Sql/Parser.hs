@@ -142,5 +142,5 @@ spec = parallel do
         it "simple function" do
             parseOnly selectCore
                 `shouldSucceedOn` [text|
-             select concat('abc','cba', 'xxx')
+             select concat('abc','cba', 'xxx', true and false)
                |]

@@ -181,3 +181,11 @@ spec = around withDB $ do
                     |]
             length rowsZero `shouldBe` 0
             length rowsOne `shouldBe` 1
+
+        it "simple function" $ \conn -> do
+            let abc = True
+                cba = "cba"
+            rows <- execute conn do
+                [Tdb.sql| select length('12345') as len |]
+            let row = V.head rows
+            row.len `shouldBe` 5

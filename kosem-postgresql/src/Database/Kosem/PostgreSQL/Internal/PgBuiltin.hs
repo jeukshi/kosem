@@ -44,6 +44,7 @@ pattern PgBigint <- Scalar "bigint"
 data DatabaseConfig = DatabaseConfig
     { types :: [(Identifier, PgType, Name)]
     , binaryOperators :: [(Operator, PgType, PgType, PgType)]
+    , confFunctions :: [(Identifier, [PgType], PgType)]
     }
 
 defaultDatabaseConfig :: DatabaseConfig
@@ -56,6 +57,7 @@ defaultDatabaseConfig =
             , ("boolean", PgBoolean, ''Bool)
             ]
         , binaryOperators = pgbinaryOperators
+        , confFunctions = pgFunctions
         }
 
 -- * Operators

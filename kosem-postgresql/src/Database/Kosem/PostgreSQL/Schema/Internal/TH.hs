@@ -34,6 +34,7 @@ database' databaseConfig userInput = do
             db
                 { typesMap = databaseConfig.types
                 , binaryOps = databaseConfig.binaryOperators
+                , functions = databaseConfig.confFunctions
                 }
     dbExp <- [e|dbWithTypes|]
     let sql = mkName "sql"
