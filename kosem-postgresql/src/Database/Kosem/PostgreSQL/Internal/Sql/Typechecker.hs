@@ -208,9 +208,13 @@ tcJoinCondition env = \cases
         return $ JcOn tyExpr
 
 exprType :: Expr TypeInfo -> TypeInfo
+-- TODO all those `Nullable` should be inferred
+-- `NonNullable AND NonNullable` is NonNullable
+-- so final type should be part of the constructor.
 exprType = \cases
     (EPgCast _ _ _ _ ty) -> ty
     (EParens _ _ _ ty) -> ty
+    (EFunction _ _ _ ty) -> ty
     (EParam _ _ ty) -> ty
     (EParamMaybe _ _ ty) -> ty
     (EGuardedBoolAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
