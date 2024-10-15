@@ -182,10 +182,17 @@ spec = around withDB $ do
             length rowsZero `shouldBe` 0
             length rowsOne `shouldBe` 1
 
-        it "simple function" $ \conn -> do
+        it "call function" $ \conn -> do
             let abc = True
                 cba = "cba"
             rows <- execute conn do
                 [Tdb.sql| select length('12345') as len |]
             let row = V.head rows
             row.len `shouldBe` 5
+
+        it "call function (multi arg)" $ \conn -> do
+            let someText = "aabb"
+            rows <- execute conn do
+                [Tdb.sql| select replace(:someText::text, 'a', 'b') as len |]
+            let row = V.head rows
+            row.len `shouldBe` "bbbb"

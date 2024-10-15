@@ -196,4 +196,7 @@ pgbinaryOperators =
     ]
 
 pgFunctions :: [(Identifier, [PgType], PgType)]
-pgFunctions = [("length", [PgText], PgInteger)]
+pgFunctions =
+    [ ("length", [PgText], PgInteger)
+    , ("replace", [PgText, PgText, PgText], PgText)
+    ]
