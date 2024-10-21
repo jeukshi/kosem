@@ -83,16 +83,13 @@ genRowParser sqlMappings =
 
 hsIdentifierToVarE :: HsIdentifier -> Exp
 hsIdentifierToVarE = \cases
-    (MkHsIdentifier i []) -> do
+    (MkHsIdentifier i []) ->
         VarE . mkName . identifierToString $ i
-    (MkHsIdentifier i (i' : is)) -> do
+    (MkHsIdentifier i (firstId : restIds)) -> do
         let varE = VarE . mkName . identifierToString $ i
-        let rest = map identifierToString is
-        let z = GetFieldE varE (identifierToString i')
-        let x = foldl' (\x y -> GetFieldE x y) z rest
-        x
-  where
-    go var i = GetFieldE
+        let firstDot = GetFieldE varE (identifierToString firstId)
+        let rest = map identifierToString restIds
+        foldl' GetFieldE firstDot rest
 
 {- |
 Generate case expression selecting expression `EXP`.
