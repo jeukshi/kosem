@@ -89,6 +89,9 @@ hsIdentifierToVarE = \cases
         let varE = VarE . mkName . identifierToString $ i
         let firstDot = GetFieldE varE (identifierToString firstId)
         let rest = map identifierToString restIds
+        -- \| Fold into:
+        -- GetFieldE (GetFieldE (VarE var) "inside") "outside"
+        -- which is: `var.inside.outside`
         foldl' GetFieldE firstDot rest
 
 {- |
