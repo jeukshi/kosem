@@ -8,7 +8,7 @@ module Database.Kosem.PostgreSQL.Internal.Sql.TH where
 import Control.Monad (join)
 import Data.Bifunctor (Bifunctor (..), second)
 import Data.ByteString (ByteString)
-import Data.List (nub)
+import Data.List (foldl', nub)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.List.NonEmpty qualified as NonEmpty
 import Data.Text (Text)
@@ -83,11 +83,16 @@ genRowParser sqlMappings =
 
 hsIdentifierToVarE :: HsIdentifier -> Exp
 hsIdentifierToVarE = \cases
-    (MkHsIdentifier i Nothing) -> do
+    (MkHsIdentifier i []) -> do
         VarE . mkName . identifierToString $ i
-    (MkHsIdentifier i (Just i2)) -> do
+    (MkHsIdentifier i (i' : is)) -> do
         let varE = VarE . mkName . identifierToString $ i
-        GetFieldE varE (identifierToString i2)
+        let rest = map identifierToString is
+        let z = GetFieldE varE (identifierToString i')
+        let x = foldl' (\x y -> GetFieldE x y) z rest
+        x
+  where
+    go var i = GetFieldE
 
 {- |
 Generate case expression selecting expression `EXP`.

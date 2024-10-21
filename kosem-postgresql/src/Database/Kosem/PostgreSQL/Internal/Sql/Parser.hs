@@ -205,7 +205,7 @@ identifierP = Identifier <$> labelP
 hsIdentifierP :: Parser HsIdentifier
 hsIdentifierP = do
     idPart <- identifierP
-    mbIdPart <- optional do
+    mbIdPart <- many do
         _ <- symbol "."
         identifierP
     return $ MkHsIdentifier idPart mbIdPart

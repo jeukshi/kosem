@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module Test.Database.Kosem.PostgreSQL.Internal where
@@ -10,7 +11,7 @@ import Database.Kosem.PostgreSQL.Internal.Connection (close, connectConnString)
 import Test.Db qualified as Tdb
 import Test.Hspec
 import Test.TH (text)
-import Test.Utils (MyRecord (..), withDB)
+import Test.Utils (MyOtherRecord (..), MyRecord (..), withDB)
 
 -- import Test.Utils
 
@@ -194,21 +195,29 @@ spec = around withDB $ do
         it "call function (multi arg)" $ \conn -> do
             let someText = "aabb"
             rows <- execute conn do
-                [Tdb.sql| select replace(:someText::text, 'a', 'b') as len |]
+                [Tdb.sql| select replace(:someText::text, 'a', 'b') as t |]
             let row = V.head rows
-            row.len `shouldBe` "bbbb"
+            row.t `shouldBe` "bbbb"
 
-        it "OverloadedRecordDot identifier" $ \conn -> do
+        it "OverloadedRecordDot identifier (nested)" $ \conn -> do
             let myRec =
                     MkMyRecord
                         { field1 = "aabb"
                         , field2 = "a"
-                        , field3 = "b"
+                        , field3 =
+                            MkMyOtherRecord
+                                { field1 = "not important"
+                                , field2 = "b"
+                                , field3 = "not important"
+                                }
                         }
             rows <- execute conn do
                 [Tdb.sql| select replace(
                           :myRec.field1::text
                         , :myRec.field2::text
-                        , :myRec.field3::text) as len |]
+                        , :myRec.field3.field2::text) as t |]
             let row = V.head rows
-            row.len `shouldBe` "bbbb"
+            rows2 <- execute conn do
+                [Tdb.sql| select :row.t::text = 'bbbb' as bool |]
+            let row2 = V.head rows2
+            row2.bool `shouldBe` True

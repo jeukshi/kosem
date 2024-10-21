@@ -4,6 +4,7 @@ module Database.Kosem.PostgreSQL.Internal.Types where
 
 import Data.ByteString.Builder (Builder)
 import Data.Coerce (coerce)
+import Data.List (intersperse)
 import Data.String (IsString)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -30,8 +31,7 @@ newtype Identifier = Identifier String
 
 data HsIdentifier = MkHsIdentifier
     { hsIdentifier :: Identifier
-    , -- FIXME it really should be a list, so we can support nesting
-      hiRecordDot :: Maybe Identifier
+    , hiRecordDot :: [Identifier]
     }
     deriving (Show, Eq)
 
@@ -40,10 +40,11 @@ identifierLength (Identifier t) = length t
 
 hsIdentifierLength :: HsIdentifier -> Int
 hsIdentifierLength = \cases
-    (MkHsIdentifier t Nothing) -> identifierLength t
-    (MkHsIdentifier t (Just t2)) ->
-        -- \| +1 for dot between identifiers: `myRecord.myField`.
-        identifierLength t + identifierLength t2 + 1
+    (MkHsIdentifier i []) -> identifierLength i
+    (MkHsIdentifier i is) -> do
+        -- \| +1 for dot between identifiers: `myRecord.myField.myOtherField`.
+        let rest = (+ 1) . sum . intersperse 1 . map identifierLength $ is
+        identifierLength i + rest
 
 identifierToString :: Identifier -> String
 identifierToString (Identifier t) = t

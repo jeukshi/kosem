@@ -1,3 +1,5 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+
 module Test.Utils where
 
 import Control.Exception (bracket)
@@ -12,6 +14,12 @@ import Text.Megaparsec.Char qualified as C
 
 -- | example record for testing OverloadedRecordDot
 data MyRecord = MkMyRecord
+    { field1 :: Text
+    , field2 :: Text
+    , field3 :: MyOtherRecord
+    }
+
+data MyOtherRecord = MkMyOtherRecord
     { field1 :: Text
     , field2 :: Text
     , field3 :: Text
