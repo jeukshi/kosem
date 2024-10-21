@@ -2,6 +2,7 @@
 
 module Test.Database.Kosem.PostgreSQL.Internal where
 
+import Data.Text (Text)
 import Data.Text.Encoding qualified as T
 import Data.Vector qualified as V
 import Database.Kosem.PostgreSQL.Internal
@@ -9,7 +10,7 @@ import Database.Kosem.PostgreSQL.Internal.Connection (close, connectConnString)
 import Test.Db qualified as Tdb
 import Test.Hspec
 import Test.TH (text)
-import Test.Utils (withDB)
+import Test.Utils (MyRecord (..), withDB)
 
 -- import Test.Utils
 
@@ -194,5 +195,20 @@ spec = around withDB $ do
             let someText = "aabb"
             rows <- execute conn do
                 [Tdb.sql| select replace(:someText::text, 'a', 'b') as len |]
+            let row = V.head rows
+            row.len `shouldBe` "bbbb"
+
+        it "OverloadedRecordDot identifier" $ \conn -> do
+            let myRec =
+                    MkMyRecord
+                        { field1 = "aabb"
+                        , field2 = "a"
+                        , field3 = "b"
+                        }
+            rows <- execute conn do
+                [Tdb.sql| select replace(
+                          :myRec.field1::text
+                        , :myRec.field2::text
+                        , :myRec.field3::text) as len |]
             let row = V.head rows
             row.len `shouldBe` "bbbb"

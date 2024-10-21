@@ -28,6 +28,7 @@ import Database.Kosem.PostgreSQL.Internal.Types (
     Operator,
     PgType,
     TypeInfo,
+    hsIdentifierLength,
     identifierLength,
     identifierPretty,
     identifierToString,
@@ -186,12 +187,12 @@ toDiagnosticSpan = \cases
         DiagnosticSpan
             p
             -- \| +1 from ':' prefix.
-            (p `movePby` (identifierLength identifier + 1))
+            (p `movePby` (hsIdentifierLength identifier + 1))
     (EParamMaybe p identifier _) ->
         DiagnosticSpan
             p
             -- \| +2 from ':?' prefix.
-            (p `movePby` (identifierLength identifier + 2))
+            (p `movePby` (hsIdentifierLength identifier + 2))
     (EFunction p identifier _ _) ->
         DiagnosticSpan
             p

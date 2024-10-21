@@ -48,7 +48,6 @@ import Database.Kosem.PostgreSQL.Internal.Sql.Typechecker qualified as Typecheck
 import Database.Kosem.PostgreSQL.Internal.Sql.Types
 import Database.Kosem.PostgreSQL.Internal.Sql.Types qualified
 import Database.Kosem.PostgreSQL.Internal.Types
-import Debug.Trace
 import GHC.Driver.Errors.Types (GhcMessage (..))
 import GHC.Parser.Errors.Types (PsMessage (PsUnknownMessage))
 import GHC.Tc.Errors.Types (TcRnMessage (..))

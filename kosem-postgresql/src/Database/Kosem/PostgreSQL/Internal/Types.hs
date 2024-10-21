@@ -28,8 +28,22 @@ newtype Identifier = Identifier String
     deriving (IsString) via String
     deriving (Lift)
 
+data HsIdentifier = MkHsIdentifier
+    { hsIdentifier :: Identifier
+    , -- FIXME it really should be a list, so we can support nesting
+      hiRecordDot :: Maybe Identifier
+    }
+    deriving (Show, Eq)
+
 identifierLength :: Identifier -> Int
 identifierLength (Identifier t) = length t
+
+hsIdentifierLength :: HsIdentifier -> Int
+hsIdentifierLength = \cases
+    (MkHsIdentifier t Nothing) -> identifierLength t
+    (MkHsIdentifier t (Just t2)) ->
+        -- \| +1 for dot between identifiers: `myRecord.myField`.
+        identifierLength t + identifierLength t2 + 1
 
 identifierToString :: Identifier -> String
 identifierToString (Identifier t) = t

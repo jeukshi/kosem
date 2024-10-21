@@ -10,6 +10,13 @@ import Test.Hspec.Megaparsec (initialState)
 import Text.Megaparsec
 import Text.Megaparsec.Char qualified as C
 
+-- | example record for testing OverloadedRecordDot
+data MyRecord = MkMyRecord
+    { field1 :: Text
+    , field2 :: Text
+    , field3 :: Text
+    }
+
 withDB =
     bracket
         (connectConnString "postgres://kosem:kosem@127.0.0.1:5432/kosem")

@@ -257,7 +257,7 @@ tcExpr env = \cases
                                 , nullable = NonNullable
                                 }
                     }
-        let typeInfo = TypeInfo pgTy NonNullable (Just name) hsType
+        let typeInfo = TypeInfo pgTy NonNullable (Just name.hsIdentifier) hsType
         let tyVar = EParam pParam name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
     (EPgCast p1 var@(EParamMaybe pParam name _) p2 identifier ()) -> do
@@ -278,7 +278,7 @@ tcExpr env = \cases
                                 , nullable = Nullable
                                 }
                     }
-        let typeInfo = TypeInfo pgTy Nullable (Just name) hsTy
+        let typeInfo = TypeInfo pgTy Nullable (Just name.hsIdentifier) hsTy
         let tyVar = EParamMaybe pParam name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
     (EPgCast p1 expr p2 identifier ()) -> do
@@ -298,8 +298,8 @@ tcExpr env = \cases
         tyExpr <- tcExpr env expr
         let innerTy = exprType tyExpr
         return $ EParens p1 tyExpr p2 innerTy
-    (EParam p name ()) -> throw env.compileError $ ParameterWithoutCastError p name
-    (EParamMaybe p name ()) -> throw env.compileError $ MaybeParameterWithoutCastError p name
+    (EParam p name ()) -> throw env.compileError $ ParameterWithoutCastError p name.hsIdentifier
+    (EParamMaybe p name ()) -> throw env.compileError $ MaybeParameterWithoutCastError p name.hsIdentifier
     (EFunction p name exprs ()) -> do
         tyExprs <- traverse (tcExpr env) exprs
         let tyInfos = map exprType tyExprs

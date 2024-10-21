@@ -46,7 +46,6 @@ import Database.Kosem.PostgreSQL.Internal.Sql.Typechecker qualified as Typecheck
 import Database.Kosem.PostgreSQL.Internal.Sql.Types
 import Database.Kosem.PostgreSQL.Internal.Sql.Types qualified
 import Database.Kosem.PostgreSQL.Internal.Types
-import Debug.Trace
 import GHC.Driver.Errors.Types (GhcMessage (..))
 import GHC.Parser.Errors.Types (PsMessage (PsUnknownMessage))
 import GHC.Tc.Errors.Types (TcRnMessage (..))
@@ -181,7 +180,7 @@ rewriteQuery ex commandFragments =
                 _ -> True
 
         choiceAlreadyMade
-            :: Identifier
+            :: HsIdentifier
             -> [Choice]
             -> Maybe ChoiceOption
         choiceAlreadyMade identifier choices =
@@ -317,10 +316,10 @@ splitCommand command inputs = runPureEff do
     stringToBs = Builder.toLazyByteString . Builder.stringUtf8
     parameterLength :: Parameter -> Int
     parameterLength parameter =
-        identifierLength parameter.pIdentifier + T.length (parameterTypeToText parameter.paramType)
+        hsIdentifierLength parameter.pIdentifier + T.length (parameterTypeToText parameter.paramType)
     guardLength :: Guard -> Int
     guardLength guard =
-        identifierLength guard.gIdentifier + T.length (guardTypeToText guard.guardType)
+        hsIdentifierLength guard.gIdentifier + T.length (guardTypeToText guard.guardType)
     splitByPos :: [CommandInput] -> Int -> ([CommandInput], [CommandInput])
     splitByPos ci pos = do
         let less = filter (\c -> unP (commandInputPosition c) < pos) ci

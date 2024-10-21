@@ -9,7 +9,13 @@ import Data.ByteString (ByteString)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.P (P)
-import Database.Kosem.PostgreSQL.Internal.Types (Identifier, IsNullable, PgType, SqlMapping)
+import Database.Kosem.PostgreSQL.Internal.Types (
+    HsIdentifier,
+    Identifier,
+    IsNullable,
+    PgType,
+    SqlMapping,
+ )
 import GHC.Exts (Any)
 import Language.Haskell.TH.Lift (Lift)
 import Language.Haskell.TH.Syntax (Name)
@@ -57,7 +63,7 @@ data Guard = Guard
     { guardPos :: P
     , openBracketPos :: P
     , closeBracketPos :: P
-    , gIdentifier :: Identifier
+    , gIdentifier :: HsIdentifier
     , guardType :: GuardType
     }
     deriving (Show)
@@ -69,7 +75,7 @@ data GuardType
 
 data Parameter = Parameter
     { position :: P
-    , pIdentifier :: Identifier
+    , pIdentifier :: HsIdentifier
     , paramType :: ParameterType
     , info :: Maybe ParameterInfo
     }
@@ -81,7 +87,7 @@ data ParameterType
     deriving (Show, Eq)
 
 data CommandParameter = MkCommandParameter
-    { cpIdentifier :: Identifier
+    { cpIdentifier :: HsIdentifier
     , cpHsType :: Name
     , cpIsNullable :: IsNullable
     }
@@ -95,7 +101,7 @@ data ParameterInfo = ParameterInfo
     deriving (Show)
 
 data Choice = Choice
-    { choiceIdentifier :: Identifier
+    { choiceIdentifier :: HsIdentifier
     , choiceOption :: ChoiceOption
     }
     deriving (Show)
@@ -118,7 +124,7 @@ instance Bifunctor Command where
 data CommandVariant a b
     = SingleCommand (Command a b)
     | TwoCommands
-        Identifier
+        HsIdentifier
         ChoiceOption
         (Command a b)
         ChoiceOption

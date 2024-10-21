@@ -81,6 +81,14 @@ genRowParser sqlMappings =
                     )
                 )
 
+hsIdentifierToVarE :: HsIdentifier -> Exp
+hsIdentifierToVarE = \cases
+    (MkHsIdentifier i Nothing) -> do
+        VarE . mkName . identifierToString $ i
+    (MkHsIdentifier i (Just i2)) -> do
+        let varE = VarE . mkName . identifierToString $ i
+        GetFieldE varE (identifierToString i2)
+
 {- |
 Generate case expression selecting expression `EXP`.
 
@@ -105,7 +113,7 @@ genPatternMatch
 genPatternMatch f = \cases
     (SingleCommand command) -> return $ f command
     (TwoCommands identifier choice1 cmd1 choice2 cmd2) -> do
-        let varName = mkName . identifierToString $ identifier
+        let idVarE = hsIdentifierToVarE identifier
         let matches =
                 [ Match
                     (choiceOptionToPat choice1)
@@ -116,15 +124,13 @@ genPatternMatch f = \cases
                     (NormalB (f cmd2))
                     []
                 ]
-        return $ CaseE (VarE varName) matches
+        return $ CaseE idVarE matches
     (MultipleCommands cmds) -> do
         let caseTuple =
                 TupE
                     . map
                         ( Just
-                            . VarE
-                            . mkName
-                            . identifierToString
+                            . hsIdentifierToVarE
                             . choiceIdentifier
                         )
                     . fst
@@ -159,13 +165,14 @@ genParamsList = \cases
   where
     genToField :: CommandParameter -> Exp
     genToField param = do
-        let hsName = mkName (identifierToString param.cpIdentifier)
+        -- let hsName = mkName (identifierToString param.cpIdentifier.hsIdentifier)
+        let idVarE = hsIdentifierToVarE param.cpIdentifier
         case param.cpIsNullable of
             NonNullable -> do
                 -- \| toField'Internal @Type variable
                 AppE
                     (AppTypeE (VarE 'toField'Internal) (ConT param.cpHsType))
-                    (VarE hsName)
+                    idVarE
             Nullable -> do
                 -- \| toField'Internal @(Maybe Type) variable
                 AppE
@@ -173,4 +180,4 @@ genParamsList = \cases
                         (VarE 'toField'Internal)
                         (AppT (ConT ''Maybe) (ConT param.cpHsType))
                     )
-                    (VarE hsName)
+                    idVarE

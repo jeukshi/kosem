@@ -202,6 +202,14 @@ termP = lexeme do
 identifierP :: Parser Identifier
 identifierP = Identifier <$> labelP
 
+hsIdentifierP :: Parser HsIdentifier
+hsIdentifierP = do
+    idPart <- identifierP
+    mbIdPart <- optional do
+        _ <- symbol "."
+        identifierP
+    return $ MkHsIdentifier idPart mbIdPart
+
 getP :: Parser P
 getP = MkP <$> getOffset
 
@@ -209,13 +217,15 @@ paramP :: Parser (Expr ())
 paramP = lexeme do
     p <- getP
     symbol ":"
-    (EParam p <$> identifierP) <*> pure ()
+    hsId <- hsIdentifierP
+    return $ EParam p hsId ()
 
 paramMaybeP :: Parser (Expr ())
 paramMaybeP = lexeme do
     p <- getP
     symbol ":?"
-    (EParamMaybe p <$> identifierP) <*> pure ()
+    hsId <- hsIdentifierP
+    return $ EParamMaybe p hsId ()
 
 pgCastP :: Parser (P, Identifier)
 pgCastP = lexeme do
@@ -341,7 +351,7 @@ exprP = makeExprParser termP operatorsTable
     mkGuardedBoolAnd = lexeme do
         p1 <- getP
         symbol ":"
-        identifier <- identifierP
+        identifier <- hsIdentifierP
         pOpen <- lexeme getP
         _ <- symbol "{and"
         innerExpr <- exprP
@@ -355,7 +365,7 @@ exprP = makeExprParser termP operatorsTable
     mkGuardedMaybeAnd = lexeme do
         p1 <- getP
         symbol ":?"
-        identifier <- identifierP
+        identifier <- hsIdentifierP
         pOpen <- lexeme getP
         _ <- symbol "{and"
         innerExpr <- exprP
