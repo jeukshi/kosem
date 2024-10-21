@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Database.Kosem.PostgreSQL.Internal.Sql.TH where
 
@@ -143,14 +143,13 @@ genPatternMatch f = \cases
                     $ cmds
         let matchesTuple =
                 map
-                    (\(p, c) -> Match p (NormalB (f c)) [])
-                    . map
-                        ( first
+                    ( (\(p, c) -> Match p (NormalB (f c)) [])
+                        . first
                             ( TupP
                                 . map (choiceOptionToPat . choiceOption)
                             )
-                        )
-                    $ cmds
+                    )
+                    cmds
         return $ CaseE caseTuple matchesTuple
   where
     choiceOptionToPat :: ChoiceOption -> Pat

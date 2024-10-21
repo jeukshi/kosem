@@ -1,6 +1,4 @@
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NoDuplicateRecordFields #-}
 
 module Database.Kosem.PostgreSQL.Internal.Sql.CommandGen where
