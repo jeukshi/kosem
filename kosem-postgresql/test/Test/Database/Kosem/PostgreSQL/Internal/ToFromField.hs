@@ -91,7 +91,15 @@ specIO = around withDB do
                             |]
             let row = V.head rows
             row.dbText === hsText
+        -- FIXME:
+        {- ┃             row.dbText === hsText
+                 ┃             ^^^^^^^^^^^^^^^^^^^^^
+                 ┃             │ ━━━ Failed (- lhs) (+ rhs) ━━━
+                 ┃             │ - ""
+                 ┃             │ + "\NUL"
 
+        To rerun use: --match "/Test.Database.Kosem.PostgreSQL.Internal.ToFromField (IO)/'Text' instances/select 'Text'/" --seed 609174876
+              -}
         it "select 'Text' with '\\NUL' character" $ \conn -> do
             let (hsNullText :: Text) = "\NUL"
             rows <-
