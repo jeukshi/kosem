@@ -163,7 +163,7 @@ spec = around withDB $ do
                 select type_text
                   from data_types
                  where true :guardTrue{and type_text <> :someText::text}
-            :guardTrue2{and type_text <> :someText::text}
+                            :guardTrue2{and type_text <> :someText::text}
                  |]
             let guardFalse = False
             let guardFalse2 = False
@@ -174,8 +174,55 @@ spec = around withDB $ do
                 select type_text
                   from data_types
                  where true :guardFalse{and type_text<>:someText::text}
-                 :guardFalse2{and type_text <> :someText::text}
+                            :guardFalse2{and type_text <> :someText::text}
                  |]
+            unsafeExecute_ conn do
+                T.encodeUtf8
+                    [text|
+                     delete from data_types
+                    |]
+            length rowsZero `shouldBe` 0
+            length rowsOne `shouldBe` 1
+
+        it "and guard (OverloadedRecordDot)" $ \conn -> do
+            unsafeExecute_ conn do
+                T.encodeUtf8
+                    [text|
+                     insert
+                       into data_types
+                     values ('some text', 9000, 9001, True)
+                    |]
+            let myRec =
+                    MkMyRecord
+                        { field1 = True
+                        , field2 = False
+                        , field3 =
+                            MkMyOtherRecord
+                                { field1 = True
+                                , field2 = False
+                                , field3 = "not important"
+                                }
+                        }
+
+            let someText = "some text"
+            rowsZero <-
+                execute
+                    conn
+                    [Tdb.sql|
+                select type_text
+                  from data_types
+                 where true :myRec.field1{and type_text <> :someText::text}
+                            :myRec.field3.field1{and type_text <> :someText::text}
+                    |]
+            rowsOne <-
+                execute
+                    conn
+                    [Tdb.sql|
+                select type_text
+                  from data_types
+                 where true :myRec.field2{and type_text<>:someText::text}
+                            :myRec.field3.field2{and type_text <> :someText::text}
+                    |]
             unsafeExecute_ conn do
                 T.encodeUtf8
                     [text|

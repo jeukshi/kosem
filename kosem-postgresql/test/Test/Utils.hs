@@ -13,16 +13,16 @@ import Text.Megaparsec
 import Text.Megaparsec.Char qualified as C
 
 -- | example record for testing OverloadedRecordDot
-data MyRecord = MkMyRecord
-    { field1 :: Text
-    , field2 :: Text
-    , field3 :: MyOtherRecord
+data MyRecord a b c d e = MkMyRecord
+    { field1 :: a
+    , field2 :: b
+    , field3 :: MyOtherRecord c d e
     }
 
-data MyOtherRecord = MkMyOtherRecord
-    { field1 :: Text
-    , field2 :: Text
-    , field3 :: Text
+data MyOtherRecord a b c = MkMyOtherRecord
+    { field1 :: a
+    , field2 :: b
+    , field3 :: c
     }
 
 withDB =
