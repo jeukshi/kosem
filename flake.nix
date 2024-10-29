@@ -38,6 +38,7 @@
             #config.treefmt.build.devShell
           ];
           nativeBuildInputs = with pkgs; [
+            typos
             just
             postgresql
           ];

@@ -18,3 +18,7 @@ dev:
 
 run:
   cabal run
+
+# find typos
+typos:
+  typos
