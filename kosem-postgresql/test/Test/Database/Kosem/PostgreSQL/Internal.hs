@@ -184,6 +184,42 @@ spec = around withDB $ do
             length rowsZero `shouldBe` 0
             length rowsOne `shouldBe` 1
 
+        it "mixed and guards" $ \conn -> do
+            unsafeExecute_ conn do
+                T.encodeUtf8
+                    [text|
+                     insert
+                       into data_types
+                     values ('some text', 9000, 9001, True)
+                    |]
+            let someText = "some text"
+            let guardTrue = True
+            let guardTrue2 = True
+            let mbGuardTrue = Just True
+            let mbGuardTrue2 = Just True
+            rowsZero <-
+                execute
+                    conn
+                    [Tdb.sql|
+                select type_text
+                  from data_types
+                 where true :guardTrue{and type_text <> :someText::text}
+                            and true = true
+                            :guardTrue2{and type_text <> :someText::text}
+                            and false = false
+                            :?mbGuardTrue{and type_text <> :someText::text}
+                            :?mbGuardTrue2{and type_text <> :someText::text}
+                            :guardTrue2{and type_text <> :someText::text}
+                            :guardTrue2{and type_text <> :someText::text}
+                            and false = false
+                 |]
+            unsafeExecute_ conn do
+                T.encodeUtf8
+                    [text|
+                     delete from data_types
+                    |]
+            length rowsZero `shouldBe` 0
+
         it "and guard (OverloadedRecordDot)" $ \conn -> do
             unsafeExecute_ conn do
                 T.encodeUtf8

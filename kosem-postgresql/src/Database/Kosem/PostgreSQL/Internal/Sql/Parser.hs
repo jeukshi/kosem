@@ -337,7 +337,8 @@ exprP = makeExprParser termP operatorsTable
         , [Prefix do ENot <$> lexeme getP <* pKeyword "not"]
         ,
             [ InfixL do EAnd <$> lexeme getP <* pKeyword "and"
-            , Postfix do foldr1 (.) <$> some mkGuardedBoolAnd
+            , -- This feeld a bit hacky.
+              Postfix do foldr1 (.) <$> some (try mkGuardedMaybeAnd <|> mkGuardedBoolAnd)
             ]
         , [InfixL do EOr <$> lexeme getP <* pKeyword "or"]
         ]
