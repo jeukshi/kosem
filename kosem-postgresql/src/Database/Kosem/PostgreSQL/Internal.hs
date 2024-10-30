@@ -60,7 +60,7 @@ execute connection query = do
 
     toPgParam :: Maybe ByteString -> Maybe (LibPQ.Oid, ByteString, LibPQ.Format)
     -- \| We can use `invalidOid` because we apply type cast
-    -- to every parameter ($1::text), so PostgreSQL doesn't neet it.
+    -- to every parameter ($1::text), so PostgreSQL doesn't need it.
     toPgParam = fmap (\val -> (LibPQ.invalidOid, val, LibPQ.Binary))
 
     unsafeSwap :: [Any] -> Row a -> Row a

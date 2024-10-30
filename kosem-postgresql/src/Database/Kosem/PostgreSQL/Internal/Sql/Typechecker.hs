@@ -186,7 +186,7 @@ tcFromItem env = \cases
             [table] -> do
                 addTableToEnv env.fields table
                 return $ FiTableName p tableName
-            ts -> throw env.compileError $ TableNameIsAmbigious p tableName
+            ts -> throw env.compileError $ TableNameIsAmbiguous p tableName
         return fiTable
     (FiJoin lhs joinType rhs joinCondition) -> do
         tyLhs <- tcFromItem env lhs
@@ -343,7 +343,7 @@ tcExpr env = \cases
                         p
                         colName
                         (TypeInfo envCol.typeName envCol.nullable (Just envCol.label) hsTy)
-            ts -> throw env.compileError $ ColumnNameIsAmbigious p colName
+            ts -> throw env.compileError $ ColumnNameIsAmbiguous p colName
     expr@(ENot p innerExpr) -> do
         tyExpr <- tcExpr env innerExpr
         let ty = exprType tyExpr

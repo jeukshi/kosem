@@ -101,9 +101,9 @@ data CompileError
     | ExprWithNoAlias (Expr TypeInfo)
     | OperatorDoesntExist P PgType Operator PgType
     | ColumnDoesNotExist P Identifier
-    | ColumnNameIsAmbigious P Identifier
+    | ColumnNameIsAmbiguous P Identifier
     | TableDoesNotExist P Identifier
-    | TableNameIsAmbigious P Identifier
+    | TableNameIsAmbiguous P Identifier
     deriving (Show)
 
 compileErrorSpan :: CompileError -> DiagnosticSpan P
@@ -132,11 +132,11 @@ compileErrorSpan = \case
         (DiagnosticSpan p (p `movePby` operatorLength operator))
     ColumnDoesNotExist p identifier ->
         DiagnosticSpan p (p `movePby` identifierLength identifier)
-    ColumnNameIsAmbigious p identifier ->
+    ColumnNameIsAmbiguous p identifier ->
         DiagnosticSpan p (p `movePby` identifierLength identifier)
     TableDoesNotExist p identifier ->
         DiagnosticSpan p (p `movePby` identifierLength identifier)
-    TableNameIsAmbigious p identifier ->
+    TableNameIsAmbiguous p identifier ->
         DiagnosticSpan p (p `movePby` identifierLength identifier)
 
 compileErrorMsg :: CompileError -> String
@@ -168,12 +168,12 @@ compileErrorMsg = \case
             <> pgTypePretty rhs
     ColumnDoesNotExist _ identifier ->
         "table does not exist: " <> identifierPretty identifier
-    ColumnNameIsAmbigious _ identifier ->
-        "column name is ambigious: " <> identifierPretty identifier
+    ColumnNameIsAmbiguous _ identifier ->
+        "column name is ambiguous: " <> identifierPretty identifier
     TableDoesNotExist _ identifier ->
         "table does not exist: " <> identifierPretty identifier
-    TableNameIsAmbigious p identifier ->
-        "table name is ambigious: " <> identifierPretty identifier
+    TableNameIsAmbiguous p identifier ->
+        "table name is ambiguous: " <> identifierPretty identifier
 
 toDiagnosticSpan :: Expr a -> DiagnosticSpan P
 toDiagnosticSpan = \cases

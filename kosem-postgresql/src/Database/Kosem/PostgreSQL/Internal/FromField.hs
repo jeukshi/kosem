@@ -9,7 +9,7 @@ import PostgreSQL.Binary.Decoding
 import Unsafe.Coerce (unsafeCoerce)
 
 class FromField a where
-    -- TODO We shoud prolly return Either
+    -- TODO We should prolly return Either
     -- and allow users to signal failure that way. TBD
     parseField :: ByteString -> a
     {-# MINIMAL parseField #-}

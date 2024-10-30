@@ -67,7 +67,7 @@ data Expr t
     | EAnd P (Expr t) (Expr t)
     | EOr P (Expr t) (Expr t)
     | EBinOp P (Expr t) Operator (Expr t) t
-    | -- Comparsion predicates
+    | -- Comparison predicates
       EBetween P (Expr t) (Expr t) (Expr t)
     | ENotBetween P (Expr t) (Expr t) (Expr t)
     deriving (Show)
