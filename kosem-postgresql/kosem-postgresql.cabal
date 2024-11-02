@@ -13,7 +13,9 @@ common runtime-opts
     ghc-options: -threaded -with-rtsopts=-N
 
 common warning-opts
-    ghc-options: -fwarn-incomplete-patterns
+    ghc-options:
+      -fwarn-incomplete-patterns
+      -fno-show-error-context
 
 library
   import:
