@@ -1,12 +1,12 @@
 version: '3.9'
 
 services:
-  postgres:
-    image: postgres:14-alpine
+  postgres_15:
+    image: postgres:15-alpine
     ports:
       - 5432:5432
     volumes:
-      - ~/docker-vol/postgres-kosem:/var/lib/postgresql/data
+      - ~/docker-vol/postgres-kosem/15:/var/lib/postgresql/data
     environment:
       - POSTGRES_PASSWORD=kosem
       - POSTGRES_USER=kosem
