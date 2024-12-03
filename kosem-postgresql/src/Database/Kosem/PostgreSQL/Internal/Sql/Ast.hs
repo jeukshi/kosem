@@ -18,7 +18,7 @@ data STerm t
     deriving (Show)
 
 data FromItem t
-    = FiTableName P Identifier
+    = FiTableName P Identifier (Maybe Identifier)
     | FiJoin (FromItem t) JoinType (FromItem t) (JoinCondition t)
     deriving (Show)
 

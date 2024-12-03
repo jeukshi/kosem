@@ -137,7 +137,20 @@ joinOnP = lexeme do
 
 fromItemTableNameP :: Parser (FromItem ())
 fromItemTableNameP = lexeme do
-    FiTableName <$> getP <*> tableNameP
+    p <- getP
+    tableName <- tableNameP
+    maybeAs <- (As <$) <$> optional as
+    case maybeAs of
+        Nothing -> do
+            optional (lookAhead labelP) >>= \case
+                Nothing -> return $ FiTableName p tableName Nothing
+                Just lookAheadAlias ->
+                    if lookAheadAlias `elem` reserved
+                        then return $ FiTableName p tableName Nothing
+                        else do
+                            FiTableName p tableName . Just <$> identifierP
+        Just _ -> do
+            FiTableName p tableName . Just <$> identifierP
 
 tableNameP :: Parser Identifier
 tableNameP = lexeme do
@@ -148,7 +161,15 @@ tableNameP = lexeme do
 
     return $ Identifier (first : rest)
 
-reserved = ["from", "where", "and", "not", "or"]
+reserved =
+    [ "from"
+    , "where"
+    , "and"
+    , "not"
+    , "or"
+    , "on"
+    , "join"
+    ]
 
 aliasedExprP :: Parser (AliasedExpr ())
 aliasedExprP = lexeme do

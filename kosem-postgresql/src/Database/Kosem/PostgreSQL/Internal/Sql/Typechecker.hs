@@ -180,12 +180,12 @@ tcFromItem
     -> FromItem ()
     -> Eff es (FromItem TypeInfo)
 tcFromItem env = \cases
-    (FiTableName p tableName) -> do
+    (FiTableName p tableName mbAlias) -> do
         fiTable <- case getTableByName env.database tableName of
             [] -> throw env.compileError $ TableDoesNotExist p tableName
             [table] -> do
                 addTableToEnv env.fields table
-                return $ FiTableName p tableName
+                return $ FiTableName p tableName mbAlias
             ts -> throw env.compileError $ TableNameIsAmbiguous p tableName
         return fiTable
     (FiJoin lhs joinType rhs joinCondition) -> do

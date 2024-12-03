@@ -44,6 +44,21 @@ spec = parallel do
             parseInc (pKeyword "select") "select("
                 `succeedsLeaving` "("
 
+    describe "fromItemTableNameP" do
+        it "only table name" do
+            parseAll fromItemTableNameP
+                `shouldSucceedOn` "myTable"
+        it "table name with alias" do
+            parseAll fromItemTableNameP
+                `shouldSucceedOn` "myTable myAlias"
+        it "table name with AS alias" do
+            parseAll fromItemTableNameP
+                `shouldSucceedOn` "myTable as myAlias"
+        it "table name mix" do
+            parseAll selectCore
+                `shouldSucceedOn` [text|
+            select id from tab1 t join tab2 as tt2 on true join tab3 on true|]
+
     describe "selectCore" do
         it "" do
             parseOnly selectCore
