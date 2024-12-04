@@ -411,7 +411,13 @@ exprLitP = lexeme do
 exprColP :: Parser (Expr ())
 exprColP = lexeme do
     p <- getP
-    flip (ECol p) () <$> (Identifier <$> labelP)
+    idPart <- identifierP
+    mbIdPart <- optional do
+        _ <- symbol "."
+        identifierP
+    case mbIdPart of
+        (Just identifier) -> return $ ECol p (Just idPart) identifier ()
+        Nothing -> return $ ECol p Nothing idPart ()
 
 boolLiteralP :: Parser LiteralValue
 boolLiteralP = lexeme do

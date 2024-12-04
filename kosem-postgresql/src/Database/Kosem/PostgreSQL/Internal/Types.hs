@@ -11,6 +11,9 @@ import Data.Text qualified as T
 import Language.Haskell.TH (Extension (DuplicateRecordFields), Name)
 import Language.Haskell.TH.Lift (Lift)
 
+-- Let's keep this for now.
+type Alias = Identifier
+
 data IsNullable
     = NonNullable
     | Nullable

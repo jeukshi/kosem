@@ -39,10 +39,17 @@ spec = parallel do
             parseInc (pKeyword "select") "select("
                 `succeedsLeaving` "("
 
-    describe "columnName" do
         it "" do
             parseInc (pKeyword "select") "select("
                 `succeedsLeaving` "("
+    describe "expr" do
+        describe "exprColP" do
+            it "column name" do
+                parseAll exprColP
+                    `shouldSucceedOn` "myColumn"
+            it "column name with alias" do
+                parseAll exprColP
+                    `shouldSucceedOn` "myTable.myColumn"
 
     describe "fromItemTableNameP" do
         it "only table name" do

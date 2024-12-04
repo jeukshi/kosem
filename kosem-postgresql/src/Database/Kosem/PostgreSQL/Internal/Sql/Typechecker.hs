@@ -220,7 +220,7 @@ exprType = \cases
     (EGuardedBoolAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
     (EGuardedMaybeAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
     (ELit _ _ ty) -> ty
-    (ECol _ _ ty) -> ty
+    (ECol _ _ _ ty) -> ty
     (ENot{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
     (EAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
     (EOr{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
@@ -332,8 +332,9 @@ tcExpr env = \cases
         (BoolLiteral _) -> do
             let hsTy = getHsType env.database PgBoolean
             return $ ELit p litVal (TypeInfo PgBoolean NonNullable Nothing hsTy)
-    (ECol p colName _) -> do
+    (ECol p mbAlias colName _) -> do
         fields <- get env.fields
+        -- FIXME use alias
         case getColumnByName fields colName of
             [] -> throw env.compileError $ ColumnDoesNotExist p colName
             [envCol] -> do
@@ -341,6 +342,7 @@ tcExpr env = \cases
                 return $
                     ECol
                         p
+                        mbAlias
                         colName
                         (TypeInfo envCol.typeName envCol.nullable (Just envCol.label) hsTy)
             ts -> throw env.compileError $ ColumnNameIsAmbiguous p colName

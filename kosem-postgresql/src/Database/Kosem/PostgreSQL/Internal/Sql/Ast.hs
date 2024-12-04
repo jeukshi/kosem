@@ -18,7 +18,7 @@ data STerm t
     deriving (Show)
 
 data FromItem t
-    = FiTableName P Identifier (Maybe Identifier)
+    = FiTableName P Identifier (Maybe Alias)
     | FiJoin (FromItem t) JoinType (FromItem t) (JoinCondition t)
     deriving (Show)
 
@@ -58,7 +58,7 @@ data Expr t
     | EParamMaybe P HsIdentifier t
     | EFunction P Identifier [Expr t] t
     | ELit P LiteralValue t
-    | ECol P Identifier t
+    | ECol P (Maybe Alias) Identifier t
     | EPgCast P (Expr t) P Identifier t
     | -- | expression::type
       ENot P (Expr t)

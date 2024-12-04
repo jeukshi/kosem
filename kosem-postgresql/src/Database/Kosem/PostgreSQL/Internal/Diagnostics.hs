@@ -208,10 +208,13 @@ toDiagnosticSpan = \cases
                 p
                 -- \| +2 from single quote.
                 (p `movePby` (length text + 2))
-    (ECol p identifier _) ->
+    (ECol p mbAlias identifier _) -> do
+        let aliasLength =
+                -- \| +1 from dot.
+                maybe 0 ((+ 1) . identifierLength) mbAlias
         DiagnosticSpan
             p
-            (p `movePby` identifierLength identifier)
+            (p `movePby` (aliasLength + identifierLength identifier))
     (ENot p expr) ->
         DiagnosticSpan p p
             `combineSpans` toDiagnosticSpan expr
