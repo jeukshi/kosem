@@ -140,17 +140,22 @@ fromItemTableNameP = lexeme do
     p <- getP
     tableName <- tableNameP
     maybeAs <- (As <$) <$> optional as
+    maybeAliasP >>= \case
+        Nothing -> return $ FiTableName p tableName tableName
+        (Just alias) -> return $ FiTableName p tableName alias
+
+maybeAliasP :: Parser (Maybe Alias)
+maybeAliasP = do
+    maybeAs <- (As <$) <$> optional as
     case maybeAs of
         Nothing -> do
             optional (lookAhead labelP) >>= \case
-                Nothing -> return $ FiTableName p tableName Nothing
+                Nothing -> return Nothing
                 Just lookAheadAlias ->
                     if lookAheadAlias `elem` reserved
-                        then return $ FiTableName p tableName Nothing
-                        else do
-                            FiTableName p tableName . Just <$> identifierP
-        Just _ -> do
-            FiTableName p tableName . Just <$> identifierP
+                        then return Nothing
+                        else Just <$> identifierP
+        Just _ -> do Just <$> identifierP
 
 tableNameP :: Parser Identifier
 tableNameP = lexeme do
@@ -174,20 +179,9 @@ reserved =
 aliasedExprP :: Parser (AliasedExpr ())
 aliasedExprP = lexeme do
     expr <- exprP
-    maybeAs <- (As <$) <$> optional as
-    case maybeAs of
-        Nothing -> do
-            optional (lookAhead labelP) >>= \case
-                Nothing -> return $ WithoutAlias expr
-                Just lookAheadAlias ->
-                    if lookAheadAlias `elem` reserved
-                        then return $ WithoutAlias expr
-                        else do
-                            alias <- identifierP
-                            return $ WithAlias expr alias Nothing
-        Just _ -> do
-            alias <- identifierP
-            return $ WithAlias expr alias maybeAs
+    maybeAliasP >>= \case
+        Nothing -> return $ WithoutAlias expr
+        (Just alias) -> return $ WithAlias expr alias
 
 parensExprP :: Parser (Expr ())
 parensExprP = lexeme do

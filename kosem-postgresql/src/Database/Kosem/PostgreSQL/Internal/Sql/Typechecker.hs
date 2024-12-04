@@ -93,7 +93,7 @@ resultFromAst env = \cases
         -> AliasedExpr TypeInfo
         -> Eff es SqlMapping
     resultToSqlMapping env = \case
-        WithAlias expr alias _ -> do
+        WithAlias expr alias -> do
             let typeInfo = exprType expr
             return $ SqlMapping alias typeInfo.hsType typeInfo.nullable
         WithoutAlias expr -> do
@@ -167,9 +167,9 @@ tcSelectExpr env = mapM (tc env)
         -> AliasedExpr ()
         -> Eff es (AliasedExpr TypeInfo)
     tc env = \cases
-        (WithAlias expr colAlias maybeAs) -> do
+        (WithAlias expr colAlias) -> do
             tcExpr <- tcExpr env expr
-            return $ WithAlias tcExpr colAlias maybeAs
+            return $ WithAlias tcExpr colAlias
         (WithoutAlias expr) -> do
             tcExpr <- tcExpr env expr
             return $ WithoutAlias tcExpr
@@ -180,12 +180,12 @@ tcFromItem
     -> FromItem ()
     -> Eff es (FromItem TypeInfo)
 tcFromItem env = \cases
-    (FiTableName p tableName mbAlias) -> do
+    (FiTableName p tableName alias) -> do
         fiTable <- case getTableByName env.database tableName of
             [] -> throw env.compileError $ TableDoesNotExist p tableName
             [table] -> do
-                addTableToEnv env.fields table
-                return $ FiTableName p tableName mbAlias
+                addTableToEnv env.fields table alias
+                return $ FiTableName p tableName alias
             ts -> throw env.compileError $ TableNameIsAmbiguous p tableName
         return fiTable
     (FiJoin lhs joinType rhs joinCondition) -> do
@@ -335,8 +335,8 @@ tcExpr env = \cases
     (ECol p mbAlias colName _) -> do
         fields <- get env.fields
         -- FIXME use alias
-        case getColumnByName fields colName of
-            [] -> throw env.compileError $ ColumnDoesNotExist p colName
+        case getColumnByName fields mbAlias colName of
+            [] -> throw env.compileError $ ColumnDoesNotExist p mbAlias colName
             [envCol] -> do
                 let hsTy = getHsType env.database envCol.typeName
                 return $
@@ -424,11 +424,11 @@ tcExpr env = \cases
             throw env.compileError $ ArgumentTypeError tyRhs func PgBoolean
         return (tyLhs, tyRhs)
 
-addTableToEnv :: (e :> es) => State [Field] e -> Table -> Eff es ()
-addTableToEnv fieldsS table =
-    addFieldsToEnv fieldsS . map (toTypecheckerEnvlem table.name) . columns $ table
+addTableToEnv :: (e :> es) => State [Field] e -> Table -> Alias -> Eff es ()
+addTableToEnv fieldsS table alias =
+    addFieldsToEnv fieldsS . map (toTypecheckerEnvlem alias) . columns $ table
   where
-    toTypecheckerEnvlem :: Identifier -> Column -> Field
+    toTypecheckerEnvlem :: Alias -> Column -> Field
     toTypecheckerEnvlem alias column =
         Field
             { alias = alias
@@ -511,6 +511,9 @@ getTableByName :: Database -> Identifier -> [Table]
 getTableByName database tableName =
     (filter (\table -> table.name == tableName) . tables) database
 
-getColumnByName :: [Field] -> Identifier -> [Field]
-getColumnByName fields name =
-    filter (\e -> e.label == name) fields
+getColumnByName :: [Field] -> Maybe Alias -> Identifier -> [Field]
+getColumnByName fields mbAlias name = do
+    let matchesAlias = maybe (const True) (==) mbAlias
+    filter (\e -> e.label == name)
+        . filter (\e -> matchesAlias e.alias)
+        $ fields

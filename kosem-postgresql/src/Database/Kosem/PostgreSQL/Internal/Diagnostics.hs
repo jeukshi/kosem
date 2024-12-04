@@ -24,10 +24,12 @@ import Database.Kosem.PostgreSQL.Internal.P (P (MkP, unP), initPosState, movePby
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast (Expr (..), LiteralValue (..))
 import Database.Kosem.PostgreSQL.Internal.Types (
+    Alias,
     Identifier,
     Operator,
     PgType,
     TypeInfo,
+    aliasedIdentifierPretty,
     hsIdentifierLength,
     identifierLength,
     identifierPretty,
@@ -100,7 +102,7 @@ data CompileError
     | FunctionDoesNotExist P Identifier [PgType]
     | ExprWithNoAlias (Expr TypeInfo)
     | OperatorDoesntExist P PgType Operator PgType
-    | ColumnDoesNotExist P Identifier
+    | ColumnDoesNotExist P (Maybe Alias) Identifier
     | ColumnNameIsAmbiguous P Identifier
     | TableDoesNotExist P Identifier
     | TableNameIsAmbiguous P Identifier
@@ -130,8 +132,11 @@ compileErrorSpan = \case
     ExprWithNoAlias expr -> toDiagnosticSpan expr
     OperatorDoesntExist p _ operator _ ->
         (DiagnosticSpan p (p `movePby` operatorLength operator))
-    ColumnDoesNotExist p identifier ->
-        DiagnosticSpan p (p `movePby` identifierLength identifier)
+    ColumnDoesNotExist p mbAlias identifier -> do
+        let aliasLength =
+                -- \| +1 from dot.
+                maybe 0 ((+ 1) . identifierLength) mbAlias
+        DiagnosticSpan p (p `movePby` (aliasLength + identifierLength identifier))
     ColumnNameIsAmbiguous p identifier ->
         DiagnosticSpan p (p `movePby` identifierLength identifier)
     TableDoesNotExist p identifier ->
@@ -166,8 +171,11 @@ compileErrorMsg = \case
             <> operatorPretty op
             <> " "
             <> pgTypePretty rhs
-    ColumnDoesNotExist _ identifier ->
-        "table does not exist: " <> identifierPretty identifier
+    ColumnDoesNotExist _ mbAlias identifier -> do
+        let colPretty = case mbAlias of
+                Nothing -> identifierPretty identifier
+                (Just alias) -> aliasedIdentifierPretty alias identifier
+        "column does not exist: " <> colPretty
     ColumnNameIsAmbiguous _ identifier ->
         "column name is ambiguous: " <> identifierPretty identifier
     TableDoesNotExist _ identifier ->

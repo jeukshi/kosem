@@ -50,6 +50,24 @@ spec = around withDB $ do
                                and col || abc = 'abc'
                                 |]
             "it compiles" `shouldBe` "it compiles"
+
+    describe "aliases" do
+        it "aliases mix" $ \conn -> do
+            let _ =
+                    [Tdb.sql|
+                            select t1.abc
+                                 , t2.col2
+                                 , t2.col
+                              from tab1 as t1
+                              left join tab2 as t2
+                                on t1.abc = t2.col
+                              left join tab2
+                                on tab2.col2 = t2.col2
+                             where t1.abc2 = t2.col
+                               and tab2.col = t2.col
+                                |]
+            "it compiles" `shouldBe` "it compiles"
+
     describe "parameters" do
         it "in output don't need an alias" $ \conn -> do
             let abc = True

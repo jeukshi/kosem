@@ -18,7 +18,9 @@ data STerm t
     deriving (Show)
 
 data FromItem t
-    = FiTableName P Identifier (Maybe Alias)
+    -- | Even though alias is optional, if it is not specified,
+    -- we set identifier as an alias. This makes searching more uniform.
+    = FiTableName P Identifier Alias
     | FiJoin (FromItem t) JoinType (FromItem t) (JoinCondition t)
     deriving (Show)
 
@@ -48,7 +50,7 @@ data As = As
     deriving (Show)
 
 data AliasedExpr t
-    = WithAlias (Expr t) Identifier (Maybe As)
+    = WithAlias (Expr t) Alias
     | WithoutAlias (Expr t)
     deriving (Show)
 
