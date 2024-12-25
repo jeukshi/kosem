@@ -32,8 +32,8 @@ data SqlCommand result = SqlCommand
 
 -- type CommandInput = [(Identifier, Name, IsNullable)]
 
-data CommandInfo = CommandInfo
-    { output :: NonEmpty SqlMapping
+data CommandInfo a = CommandInfo
+    { output :: NonEmpty a
     , input :: [CommandInput]
     , rawCommand :: String
     }
@@ -48,6 +48,13 @@ guardTypeToText :: GuardType -> Text
 guardTypeToText = \case
     BooleanGuard -> ":"
     MaybeGuard -> ":?"
+
+data CommandOutput = MkCommandOutput
+    { coIdentifier :: Identifier
+    , coPgType :: PgType
+    , coNullable :: IsNullable
+    }
+    deriving (Show)
 
 data CommandInput
     = CommandParameter Parameter
@@ -77,7 +84,8 @@ data Parameter = Parameter
     { position :: P
     , pIdentifier :: HsIdentifier
     , paramType :: ParameterType
-    , info :: Maybe ParameterInfo
+    , pPgType :: PgType
+    , pNullable :: IsNullable
     }
     deriving (Show)
 

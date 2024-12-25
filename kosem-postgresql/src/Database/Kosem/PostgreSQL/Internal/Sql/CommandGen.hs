@@ -78,8 +78,8 @@ data CommandFragment
 run
     :: (e :> es)
     => Exception CompileError e
-    -> CommandInfo
-    -> Eff es (CommandVariant [CommandParameter] ByteString)
+    -> CommandInfo SqlMapping
+    -> Eff es (CommandVariant [Parameter] ByteString)
 run ex commandInfo = do
     let commandFragments =
             splitCommand commandInfo.rawCommand commandInfo.input
@@ -114,7 +114,7 @@ rewriteQuery
     :: (e :> es)
     => Exception CompileError e
     -> [CommandFragment]
-    -> Eff es (CommandVariant [CommandParameter] ByteString)
+    -> Eff es (CommandVariant [Parameter] ByteString)
 rewriteQuery ex commandFragments =
     runCommandGenEnv ex [] [] [] Nothing \(env :: CommandGenEnv e) -> do
         (res, _) <- yieldToReverseList \y -> do
@@ -124,7 +124,7 @@ rewriteQuery ex commandFragments =
     go
         :: (e1 :> es, e2 :> es)
         => CommandGenEnv e1
-        -> Stream (ByteString, [CommandParameter], [Choice]) e2
+        -> Stream (ByteString, [Parameter], [Choice]) e2
         -> [CommandFragment]
         -> Eff es ()
     go env y = \cases
@@ -167,7 +167,7 @@ rewriteQuery ex commandFragments =
             commandParts <- get env.commandPartsS
             let commandBuilder = foldMap Builder.lazyByteString commandParts
             let commandBs = toStrict $ Builder.toLazyByteString commandBuilder
-            parameters <- map paramForTH <$> get env.usedParametersS
+            parameters <- get env.usedParametersS
             choices <- get env.choicesS
             yield y (commandBs, parameters, choices)
       where
@@ -210,14 +210,6 @@ rewriteQuery ex commandFragments =
                     else Just i
             find _ [] _ = Nothing
 
-        paramForTH :: Parameter -> CommandParameter
-        paramForTH p =
-            MkCommandParameter
-                { cpIdentifier = p.pIdentifier
-                , cpHsType = (.hsType) . fromJust $ p.info
-                , cpIsNullable = (.nullable) . fromJust $ p.info
-                }
-
         guardToChoice :: Guard -> Bool -> Choice
         guardToChoice guard bool = case guard.guardType of
             BooleanGuard -> Choice guard.gIdentifier (VcBool bool)
@@ -226,8 +218,8 @@ rewriteQuery ex commandFragments =
 toCommandVariant
     :: (e :> es)
     => Exception CompileError e
-    -> [(ByteString, [CommandParameter], [Choice])]
-    -> Eff es (CommandVariant [CommandParameter] ByteString)
+    -> [(ByteString, [Parameter], [Choice])]
+    -> Eff es (CommandVariant [Parameter] ByteString)
 toCommandVariant ex = \cases
     [] -> throw ex (AssertionError "TODO no command")
     [(bs, cps, choices)] -> do

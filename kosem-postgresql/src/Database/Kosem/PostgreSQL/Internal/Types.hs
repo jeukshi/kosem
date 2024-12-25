@@ -59,8 +59,8 @@ identifierPretty :: Identifier -> String
 identifierPretty (Identifier t) = "‘" <> t <> "’"
 
 aliasedIdentifierPretty :: Alias -> Identifier -> String
-aliasedIdentifierPretty (Identifier a) (Identifier t)
-    = "‘" <> a <> "." <> t <> "’"
+aliasedIdentifierPretty (Identifier a) (Identifier t) =
+    "‘" <> a <> "." <> t <> "’"
 
 newtype Operator = Operator String
     deriving (Show) via String
@@ -100,7 +100,6 @@ data TypeInfo = TypeInfo
     { pgType :: PgType
     , nullable :: IsNullable
     , identifier :: Maybe Identifier
-    , hsType :: Name
     }
     deriving (Show, Eq)
 

@@ -63,18 +63,20 @@ run
     -> Database
     -> STerm ()
     -> String
-    -> Eff es CommandInfo
+    -> Eff es (CommandInfo CommandOutput)
 run ex database ast input = do
     runTypecheckerEnv database ex [] [] \(env :: TypecheckerEnv e) -> do
         typedAst <- typecheck env ast
+        -- TODO add to typecheck result
         fields <- get @e env.fields
+        -- TODO add to typecheck result
         commandInput <- get @e env.commandInput
-        hsTypes <- resultFromAst env typedAst
+        pgTypes <- resultFromAst env typedAst
         let commandInputSorted = sortBy (comparing commandInputPosition) commandInput
         return $
             CommandInfo
                 { input = commandInputSorted
-                , output = hsTypes
+                , output = pgTypes
                 , rawCommand = input
                 }
 
@@ -82,29 +84,29 @@ resultFromAst
     :: (e :> es)
     => TypecheckerEnv e
     -> STerm TypeInfo
-    -> Eff es (NonEmpty SqlMapping)
+    -> Eff es (NonEmpty CommandOutput)
 resultFromAst env = \cases
     (Select resultColumns _ _) ->
-        traverse (resultToSqlMapping env) resultColumns
+        traverse (resultToCommandOutput env) resultColumns
   where
-    resultToSqlMapping
+    resultToCommandOutput
         :: (e :> es)
         => TypecheckerEnv e
         -> AliasedExpr TypeInfo
-        -> Eff es SqlMapping
-    resultToSqlMapping env = \case
+        -> Eff es CommandOutput
+    resultToCommandOutput env = \case
         WithAlias expr alias -> do
             let typeInfo = exprType expr
-            return $ SqlMapping alias typeInfo.hsType typeInfo.nullable
+            return $ MkCommandOutput alias typeInfo.pgType typeInfo.nullable
         WithoutAlias expr -> do
             let typeInfo = exprType expr
             case typeInfo.identifier of
                 Just identifier ->
                     return $
-                        SqlMapping
-                            { identifier = identifier
-                            , hsType = typeInfo.hsType
-                            , nullable = typeInfo.nullable
+                        MkCommandOutput
+                            { coIdentifier = identifier
+                            , coPgType = typeInfo.pgType
+                            , coNullable = typeInfo.nullable
                             }
                 Nothing -> throw env.compileError $ ExprWithNoAlias expr
 
@@ -217,16 +219,16 @@ exprType = \cases
     (EFunction _ _ _ ty) -> ty
     (EParam _ _ ty) -> ty
     (EParamMaybe _ _ ty) -> ty
-    (EGuardedBoolAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
-    (EGuardedMaybeAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
+    (EGuardedBoolAnd{}) -> TypeInfo PgBoolean Nullable Nothing
+    (EGuardedMaybeAnd{}) -> TypeInfo PgBoolean Nullable Nothing
     (ELit _ _ ty) -> ty
     (ECol _ _ _ ty) -> ty
-    (ENot{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
-    (EAnd{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
-    (EOr{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
+    (ENot{}) -> TypeInfo PgBoolean Nullable Nothing
+    (EAnd{}) -> TypeInfo PgBoolean Nullable Nothing
+    (EOr{}) -> TypeInfo PgBoolean Nullable Nothing
     (EBinOp _ _ _ _ ty) -> ty
-    (EBetween{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
-    (ENotBetween{}) -> TypeInfo PgBoolean Nullable Nothing ''Bool
+    (EBetween{}) -> TypeInfo PgBoolean Nullable Nothing
+    (ENotBetween{}) -> TypeInfo PgBoolean Nullable Nothing
 
 tcNullable :: IsNullable -> IsNullable -> IsNullable
 tcNullable = \cases
@@ -242,43 +244,31 @@ tcExpr env = \cases
     (EPgCast p1 var@(EParam pParam name _) p2 identifier ()) -> do
         -- FIXME check if can be casted
         let pgTy = getPgType env.database identifier
-        let hsType = getHsType env.database pgTy
         introduceCommandInput env $
             CommandParameter $
                 Parameter
                     { position = pParam
                     , pIdentifier = name
                     , paramType = SimpleParameter
-                    , info =
-                        Just
-                            ParameterInfo
-                                { pgType = pgTy
-                                , hsType = hsType
-                                , nullable = NonNullable
-                                }
+                    , pPgType = pgTy
+                    , pNullable = NonNullable
                     }
-        let typeInfo = TypeInfo pgTy NonNullable (Just name.hsIdentifier) hsType
+        let typeInfo = TypeInfo pgTy NonNullable (Just name.hsIdentifier)
         let tyVar = EParam pParam name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
     (EPgCast p1 var@(EParamMaybe pParam name _) p2 identifier ()) -> do
         -- FIXME check if can be casted
         let pgTy = getPgType env.database identifier
-        let hsTy = getHsType env.database pgTy
         introduceCommandInput env $
             CommandParameter $
                 Parameter
                     { position = pParam
                     , pIdentifier = name
                     , paramType = SimpleMaybeParameter
-                    , info =
-                        Just
-                            ParameterInfo
-                                { pgType = pgTy
-                                , hsType = hsTy
-                                , nullable = Nullable
-                                }
+                    , pPgType = pgTy
+                    , pNullable = Nullable
                     }
-        let typeInfo = TypeInfo pgTy Nullable (Just name.hsIdentifier) hsTy
+        let typeInfo = TypeInfo pgTy Nullable (Just name.hsIdentifier)
         let tyVar = EParamMaybe pParam name typeInfo
         return $ EPgCast p1 tyVar p2 identifier typeInfo
     (EPgCast p1 expr p2 identifier ()) -> do
@@ -286,14 +276,13 @@ tcExpr env = \cases
         -- FIXME check text, check if can be casted
         -- FIXME preserve IsNullable from underlying type
         let pgTy = getPgType env.database identifier
-        let hsTy = getHsType env.database pgTy
         return $
             EPgCast
                 p1
                 tyExpr
                 p2
                 identifier
-                (TypeInfo pgTy Nullable (Just identifier) hsTy)
+                (TypeInfo pgTy Nullable (Just identifier))
     (EParens p1 expr p2 ()) -> do
         tyExpr <- tcExpr env expr
         let innerTy = exprType tyExpr
@@ -316,35 +305,30 @@ tcExpr env = \cases
         case mbFuncTy of
             Nothing -> throw env.compileError $ FunctionDoesNotExist p name argsPgTypes
             Just ty -> do
-                let hsTy = getHsType env.database ty
-                return $ EFunction p name tyExprs (TypeInfo ty resNullable Nothing hsTy)
+                return $ EFunction p name tyExprs (TypeInfo ty resNullable Nothing)
     (ELit p litVal _) -> case litVal of
         NumericLiteral -> do
-            let hsTy = getHsType env.database PgNumeric
             return $
                 ELit
                     p
                     litVal
-                    (TypeInfo PgNumeric NonNullable Nothing hsTy)
+                    (TypeInfo PgNumeric NonNullable Nothing)
         TextLiteral _ -> do
-            let hsTy = getHsType env.database PgText
-            return $ ELit p litVal (TypeInfo PgText NonNullable Nothing hsTy) -- FIXME this is 'unknown'
+            return $ ELit p litVal (TypeInfo PgText NonNullable Nothing) -- FIXME this is 'unknown'
         (BoolLiteral _) -> do
-            let hsTy = getHsType env.database PgBoolean
-            return $ ELit p litVal (TypeInfo PgBoolean NonNullable Nothing hsTy)
+            return $ ELit p litVal (TypeInfo PgBoolean NonNullable Nothing)
     (ECol p mbAlias colName _) -> do
         fields <- get env.fields
         -- FIXME use alias
         case getColumnByName fields mbAlias colName of
             [] -> throw env.compileError $ ColumnDoesNotExist p mbAlias colName
             [envCol] -> do
-                let hsTy = getHsType env.database envCol.typeName
                 return $
                     ECol
                         p
                         mbAlias
                         colName
-                        (TypeInfo envCol.typeName envCol.nullable (Just envCol.label) hsTy)
+                        (TypeInfo envCol.typeName envCol.nullable (Just envCol.label))
             ts -> throw env.compileError $ ColumnNameIsAmbiguous p colName
     expr@(ENot p innerExpr) -> do
         tyExpr <- tcExpr env innerExpr
@@ -385,13 +369,12 @@ tcExpr env = \cases
     (EBinOp p lhs op rhs ()) -> do
         tcLhs <- tcExpr env lhs
         tcRhs <- tcExpr env rhs
-        let (TypeInfo tyLhs nullableLhs _ _) = exprType tcLhs
-        let (TypeInfo tyRhs nullableRhs _ _) = exprType tcRhs
+        let (TypeInfo tyLhs nullableLhs _) = exprType tcLhs
+        let (TypeInfo tyRhs nullableRhs _) = exprType tcRhs
         let nullableRes = tcNullable nullableLhs nullableRhs
         case getBinaryOpResult env.database tyLhs op tyRhs of
-            Just tyRes -> do
-                let hsTy = getHsType env.database tyRes
-                return $ EBinOp p tcLhs op tcRhs (TypeInfo tyRes nullableRes Nothing hsTy)
+            Just tyRes ->
+                return $ EBinOp p tcLhs op tcRhs (TypeInfo tyRes nullableRes Nothing)
             Nothing -> throw env.compileError $ OperatorDoesntExist p tyLhs op tyRhs
     (EBetween p lhs rhs1 rhs2) -> do
         -- TODO typecheck `between` against <= >=
@@ -485,18 +468,6 @@ getPgType database identifier = find identifier database.typesMap
         ((i, t, _) : xs) ->
             if i == identifier
                 then t
-                else find identifier xs
-
-getHsType :: Database -> PgType -> Name
-getHsType database pgType = find pgType database.typesMap
-  where
-    find :: PgType -> [(Identifier, PgType, Name)] -> Name
-    find identifier = \cases
-        -- TODO proper error
-        [] -> error $ "no type: " <> show identifier
-        ((_, t, n) : xs) ->
-            if t == pgType
-                then n
                 else find identifier xs
 
 addFieldsToEnv

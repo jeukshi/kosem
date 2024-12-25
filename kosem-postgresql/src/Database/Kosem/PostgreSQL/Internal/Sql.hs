@@ -28,6 +28,7 @@ import Data.Foldable (fold, for_)
 import Data.Functor (void)
 import Data.List (find, foldl', nub, sortOn)
 import Data.List.NonEmpty (NonEmpty (..))
+import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromJust)
 import Data.String (IsString (fromString))
 import Data.Text (Text)
@@ -69,17 +70,22 @@ unsafeSql database userInput = do
     let res = runPureEff do
             try \ex -> do
                 ast <- Parser.run ex userInput
-                commandInfo <-
+                commandInfoPg <-
                     Typechecker.run ex database ast userInput
+                let commandInfoHs = outputForTH database commandInfoPg
                 -- TODO make this a proper record
-                stuff <- CommandGen.run ex commandInfo
-                return (stuff, commandInfo)
+                stuff <- CommandGen.run ex commandInfoHs
+                let commandVariant = first (map (paramForTH database)) stuff
+                return (commandVariant, commandInfoHs)
     case res of
         Right (stuff, ci) -> gen stuff ci
         Left err -> do
             compilationError userInput err
   where
-    gen :: CommandVariant [CommandParameter] ByteString -> CommandInfo -> Q Exp
+    gen
+        :: CommandVariant [CommandParameter] ByteString
+        -> CommandInfo SqlMapping
+        -> Q Exp
     gen commands commandInfo = do
         commandsQ <-
             traverse genCommand
@@ -96,3 +102,41 @@ unsafeSql database userInput = do
                 , params = $(genPatternMatch cParams commandsQ)
                 }
             |]
+
+-- TODO all of this should go to other module?
+outputForTH
+    :: Database
+    -> CommandInfo CommandOutput
+    -> CommandInfo SqlMapping
+outputForTH database ci = do
+    CommandInfo
+        { output = NE.map (forTH database) ci.output
+        , input = ci.input
+        , rawCommand = ci.rawCommand
+        }
+  where
+    forTH :: Database -> CommandOutput -> SqlMapping
+    forTH database co = do
+        let hsType = getHsType database co.coPgType
+        SqlMapping co.coIdentifier hsType co.coNullable
+
+paramForTH :: Database -> Parameter -> CommandParameter
+paramForTH database p = do
+    let hsType = getHsType database p.pPgType
+    MkCommandParameter
+        { cpIdentifier = p.pIdentifier
+        , cpHsType = hsType
+        , cpIsNullable = p.pNullable
+        }
+
+getHsType :: Database -> PgType -> Name
+getHsType database pgType = find pgType database.typesMap
+  where
+    find :: PgType -> [(Identifier, PgType, Name)] -> Name
+    find identifier = \cases
+        -- TODO proper error
+        [] -> error $ "no type: " <> show identifier
+        ((_, t, n) : xs) ->
+            if t == pgType
+                then n
+                else find identifier xs
