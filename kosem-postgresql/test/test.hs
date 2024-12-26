@@ -2,6 +2,7 @@ import Control.Exception (evaluate)
 import Test.Database.Kosem.PostgreSQL.Internal qualified
 import Test.Database.Kosem.PostgreSQL.Internal.Sql qualified
 import Test.Database.Kosem.PostgreSQL.Internal.Sql.Parser qualified
+import Test.Database.Kosem.PostgreSQL.Internal.Sql.Typechecker qualified
 import Test.Database.Kosem.PostgreSQL.Internal.ToFromField qualified
 import Test.Database.Kosem.PostgreSQL.Schema.Internal.Parser qualified
 import Test.Hspec
@@ -14,6 +15,8 @@ spec = do
         Test.Database.Kosem.PostgreSQL.Internal.spec
     describe "Test.Database.Kosem.PostgreSQL.Internal.Sql.Parser" do
         Test.Database.Kosem.PostgreSQL.Internal.Sql.Parser.spec
+    describe "Test.Database.Kosem.PostgreSQL.Internal.Sql.Typechecker" do
+        Test.Database.Kosem.PostgreSQL.Internal.Sql.Typechecker.spec
     describe "Test.Database.Kosem.PostgreSQL.Schema.Internal.Parser" do
         Test.Database.Kosem.PostgreSQL.Schema.Internal.Parser.spec
     describe "Test.Database.Kosem.PostgreSQL.Internal.ToFromField" do

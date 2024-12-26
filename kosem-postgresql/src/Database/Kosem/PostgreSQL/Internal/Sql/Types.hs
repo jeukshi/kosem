@@ -54,7 +54,7 @@ data CommandOutput = MkCommandOutput
     , coPgType :: PgType
     , coNullable :: IsNullable
     }
-    deriving (Show)
+    deriving (Show, Eq)
 
 data CommandInput
     = CommandParameter Parameter
