@@ -31,4 +31,4 @@ library
   default-language: GHC2021
   build-depends:
       base
-    , bluefin
+    , bluefin == 0.0.14.0

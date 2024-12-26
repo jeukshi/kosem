@@ -45,7 +45,7 @@ library
     , Database.Kosem.PostgreSQL.Schema.Internal.TH
   build-depends:
       base
-    , bluefin
+    , bluefin == 0.0.14.0
     , megaparsec
     , parser-combinators
     , text
@@ -79,6 +79,7 @@ test-suite spec
   other-modules:
     , Test.Database.Kosem.PostgreSQL.Internal.Sql
     , Test.Database.Kosem.PostgreSQL.Internal.Sql.Parser
+    , Test.Database.Kosem.PostgreSQL.Internal.Sql.Typechecker
     , Test.Database.Kosem.PostgreSQL.Internal.ToFromField
     , Test.Database.Kosem.PostgreSQL.Schema.Internal.Parser
     , Test.Database.Kosem.PostgreSQL.Internal
@@ -112,6 +113,6 @@ test-suite spec
     , vector
     , neat-interpolation
     , template-haskell
-    , bluefin
+    , bluefin == 0.0.14.0
     -- dbg
     , pretty-simple
