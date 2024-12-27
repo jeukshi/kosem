@@ -53,7 +53,16 @@ co = MkCommandOutput
 
 spec :: SpecWith ()
 spec = do
-    describe "TODO" $ do
-        it "TODO" do
+    describe "'unknown' in select" $ do
+        it "is casted as text" do
             res <- tcOk [text| select 'abc' text  |]
             res `shouldBe` NE.singleton (co "text" PgText NonNullable)
+
+    describe "binary operators" $ do
+        it "one arg is unknown" do
+            res <- tcOk [text| select 'abc'::text || 'cba' r  |]
+            res `shouldBe` NE.singleton (co "r" PgText NonNullable)
+        it "both args are 'unknown'" do
+            pendingWith "TODO"
+            res <- tcOk [text| select 'abc' || 'cba' r  |]
+            res `shouldBe` NE.singleton (co "r" PgText NonNullable)

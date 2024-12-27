@@ -58,8 +58,8 @@ tableItemP databaseConfig = lexemeS do
     columnName <- identifierS <?> "column name"
     -- FIXME assumes Scalar
     typeName <- identifierS <?> "column data type"
-    let x = filter (\(n, _, _) -> n == typeName) databaseConfig.types
-    let pgType = head . map (\(_, ty, _) -> ty) $ x
+    let x = filter (\(n, _) -> n == typeName) databaseConfig.types
+    let pgType = head . map snd $ x
     Column columnName pgType <$> isNullableP
 
 isNullableP :: Parser IsNullable
@@ -73,4 +73,4 @@ schemaP databaseConfig = lexeme do
     _ <- skipMany C.spaceChar
     databaseName <- databaseNameP
     tables <- some (tableP databaseConfig)
-    return $ Database databaseName [] [] [] tables
+    return $ Database databaseName [] [] [] [] tables

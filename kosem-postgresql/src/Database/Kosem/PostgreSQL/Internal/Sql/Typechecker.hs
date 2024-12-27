@@ -451,13 +451,13 @@ getFunctionTy database functionId argsTy =
         $ database.functions
 
 getPgType :: Database -> Identifier -> PgType
-getPgType database identifier = find identifier database.typesMap
+getPgType database identifier = find identifier database.typesL
   where
-    find :: Identifier -> [(Identifier, PgType, Name)] -> PgType
+    find :: Identifier -> [(Identifier, PgType)] -> PgType
     find identifier = \cases
         -- TODO proper error
         [] -> error $ "no type: " <> show identifier
-        ((i, t, _) : xs) ->
+        ((i, t) : xs) ->
             if i == identifier
                 then t
                 else find identifier xs

@@ -32,7 +32,8 @@ database' databaseConfig userInput = do
             Right db -> db
     let dbWithTypes =
             db
-                { typesMap = databaseConfig.types
+                { typesL = databaseConfig.types
+                , typesMap = databaseConfig.typesToHs
                 , binaryOps = databaseConfig.binaryOperators
                 , functions = databaseConfig.confFunctions
                 }

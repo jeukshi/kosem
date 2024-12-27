@@ -132,11 +132,11 @@ paramForTH database p = do
 getHsType :: Database -> PgType -> Name
 getHsType database pgType = find pgType database.typesMap
   where
-    find :: PgType -> [(Identifier, PgType, Name)] -> Name
+    find :: PgType -> [(PgType, Name)] -> Name
     find identifier = \cases
         -- TODO proper error
         [] -> error $ "no type: " <> show identifier
-        ((_, t, n) : xs) ->
+        ((t, n) : xs) ->
             if t == pgType
                 then n
                 else find identifier xs

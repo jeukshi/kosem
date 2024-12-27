@@ -11,7 +11,8 @@ emptyDatabase :: Database
 emptyDatabase =
     Database
         { name = "test-empty"
-        , typesMap = defaultDatabaseConfig.types
+        , typesL = defaultDatabaseConfig.types
+        , typesMap = defaultDatabaseConfig.typesToHs
         , binaryOps = defaultDatabaseConfig.binaryOperators
         , functions = defaultDatabaseConfig.confFunctions
         , tables = []

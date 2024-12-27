@@ -42,7 +42,8 @@ pattern PgBigint <- Scalar "bigint" TcN
         PgBigint = Scalar "bigint" TcN
 
 data DatabaseConfig = DatabaseConfig
-    { types :: [(Identifier, PgType, Name)]
+    { types :: [(Identifier, PgType)]
+    , typesToHs :: [(PgType, Name)]
     , binaryOperators :: [(Operator, PgType, PgType, PgType)]
     , confFunctions :: [(Identifier, [PgType], PgType)]
     }
@@ -51,10 +52,16 @@ defaultDatabaseConfig :: DatabaseConfig
 defaultDatabaseConfig =
     DatabaseConfig
         { types =
-            [ ("text", PgText, ''Text)
-            , ("integer", PgInteger, ''Int)
-            , ("bigint", PgBigint, ''Int)
-            , ("boolean", PgBoolean, ''Bool)
+            [ ("text", PgText)
+            , ("integer", PgInteger)
+            , ("bigint", PgBigint)
+            , ("boolean", PgBoolean)
+            ]
+        , typesToHs =
+            [ (PgText, ''Text)
+            , (PgInteger, ''Int)
+            , (PgBigint, ''Int)
+            , (PgBoolean, ''Bool)
             ]
         , binaryOperators = pgbinaryOperators
         , confFunctions = pgFunctions
