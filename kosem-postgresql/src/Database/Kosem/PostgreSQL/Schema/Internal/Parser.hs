@@ -45,19 +45,21 @@ data TableItem
     | TableConstraint
     deriving (Show, Eq, Lift)
 
-tableP :: Parser Table -- header and list items
-tableP = L.nonIndented spaceNewlineP (L.indentBlock spaceNewlineP p)
+tableP :: DatabaseConfig -> Parser Table -- header and list items
+tableP databaseConfig = L.nonIndented spaceNewlineP (L.indentBlock spaceNewlineP p)
   where
     p = do
         tableName <- tableNameP
 
-        return (L.IndentSome Nothing (return . Table tableName) tableItemP)
+        return (L.IndentSome Nothing (return . Table tableName) (tableItemP databaseConfig))
 
-tableItemP :: Parser Column
-tableItemP = lexemeS do
+tableItemP :: DatabaseConfig -> Parser Column
+tableItemP databaseConfig = lexemeS do
     columnName <- identifierS <?> "column name"
     -- FIXME assumes Scalar
-    pgType <- Scalar <$> identifierS <?> "column data type"
+    typeName <- identifierS <?> "column data type"
+    let x = filter (\(n, _, _) -> n == typeName) databaseConfig.types
+    let pgType = head . map (\(_, ty, _) -> ty) $ x
     Column columnName pgType <$> isNullableP
 
 isNullableP :: Parser IsNullable
@@ -66,9 +68,9 @@ isNullableP = lexemeS do
         Nothing -> return Nullable
         Just _ -> return NonNullable
 
-schemaP :: Parser Database
-schemaP = lexeme do
+schemaP :: DatabaseConfig -> Parser Database
+schemaP databaseConfig = lexeme do
     _ <- skipMany C.spaceChar
     databaseName <- databaseNameP
-    tables <- some tableP
+    tables <- some (tableP databaseConfig)
     return $ Database databaseName [] [] [] tables

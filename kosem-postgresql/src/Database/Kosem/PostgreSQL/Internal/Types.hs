@@ -14,17 +14,75 @@ import Language.Haskell.TH.Lift (Lift)
 -- Let's keep this for now.
 type Alias = Identifier
 
+-- TODO this might not be right, as custom categories can be created
+data PgTypCategory
+    = TcA -- 'A': Array types
+    | TcB -- 'B': Boolean types
+    | TcC -- 'C': Composite types
+    | TcD -- 'D': Date/time types
+    | TcE -- 'E': Enum types
+    | TcG -- 'G': Geometric types
+    | TcI -- 'I': Network address types
+    | TcN -- 'N': Numeric types
+    | TcP -- 'P': Pseudo types
+    | TcR -- 'R': Range types
+    | TcS -- 'S': String types
+    | TcT -- 'T': Timespan types
+    | TcU -- 'U': User-defined types
+    | TcV -- 'V': Bit-string types
+    | TcX -- 'X': Unknown types
+    deriving (Show, Eq, Lift)
+
+instance Enum PgTypCategory where
+    fromEnum :: PgTypCategory -> Int
+    fromEnum TcA = 0
+    fromEnum TcB = 1
+    fromEnum TcC = 2
+    fromEnum TcD = 3
+    fromEnum TcE = 4
+    fromEnum TcG = 5
+    fromEnum TcI = 6
+    fromEnum TcN = 7
+    fromEnum TcP = 8
+    fromEnum TcR = 9
+    fromEnum TcS = 10
+    fromEnum TcT = 11
+    fromEnum TcU = 12
+    fromEnum TcV = 13
+    fromEnum TcX = 14
+    toEnum :: Int -> PgTypCategory
+    toEnum 0 = TcA
+    toEnum 1 = TcB
+    toEnum 2 = TcC
+    toEnum 3 = TcD
+    toEnum 4 = TcE
+    toEnum 5 = TcG
+    toEnum 6 = TcI
+    toEnum 7 = TcN
+    toEnum 8 = TcP
+    toEnum 9 = TcR
+    toEnum 10 = TcS
+    toEnum 11 = TcT
+    toEnum 12 = TcU
+    toEnum 13 = TcV
+    toEnum 14 = TcX
+    toEnum _ = error "Invalid PgTypeCategory value"
+
+instance Ord PgTypCategory where
+    compare :: PgTypCategory -> PgTypCategory -> Ordering
+    compare x y = compare (fromEnum x) (fromEnum y)
+
 data IsNullable
     = NonNullable
     | Nullable
     deriving (Show, Eq, Lift)
 
-newtype PgType = Scalar Identifier
+data PgType = Scalar Identifier PgTypCategory
     deriving (Show, Eq, Lift)
 
 pgTypePretty :: PgType -> String
 pgTypePretty = \cases
-    (Scalar identifier) -> identifierPretty identifier
+    (Scalar identifier _) -> identifierPretty identifier
 
 newtype Identifier = Identifier String
     deriving (Show) via String

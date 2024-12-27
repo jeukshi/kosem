@@ -35,7 +35,7 @@ tcOk userInput = do
                 ( "tcOK: Left" <> show err
                 , NE.singleton (co "" PgUnknown Nullable)
                 )
-    isRight `shouldBe` "OK"
+    isRight `shouldBe` "tcOK"
     return commandOutput
   where
     typecheck
@@ -55,5 +55,5 @@ spec :: SpecWith ()
 spec = do
     describe "TODO" $ do
         it "TODO" do
-            res <- tcOk [text| select 'abc'  |]
-            res `shouldBe` NE.singleton (co "text" PgText Nullable)
+            res <- tcOk [text| select 'abc' text  |]
+            res `shouldBe` NE.singleton (co "text" PgText NonNullable)

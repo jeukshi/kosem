@@ -12,34 +12,34 @@ import Language.Haskell.TH (Name)
 -- * Types
 
 pattern PgBoolean :: PgType
-pattern PgBoolean <- Scalar "boolean"
+pattern PgBoolean <- Scalar "boolean" TcB
     where
-        PgBoolean = Scalar "boolean"
+        PgBoolean = Scalar "boolean" TcB
 
 pattern PgUnknown :: PgType
-pattern PgUnknown <- Scalar "unknown"
+pattern PgUnknown <- Scalar "unknown" TcX
     where
-        PgUnknown = Scalar "unknown"
+        PgUnknown = Scalar "unknown" TcX
 
 pattern PgNumeric :: PgType
-pattern PgNumeric <- Scalar "numeric"
+pattern PgNumeric <- Scalar "numeric" TcN
     where
-        PgNumeric = Scalar "numeric"
+        PgNumeric = Scalar "numeric" TcN
 
 pattern PgText :: PgType
-pattern PgText <- Scalar "text"
+pattern PgText <- Scalar "text" TcS
     where
-        PgText = Scalar "text"
+        PgText = Scalar "text" TcS
 
 pattern PgInteger :: PgType
-pattern PgInteger <- Scalar "integer"
+pattern PgInteger <- Scalar "integer" TcN
     where
-        PgInteger = Scalar "integer"
+        PgInteger = Scalar "integer" TcN
 
 pattern PgBigint :: PgType
-pattern PgBigint <- Scalar "bigint"
+pattern PgBigint <- Scalar "bigint" TcN
     where
-        PgBigint = Scalar "bigint"
+        PgBigint = Scalar "bigint" TcN
 
 data DatabaseConfig = DatabaseConfig
     { types :: [(Identifier, PgType, Name)]
