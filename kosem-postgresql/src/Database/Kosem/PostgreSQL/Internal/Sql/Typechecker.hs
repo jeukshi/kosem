@@ -97,7 +97,15 @@ resultFromAst env = \cases
     resultToCommandOutput env = \case
         WithAlias expr alias -> do
             let typeInfo = exprType expr
-            return $ MkCommandOutput alias typeInfo.pgType typeInfo.nullable
+            -- FIXME this is not exacly correct,
+            -- unknown might be resolved by `UNION`
+            -- and we don't check if it is a string literal
+            -- but this whole function has to be rewritten.
+            let pgType =
+                    if typeInfo.pgType == PgUnknown
+                        then PgText
+                        else typeInfo.pgType
+            return $ MkCommandOutput alias pgType typeInfo.nullable
         WithoutAlias expr -> do
             let typeInfo = exprType expr
             case typeInfo.identifier of
@@ -209,6 +217,8 @@ tcJoinCondition env = \cases
             throw env.compileError $ ConditionTypeError tyExpr "JOIN/ON"
         return $ JcOn tyExpr
 
+-- exprSetType :: Expr TypeInfo -> TypeInfo -> Expr TypeInfo
+
 exprType :: Expr TypeInfo -> TypeInfo
 -- TODO all those `Nullable` should be inferred
 -- `NonNullable AND NonNullable` is NonNullable
@@ -274,7 +284,7 @@ tcExpr env = \cases
     (EPgCast p1 expr p2 identifier ()) -> do
         tyExpr <- tcExpr env expr
         -- FIXME check text, check if can be casted
-        -- FIXME preserve IsNullable from underlying type
+        let (TypeInfo _ isNullable _) = exprType tyExpr
         let pgTy = getPgType env.database identifier
         return $
             EPgCast
@@ -282,7 +292,7 @@ tcExpr env = \cases
                 tyExpr
                 p2
                 identifier
-                (TypeInfo pgTy Nullable (Just identifier))
+                (TypeInfo pgTy isNullable (Just identifier))
     (EParens p1 expr p2 ()) -> do
         tyExpr <- tcExpr env expr
         let innerTy = exprType tyExpr
@@ -314,7 +324,7 @@ tcExpr env = \cases
                     litVal
                     (TypeInfo PgNumeric NonNullable Nothing)
         TextLiteral _ -> do
-            return $ ELit p litVal (TypeInfo PgText NonNullable Nothing) -- FIXME this is 'unknown'
+            return $ ELit p litVal (TypeInfo PgUnknown NonNullable Nothing) -- FIXME this is 'unknown'
         (BoolLiteral _) -> do
             return $ ELit p litVal (TypeInfo PgBoolean NonNullable Nothing)
     (ECol p mbAlias colName _) -> do
@@ -372,9 +382,9 @@ tcExpr env = \cases
         let (TypeInfo tyLhs nullableLhs _) = exprType tcLhs
         let (TypeInfo tyRhs nullableRhs _) = exprType tcRhs
         let nullableRes = tcNullable nullableLhs nullableRhs
-        case getBinaryOpResult env.database tyLhs op tyRhs of
-            Just tyRes ->
-                return $ EBinOp p tcLhs op tcRhs (TypeInfo tyRes nullableRes Nothing)
+        case resolveBinOperatorType env.database tyLhs op tyRhs of
+            Just (resolvedLhsTy, resolvedRhsTy, resTy) ->
+                return $ EBinOp p tcLhs op tcRhs (TypeInfo resTy nullableRes Nothing)
             Nothing -> throw env.compileError $ OperatorDoesntExist p tyLhs op tyRhs
     (EBetween p lhs rhs1 rhs2) -> do
         -- TODO typecheck `between` against <= >=
@@ -428,24 +438,6 @@ introduceCommandInput
 introduceCommandInput env commandInput =
     modify env.commandInput (<> [commandInput])
 
-getBinaryOpResult
-    :: Database
-    -> PgType
-    -> Operator
-    -> PgType
-    -> Maybe PgType
-getBinaryOpResult database lhs op rhs = do
-    -- \| Postgres converts '!=' to '<>', see note:
-    -- https://www.postgresql.org/docs/current/functions-comparison.html
-    let realOp = if op == "!=" then "<>" else op
-        binOpsMap = database.binaryOps
-    listToMaybe
-        . map (\(_, _, _, ty) -> ty)
-        . filter (\(_, _, r, _) -> r == rhs)
-        . filter (\(_, l, _, _) -> l == lhs)
-        . filter (\(o, _, _, _) -> o == realOp)
-        $ database.binaryOps
-
 getFunctionTy
     :: Database
     -> Identifier
@@ -488,3 +480,44 @@ getColumnByName fields mbAlias name = do
     filter (\e -> e.label == name)
         . filter (\e -> matchesAlias e.alias)
         $ fields
+
+resolveBinOperatorType
+    :: Database
+    -> PgType
+    -> Operator
+    -> PgType
+    -> Maybe (PgType, PgType, PgType)
+resolveBinOperatorType database lhs op rhs = do
+    -- \| Algorithm explained here:
+    -- https://www.postgresql.org/docs/17/typeconv-oper.html#TYPECONV-OPER
+
+    -- \| Postgres converts '!=' to '<>', see note:
+    -- https://www.postgresql.org/docs/current/functions-comparison.html
+    let realOp = if op == "!=" then "<>" else op
+        candidateBinOps =
+            filter (\(o, _, _, _) -> o == realOp) database.binaryOps
+    let assumedLhsTy = if lhs == PgUnknown then rhs else lhs
+    let assumedRhsTy = if rhs == PgUnknown then lhs else rhs
+    listToMaybe
+        . map (\(_, _, _, ty) -> (assumedLhsTy, assumedRhsTy, ty))
+        . filter (\(_, _, r, _) -> r == assumedRhsTy)
+        . filter (\(_, l, _, _) -> l == assumedLhsTy)
+        $ candidateBinOps
+
+getBinaryOpResult
+    :: Database
+    -> PgType
+    -> Operator
+    -> PgType
+    -> Maybe PgType
+getBinaryOpResult database lhs op rhs = do
+    -- \| Postgres converts '!=' to '<>', see note:
+    -- https://www.postgresql.org/docs/current/functions-comparison.html
+    let realOp = if op == "!=" then "<>" else op
+        binOps = database.binaryOps
+    listToMaybe
+        . map (\(_, _, _, ty) -> ty)
+        . filter (\(_, _, r, _) -> r == rhs)
+        . filter (\(_, l, _, _) -> l == lhs)
+        . filter (\(o, _, _, _) -> o == realOp)
+        $ database.binaryOps

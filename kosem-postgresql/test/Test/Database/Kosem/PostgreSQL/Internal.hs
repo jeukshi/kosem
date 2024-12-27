@@ -289,14 +289,14 @@ spec = around withDB $ do
             let abc = True
                 cba = "cba"
             rows <- execute conn do
-                [Tdb.sql| select length('12345') as len |]
+                [Tdb.sql| select length('12345'::text) as len |]
             let row = V.head rows
             row.len `shouldBe` 5
 
         it "call function (multi arg)" $ \conn -> do
             let someText = "aabb"
             rows <- execute conn do
-                [Tdb.sql| select replace(:someText::text, 'a', 'b') as t |]
+                [Tdb.sql| select replace(:someText::text, 'a'::text, 'b'::text) as t |]
             let row = V.head rows
             row.t `shouldBe` "bbbb"
 
