@@ -5,6 +5,7 @@ module Test.Database.Kosem.PostgreSQL.Schema.Internal.Parser where
 
 import Database.Kosem.PostgreSQL.Internal.ParserUtils
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
+import Database.Kosem.PostgreSQL.Internal.PgType qualified as PgType
 import Database.Kosem.PostgreSQL.Internal.Types
 import Database.Kosem.PostgreSQL.Schema.Internal.Parser
 import Test.Hspec
@@ -31,8 +32,8 @@ table abc
                 `shouldBe` Right do
                     Table
                         "abc"
-                        [ Column "col1" PgText Nullable
-                        , Column "col2" PgText Nullable
+                        [ Column "col1" PgType.Text Nullable
+                        , Column "col2" PgType.Text Nullable
                         ]
     describe "schemaP" do
         it "does its job" do
@@ -56,12 +57,12 @@ table abc2
                         []
                         [ Table
                             "abc"
-                            [ Column "col1" PgText Nullable
-                            , Column "col2" PgText Nullable
+                            [ Column "col1" PgType.Text Nullable
+                            , Column "col2" PgType.Text Nullable
                             ]
                         , Table
                             "abc2"
-                            [ Column "col1" PgText NonNullable
-                            , Column "col2" PgText Nullable
+                            [ Column "col1" PgType.Text NonNullable
+                            , Column "col2" PgType.Text Nullable
                             ]
                         ]

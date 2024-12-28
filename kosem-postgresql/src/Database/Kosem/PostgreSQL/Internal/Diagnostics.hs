@@ -22,6 +22,7 @@ import Database.Kosem.PostgreSQL.Internal.Diagnostics.GHC (
  )
 import Database.Kosem.PostgreSQL.Internal.P (P (MkP, unP), initPosState, movePby)
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
+import Database.Kosem.PostgreSQL.Internal.PgType qualified as PgType
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast (Expr (..), LiteralValue (..))
 import Database.Kosem.PostgreSQL.Internal.Types (
     Alias,
@@ -151,7 +152,7 @@ compileErrorMsg = \case
     ArgumentTypeError _ func ty ->
         "argument of ‘" <> func <> "’ must be type " <> pgTypePretty ty
     ConditionTypeError _ msg ->
-        "argument of ‘" <> msg <> "’ must be of type " <> pgTypePretty PgBoolean
+        "argument of ‘" <> msg <> "’ must be of type " <> pgTypePretty PgType.Boolean
     ParameterWithoutCastError _ _ ->
         "parameters without cast are not supported"
     MaybeParameterWithoutCastError _ _ ->

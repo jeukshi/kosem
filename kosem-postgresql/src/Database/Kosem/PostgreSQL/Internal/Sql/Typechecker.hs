@@ -28,6 +28,7 @@ import Database.Kosem.PostgreSQL.Internal.Diagnostics (
     combineSpans,
  )
 import Database.Kosem.PostgreSQL.Internal.PgBuiltin
+import Database.Kosem.PostgreSQL.Internal.PgType qualified as PgType
 import Database.Kosem.PostgreSQL.Internal.Sql.Ast
 import Database.Kosem.PostgreSQL.Internal.Sql.Parser
 import Database.Kosem.PostgreSQL.Internal.Sql.Types
@@ -102,8 +103,8 @@ resultFromAst env = \cases
             -- and we don't check if it is a string literal
             -- but this whole function has to be rewritten.
             let pgType =
-                    if typeInfo.pgType == PgUnknown
-                        then PgText
+                    if typeInfo.pgType == PgType.Unknown
+                        then PgType.Text
                         else typeInfo.pgType
             return $ MkCommandOutput alias pgType typeInfo.nullable
         WithoutAlias expr -> do
@@ -160,7 +161,7 @@ tcWhereClause env = \cases
     Nothing -> return Nothing
     (Just (Where expr)) -> do
         tyExpr <- tcExpr env expr
-        when ((exprType tyExpr).pgType /= PgBoolean) do
+        when ((exprType tyExpr).pgType /= PgType.Boolean) do
             throw env.compileError $ ConditionTypeError tyExpr "WHERE"
         return $ Just $ Where tyExpr
 
@@ -213,7 +214,7 @@ tcJoinCondition env = \cases
     JcUsing -> return JcUsing
     (JcOn expr) -> do
         tyExpr <- tcExpr env expr
-        when ((exprType tyExpr).pgType /= PgBoolean) do
+        when ((exprType tyExpr).pgType /= PgType.Boolean) do
             throw env.compileError $ ConditionTypeError tyExpr "JOIN/ON"
         return $ JcOn tyExpr
 
@@ -229,16 +230,16 @@ exprType = \cases
     (EFunction _ _ _ ty) -> ty
     (EParam _ _ ty) -> ty
     (EParamMaybe _ _ ty) -> ty
-    (EGuardedBoolAnd{}) -> TypeInfo PgBoolean Nullable Nothing
-    (EGuardedMaybeAnd{}) -> TypeInfo PgBoolean Nullable Nothing
+    (EGuardedBoolAnd{}) -> TypeInfo PgType.Boolean Nullable Nothing
+    (EGuardedMaybeAnd{}) -> TypeInfo PgType.Boolean Nullable Nothing
     (ELit _ _ ty) -> ty
     (ECol _ _ _ ty) -> ty
-    (ENot{}) -> TypeInfo PgBoolean Nullable Nothing
-    (EAnd{}) -> TypeInfo PgBoolean Nullable Nothing
-    (EOr{}) -> TypeInfo PgBoolean Nullable Nothing
+    (ENot{}) -> TypeInfo PgType.Boolean Nullable Nothing
+    (EAnd{}) -> TypeInfo PgType.Boolean Nullable Nothing
+    (EOr{}) -> TypeInfo PgType.Boolean Nullable Nothing
     (EBinOp _ _ _ _ ty) -> ty
-    (EBetween{}) -> TypeInfo PgBoolean Nullable Nothing
-    (ENotBetween{}) -> TypeInfo PgBoolean Nullable Nothing
+    (EBetween{}) -> TypeInfo PgType.Boolean Nullable Nothing
+    (ENotBetween{}) -> TypeInfo PgType.Boolean Nullable Nothing
 
 tcNullable :: IsNullable -> IsNullable -> IsNullable
 tcNullable = \cases
@@ -322,11 +323,11 @@ tcExpr env = \cases
                 ELit
                     p
                     litVal
-                    (TypeInfo PgNumeric NonNullable Nothing)
+                    (TypeInfo PgType.Numeric NonNullable Nothing)
         TextLiteral _ -> do
-            return $ ELit p litVal (TypeInfo PgUnknown NonNullable Nothing) -- FIXME this is 'unknown'
+            return $ ELit p litVal (TypeInfo PgType.Unknown NonNullable Nothing) -- FIXME this is 'unknown'
         (BoolLiteral _) -> do
-            return $ ELit p litVal (TypeInfo PgBoolean NonNullable Nothing)
+            return $ ELit p litVal (TypeInfo PgType.Boolean NonNullable Nothing)
     (ECol p mbAlias colName _) -> do
         fields <- get env.fields
         -- FIXME use alias
@@ -343,7 +344,7 @@ tcExpr env = \cases
     expr@(ENot p innerExpr) -> do
         tyExpr <- tcExpr env innerExpr
         let ty = exprType tyExpr
-        when (ty.pgType /= PgBoolean) do
+        when (ty.pgType /= PgType.Boolean) do
             throw env.compileError $ ConditionTypeError tyExpr "NOT"
         return $ ENot p tyExpr
     (EGuardedBoolAnd lhs p1 identifier pOpen rhs pClose) -> do
@@ -411,10 +412,10 @@ tcExpr env = \cases
     tyMustBeBoolean env func lhs rhs = do
         tyLhs <- tcExpr env lhs
         tyRhs <- tcExpr env rhs
-        when ((exprType tyLhs).pgType /= PgBoolean) do
-            throw env.compileError $ ArgumentTypeError tyLhs func PgBoolean
-        when ((exprType tyRhs).pgType /= PgBoolean) do
-            throw env.compileError $ ArgumentTypeError tyRhs func PgBoolean
+        when ((exprType tyLhs).pgType /= PgType.Boolean) do
+            throw env.compileError $ ArgumentTypeError tyLhs func PgType.Boolean
+        when ((exprType tyRhs).pgType /= PgType.Boolean) do
+            throw env.compileError $ ArgumentTypeError tyRhs func PgType.Boolean
         return (tyLhs, tyRhs)
 
 addTableToEnv :: (e :> es) => State [Field] e -> Table -> Alias -> Eff es ()
@@ -496,8 +497,8 @@ resolveBinOperatorType database lhs op rhs = do
     let realOp = if op == "!=" then "<>" else op
         candidateBinOps =
             filter (\(o, _, _, _) -> o == realOp) database.binaryOps
-    let assumedLhsTy = if lhs == PgUnknown then rhs else lhs
-    let assumedRhsTy = if rhs == PgUnknown then lhs else rhs
+    let assumedLhsTy = if lhs == PgType.Unknown then rhs else lhs
+    let assumedRhsTy = if rhs == PgType.Unknown then lhs else rhs
     listToMaybe
         . map (\(_, _, _, ty) -> (assumedLhsTy, assumedRhsTy, ty))
         . filter (\(_, _, r, _) -> r == assumedRhsTy)
