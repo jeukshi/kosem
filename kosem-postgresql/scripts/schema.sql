@@ -1,9 +1,10 @@
-create view kosem_types as
 select toid
-     , string_agg(initcap(pat_name), '')::text AS pat_name
+     , string_agg(initcap(pat_part), '')::text  AS pat_name
+  from (
+select *
   from (
      select oid as toid
-         , unnest(string_to_array(trim('"' from format_type(oid, null)), ' ')) as pat_name
+         , trim('"' from format_type(oid, null)) as pat_name
       from pg_type
      where typnamespace = 11
        and typname not like 'pg%'
@@ -20,4 +21,8 @@ select toid
             )
      order by typtype, typcategory
 )_
+cross join lateral unnest(string_to_array(pat_name, ' '))
+            with ordinality as a(pat_part, pat_pos)
+order by toid, pat_pos
+)_2
 group by toid
