@@ -15,6 +15,7 @@ emptyDatabase =
         , typesL = defaultDatabaseConfig.types
         , typesMap = defaultDatabaseConfig.typesToHs
         , binaryOps = defaultDatabaseConfig.binaryOperators
+        , unaryOps = defaultDatabaseConfig.unaryOperators
         , functions = defaultDatabaseConfig.confFunctions
         , tables = []
         }

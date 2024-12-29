@@ -102,6 +102,7 @@ data Database = Database
     , typesL :: [(Identifier, PgType)]
     , typesMap :: [(PgType, Name)]
     , binaryOps :: [(Operator, PgType, PgType, PgType)]
+    , unaryOps :: [(Operator, PgType, PgType)]
     , functions :: [(Identifier, [PgType], PgType)]
     , tables :: [Table]
     }

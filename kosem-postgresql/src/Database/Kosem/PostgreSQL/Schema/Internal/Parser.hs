@@ -73,4 +73,4 @@ schemaP databaseConfig = lexeme do
     _ <- skipMany C.spaceChar
     databaseName <- databaseNameP
     tables <- some (tableP databaseConfig)
-    return $ Database databaseName [] [] [] [] [] tables
+    return $ Database databaseName [] [] [] [] [] [] tables

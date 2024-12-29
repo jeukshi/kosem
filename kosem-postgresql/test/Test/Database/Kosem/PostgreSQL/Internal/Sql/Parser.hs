@@ -127,6 +127,13 @@ spec = parallel do
              where a = b and c <> d
               |]
 
+        it "unary operators" do
+            parseOnly selectCore
+                `shouldSucceedOn` [text|
+            select -false
+               and |/ true
+              |]
+
         it "" do
             parseOnly selectCore
                 `shouldSucceedOn` [text|

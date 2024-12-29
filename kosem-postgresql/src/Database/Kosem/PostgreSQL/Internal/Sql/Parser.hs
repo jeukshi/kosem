@@ -292,6 +292,20 @@ binOpP sym = mkBinOp <$> getP <*> operatorP sym
     mkBinOp p operator lhs rhs =
         EBinOp p lhs operator rhs ()
 
+unaryOpP :: String -> Parser (Expr () -> Expr ())
+unaryOpP sym = lexeme do
+    mkUnaryOp <$> lexeme getP <*> operatorP sym
+  where
+    mkUnaryOp p operator rhs =
+        EUnaryOp p operator rhs ()
+
+anyUnaryOpP :: Parser (Expr () -> Expr ())
+anyUnaryOpP = lexeme do
+    mkUnaryOp <$> lexeme getP <*> anyOperatorP
+  where
+    mkUnaryOp p operator rhs =
+        EUnaryOp p operator rhs ()
+
 anyBinOpP :: Parser (Expr () -> Expr () -> Expr ())
 anyBinOpP = lexeme do
     mkBinOp <$> getP <*> anyOperatorP
@@ -312,6 +326,10 @@ exprP = makeExprParser termP operatorsTable
                     <*> pgCastP
                     <*> pure ()
             ]
+        ,
+            [ Prefix do unaryOpP "+"
+            , Prefix do unaryOpP "-"
+            ]
         , [InfixL do binOpP "^" <?> "<operator>"]
         ,
             [ InfixL do binOpP "*" <?> "<operator>"
@@ -322,7 +340,10 @@ exprP = makeExprParser termP operatorsTable
             [ InfixL do binOpP "+" <?> "<operator>"
             , InfixL do binOpP "-" <?> "<operator>"
             ]
-        , [InfixL do anyBinOpP]
+        ,
+            [ InfixL do anyBinOpP
+            , Prefix do anyUnaryOpP
+            ]
         ,
             [ Postfix do
                 mkBetween

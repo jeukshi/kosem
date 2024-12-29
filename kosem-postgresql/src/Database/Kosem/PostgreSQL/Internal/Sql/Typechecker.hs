@@ -238,6 +238,7 @@ exprType = \cases
     (EAnd{}) -> TypeInfo PgType.Boolean Nullable Nothing
     (EOr{}) -> TypeInfo PgType.Boolean Nullable Nothing
     (EBinOp _ _ _ _ ty) -> ty
+    (EUnaryOp _ _ _ ty) -> ty
     (EBetween{}) -> TypeInfo PgType.Boolean Nullable Nothing
     (ENotBetween{}) -> TypeInfo PgType.Boolean Nullable Nothing
 
@@ -387,6 +388,13 @@ tcExpr env = \cases
             Just (resolvedLhsTy, resolvedRhsTy, resTy) ->
                 return $ EBinOp p tcLhs op tcRhs (TypeInfo resTy nullableRes Nothing)
             Nothing -> throw env.compileError $ OperatorDoesntExist p tyLhs op tyRhs
+    (EUnaryOp p op rhs ()) -> do
+        tcRhs <- tcExpr env rhs
+        let (TypeInfo tyRhs nullableRhs _) = exprType tcRhs
+        case resolveUnaryOperatorType env.database op tyRhs of
+            Just (resolvedRhsTy, resTy) ->
+                return $ EUnaryOp p op tcRhs (TypeInfo resTy nullableRhs Nothing)
+            Nothing -> throw env.compileError $ UnaryOperatorDoesntExist p op tyRhs
     (EBetween p lhs rhs1 rhs2) -> do
         -- TODO typecheck `between` against <= >=
         tyLhs <- tcExpr env lhs
@@ -504,6 +512,25 @@ resolveBinOperatorType database lhs op rhs = do
         . filter (\(_, _, r, _) -> r == assumedRhsTy)
         . filter (\(_, l, _, _) -> l == assumedLhsTy)
         $ candidateBinOps
+
+resolveUnaryOperatorType
+    :: Database
+    -> Operator
+    -> PgType
+    -> Maybe (PgType, PgType)
+resolveUnaryOperatorType database op rhs = do
+    -- \| Algorithm explained here:
+    -- https://www.postgresql.org/docs/17/typeconv-oper.html#TYPECONV-OPER
+
+    -- \| Postgres converts '!=' to '<>', see note:
+    -- https://www.postgresql.org/docs/current/functions-comparison.html
+    let realOp = if op == "!=" then "<>" else op
+        candidateUnaryOps =
+            filter (\(o, _, _) -> o == realOp) database.unaryOps
+    listToMaybe
+        . map (\(_, _, ty) -> (rhs, ty))
+        . filter (\(_, r, _) -> r == rhs)
+        $ candidateUnaryOps
 
 getBinaryOpResult
     :: Database

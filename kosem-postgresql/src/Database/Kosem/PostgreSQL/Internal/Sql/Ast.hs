@@ -18,9 +18,9 @@ data STerm t
     deriving (Show)
 
 data FromItem t
-    -- | Even though alias is optional, if it is not specified,
-    -- we set identifier as an alias. This makes searching more uniform.
-    = FiTableName P Identifier Alias
+    = -- | Even though alias is optional, if it is not specified,
+      -- we set identifier as an alias. This makes searching more uniform.
+      FiTableName P Identifier Alias
     | FiJoin (FromItem t) JoinType (FromItem t) (JoinCondition t)
     deriving (Show)
 
@@ -54,6 +54,7 @@ data AliasedExpr t
     | WithoutAlias (Expr t)
     deriving (Show)
 
+-- TODO make sure P is placed right next to element it marks
 data Expr t
     = EParens P (Expr t) P t
     | EParam P HsIdentifier t
@@ -69,6 +70,7 @@ data Expr t
     | EAnd P (Expr t) (Expr t)
     | EOr P (Expr t) (Expr t)
     | EBinOp P (Expr t) Operator (Expr t) t
+    | EUnaryOp P Operator (Expr t) t
     | -- Comparison predicates
       EBetween P (Expr t) (Expr t) (Expr t)
     | ENotBetween P (Expr t) (Expr t) (Expr t)

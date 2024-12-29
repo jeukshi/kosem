@@ -103,6 +103,7 @@ data CompileError
     | FunctionDoesNotExist P Identifier [PgType]
     | ExprWithNoAlias (Expr TypeInfo)
     | OperatorDoesntExist P PgType Operator PgType
+    | UnaryOperatorDoesntExist P Operator PgType
     | ColumnDoesNotExist P (Maybe Alias) Identifier
     | ColumnNameIsAmbiguous P Identifier
     | TableDoesNotExist P Identifier
@@ -132,6 +133,8 @@ compileErrorSpan = \case
             (p `movePby` identifierLength identifier)
     ExprWithNoAlias expr -> toDiagnosticSpan expr
     OperatorDoesntExist p _ operator _ ->
+        (DiagnosticSpan p (p `movePby` operatorLength operator))
+    UnaryOperatorDoesntExist p operator _ ->
         (DiagnosticSpan p (p `movePby` operatorLength operator))
     ColumnDoesNotExist p mbAlias identifier -> do
         let aliasLength =
@@ -169,6 +172,11 @@ compileErrorMsg = \case
         "operator does not exist: "
             <> pgTypePretty lhs
             <> " "
+            <> operatorPretty op
+            <> " "
+            <> pgTypePretty rhs
+    UnaryOperatorDoesntExist _ op rhs ->
+        "operator does not exist: "
             <> operatorPretty op
             <> " "
             <> pgTypePretty rhs
@@ -239,6 +247,9 @@ toDiagnosticSpan = \cases
             `combineSpans` toDiagnosticSpan rhs
     (EBinOp _ lhs _ rhs _) ->
         toDiagnosticSpan lhs
+            `combineSpans` toDiagnosticSpan rhs
+    (EUnaryOp p _ rhs _) ->
+        DiagnosticSpan p p
             `combineSpans` toDiagnosticSpan rhs
     (EBetween _ lhs _ rhs2) ->
         toDiagnosticSpan lhs
