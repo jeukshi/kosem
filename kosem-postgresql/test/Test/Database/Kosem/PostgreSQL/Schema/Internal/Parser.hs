@@ -55,6 +55,7 @@ table abc2
                         []
                         []
                         []
+                        []
                         [ Table
                             "abc"
                             [ Column "col1" PgType.Text Nullable

@@ -15,6 +15,19 @@ import Language.Haskell.TH.Lift (Lift)
 -- Let's keep this for now.
 type Alias = Identifier
 
+data CastContext
+    = CastContextExplicit
+    | CastContextAssignment
+    | CastContextImplicit
+    deriving (Show, Eq, Lift)
+
+data PgCast = PgCast
+    { source :: PgType
+    , target :: PgType
+    , castType :: CastContext
+    }
+    deriving (Show, Eq, Lift)
+
 data IsNullable
     = NonNullable
     | Nullable
@@ -85,6 +98,7 @@ operatorPretty operator = "‘" <> coerce operator <> "’"
 
 data Database = Database
     { name :: String
+    , dbCasts :: [PgCast]
     , typesL :: [(Identifier, PgType)]
     , typesMap :: [(PgType, Name)]
     , binaryOps :: [(Operator, PgType, PgType, PgType)]
