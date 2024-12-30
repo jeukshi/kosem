@@ -118,7 +118,7 @@ outputForTH database ci = do
     forTH :: Database -> CommandOutput -> SqlMapping
     forTH database co = do
         let hsType = getHsType database co.coPgType
-        SqlMapping co.coIdentifier hsType co.coNullable
+        SqlMapping co.coIdentifier hsType co.coNullable co.coPgType.len
 
 paramForTH :: Database -> Parameter -> CommandParameter
 paramForTH database p = do

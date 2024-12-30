@@ -65,24 +65,26 @@ genRowParser sqlMappings =
         $ NonEmpty.toList sqlMappings
   where
     genParseField :: SqlMapping -> Exp
-    genParseField sqlMapping = case sqlMapping.nullable of
-        NonNullable ->
-            -- \| `unsafeCoerce . parseField'Internal @Text`
-            InfixE
-                (Just (VarE 'unsafeCoerce))
-                (VarE '(.))
-                (Just (AppTypeE (VarE 'parseField'Internal) (ConT sqlMapping.hsType)))
-        Nullable ->
-            -- \| `unsafeCoerce . parseField'Internal @(Maybe Text)`
-            InfixE
-                (Just (VarE 'unsafeCoerce))
-                (VarE '(.))
-                ( Just
-                    ( AppTypeE
-                        (VarE 'parseField'Internal)
-                        (AppT (ConT ''Maybe) (ConT sqlMapping.hsType))
-                    )
-                )
+    genParseField sqlMapping = do
+        let appTypeE = case sqlMapping.nullable of
+                -- \| @Type
+                NonNullable -> ConT sqlMapping.hsType
+                -- \| @(Maybe Type)
+                Nullable -> AppT (ConT ''Maybe) (ConT sqlMapping.hsType)
+        let lenE = LitE (IntegerL (fromIntegral sqlMapping.len))
+        -- \| `unsafeCoerce . parseField'Internal @Text`
+        -- \| `unsafeCoerce . parseFieldWithLen'Internal @Text` <len>
+        if sqlMapping.len > 0
+            then
+                InfixE
+                    (Just (VarE 'unsafeCoerce))
+                    (VarE '(.))
+                    (Just (AppE (AppTypeE (VarE 'parseFieldWithLen'Internal) appTypeE) lenE))
+            else
+                InfixE
+                    (Just (VarE 'unsafeCoerce))
+                    (VarE '(.))
+                    (Just (AppTypeE (VarE 'parseField'Internal) appTypeE))
 
 hsIdentifierToVarE :: HsIdentifier -> Exp
 hsIdentifierToVarE = \cases
@@ -175,7 +177,6 @@ genParamsList = \cases
   where
     genToField :: CommandParameter -> Exp
     genToField param = do
-        -- let hsName = mkName (identifierToString param.cpIdentifier.hsIdentifier)
         let idVarE = hsIdentifierToVarE param.cpIdentifier
         let appTypeE = case param.cpIsNullable of
                 -- \| @Type
@@ -195,15 +196,3 @@ genParamsList = \cases
                 AppE
                     (AppTypeE (VarE 'toField'Internal) appTypeE)
                     idVarE
-
-{-case param.cpIsNullable of
-    NonNullable -> do
-        -- \| toField'Internal @Type variable
-        AppE
-            (AppTypeE (VarE 'toField'Internal) appTypeE)
-            idVarE
-    Nullable -> do
-        -- \| toField'Internal @(Maybe Type) variable
-        AppE
-            (AppTypeE (VarE 'toField'Internal) appTypeE)
-            idVarE-}

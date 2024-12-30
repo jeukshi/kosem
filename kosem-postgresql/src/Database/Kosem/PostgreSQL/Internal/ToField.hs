@@ -15,7 +15,10 @@ import PostgreSQL.Binary.Encoding
 -- what about FromField then...
 class ToField a where
     toField :: a -> ByteString
-    {-# MINIMAL toField #-}
+    {-# MINIMAL toField | toFieldWithLen #-}
+
+    default toField :: a -> ByteString
+    toField _ = error "TODO nice error"
 
     toFieldWithLen :: Int8 -> a -> ByteString
     default toFieldWithLen :: Int8 -> a -> ByteString

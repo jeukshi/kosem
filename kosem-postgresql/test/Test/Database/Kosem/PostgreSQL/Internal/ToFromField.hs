@@ -51,10 +51,18 @@ spec = do
             pendingWith "doesn't work"
 
     describe "'Int' instance" do
-        it "parseField . toFieldWithLen 8 == id" $ hedgehog do
+        it "parseFieldWithLen 8 . toFieldWithLen 8 == id" $ hedgehog do
             (int :: Int) <- forAll do
                 Gen.integral (Range.linear (minBound @Int) (maxBound @Int))
-            (parseField . toFieldWithLen 8 $ int) === int
+            (parseFieldWithLen 8 . toFieldWithLen 8 $ int) === int
+        it "parseFieldWithLen 4 . toFieldWithLen 4 == id" $ hedgehog do
+            (int :: Int) <- forAll do
+                Gen.integral (Range.linear (-2147483648) 2147483647)
+            (parseFieldWithLen 4 . toFieldWithLen 4 $ int) === int
+        it "parseFieldWithLen 2 . toFieldWithLen 2 == id" $ hedgehog do
+            (int :: Int) <- forAll do
+                Gen.integral (Range.linear (-32768) 32767)
+            (parseFieldWithLen 2 . toFieldWithLen 2 $ int) === int
 
     describe "'Maybe a' instance" do
         it "work for 'Just a'" do
@@ -115,7 +123,6 @@ specIO = around withDB do
         it "select 'Int' as PG 'bigint'" $ \conn -> hedgehog do
             (hsInt :: Int) <- forAll do
                 Gen.integral (Range.linear (minBound @Int) (maxBound @Int))
-
             rows <- evalIO do
                 execute
                     conn
@@ -124,22 +131,16 @@ specIO = around withDB do
             row.dbInt === hsInt
         it "select 'Int' as PG 'integer'" $ \conn -> hedgehog do
             (hsInt :: Int) <- forAll do
-                -- TODO make it work for negative integers
-                -- Gen.integral (Range.linear (-2147483648) 2147483647)
-                Gen.integral (Range.linear 0 2147483647)
-
+                Gen.integral (Range.linear (-2147483648) 2147483647)
             rows <- evalIO do
                 execute
                     conn
                     [Tdb.sql| select :hsInt::integer dbInt |]
             let row = V.head rows
             row.dbInt === hsInt
-
         it "select 'Int' as PG 'smallint'" $ \conn -> hedgehog do
             (hsInt :: Int) <- forAll do
-                -- TODO make it work for negative integers
-                -- Gen.integral (Range.linear (-32768) 32767)
-                Gen.integral (Range.linear 0 32767)
+                Gen.integral (Range.linear (-32768) 32767)
             rows <- evalIO do
                 execute
                     conn

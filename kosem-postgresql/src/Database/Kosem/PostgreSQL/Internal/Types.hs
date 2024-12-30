@@ -140,5 +140,6 @@ data SqlMapping = SqlMapping
     { identifier :: Identifier
     , hsType :: Name
     , nullable :: IsNullable
+    , len :: Int8
     }
     deriving (Show, Eq, Lift)
