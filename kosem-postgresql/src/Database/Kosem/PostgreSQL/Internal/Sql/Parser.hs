@@ -25,6 +25,7 @@ import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
 import Text.Megaparsec.Debug (dbg)
 import Text.Pretty.Simple
+import Text.Read (readMaybe)
 import Prelude hiding (takeWhile)
 
 run
@@ -208,7 +209,7 @@ termP = lexeme do
     choice
         [ parensExprP
         , try functionExprP
-        , exprLitP
+        , exprLiteralP
         , exprColP
         , paramMaybeP
         , paramP
@@ -413,15 +414,16 @@ exprP = makeExprParser termP operatorsTable
         mk p1 identifier pOpen innerExpr pClose lhs =
             EGuardedMaybeAnd lhs p1 identifier pOpen innerExpr pClose
 
-exprLitP :: Parser (Expr ())
-exprLitP = lexeme do
+exprLiteralP :: Parser (Expr ())
+exprLiteralP = lexeme do
     p <- getP
     lit <-
         choice
             [ boolLiteralP
-            , textLiteralP
+            , integerLiteralP <?> "<number>"
+            , stringLiteralP <?> "<string>"
             ]
-    return $ ELit p lit ()
+    return $ ELiteral p lit ()
 
 exprColP :: Parser (Expr ())
 exprColP = lexeme do
@@ -434,16 +436,23 @@ exprColP = lexeme do
         (Just identifier) -> return $ ECol p (Just idPart) identifier ()
         Nothing -> return $ ECol p Nothing idPart ()
 
+integerLiteralP :: Parser LiteralValue
+integerLiteralP = lexeme do
+    str <- some C.digitChar
+    case readMaybe @Integer str of
+        Just val -> return $ IntegerLiteral val
+        Nothing -> error $ "TODO cannot parse as integer: " <> str
+
 boolLiteralP :: Parser LiteralValue
 boolLiteralP = lexeme do
     s <- C.string "true" <|> C.string "false"
     return $ BoolLiteral s
 
-textLiteralP :: Parser LiteralValue
-textLiteralP = lexeme do
+stringLiteralP :: Parser LiteralValue
+stringLiteralP = lexeme do
     -- FIXME only alphaNum literals
     s <- between (symbol "'") (symbol "'") (many C.alphaNumChar)
-    return $ TextLiteral s
+    return $ StringLiteral s
 
 resultColumnP :: Parser (NonEmpty (AliasedExpr ()))
 resultColumnP = lexeme do

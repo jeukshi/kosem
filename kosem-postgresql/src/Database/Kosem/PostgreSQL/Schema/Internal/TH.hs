@@ -34,7 +34,9 @@ database' databaseConfig userInput = do
             db
                 { typesL = databaseConfig.types
                 , typesMap = databaseConfig.typesToHs
+                , dbCasts = pgCast
                 , binaryOps = databaseConfig.binaryOperators
+                , unaryOps = databaseConfig.unaryOperators
                 , functions = databaseConfig.confFunctions
                 }
     dbExp <- [e|dbWithTypes|]

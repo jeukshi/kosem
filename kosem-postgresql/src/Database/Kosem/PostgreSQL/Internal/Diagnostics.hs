@@ -214,13 +214,17 @@ toDiagnosticSpan = \cases
         DiagnosticSpan
             p
             (p `movePby` identifierLength identifier)
-    (ELit p lit _) -> case lit of
-        NumericLiteral -> undefined -- TODO
+    (ELiteral p lit _) -> case lit of
+        NonIntegerNumberLiteral x -> undefined -- TODO
+        IntegerLiteral int ->
+            DiagnosticSpan
+                p
+                (p `movePby` length (show int))
         BoolLiteral text ->
             DiagnosticSpan
                 p
                 (p `movePby` length text)
-        TextLiteral text ->
+        StringLiteral text ->
             DiagnosticSpan
                 p
                 -- \| +2 from single quote.

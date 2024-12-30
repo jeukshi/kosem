@@ -1,4 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE NoMonoLocalBinds #-}
@@ -232,7 +233,7 @@ exprType = \cases
     (EParamMaybe _ _ ty) -> ty
     (EGuardedBoolAnd{}) -> TypeInfo PgType.Boolean Nullable Nothing
     (EGuardedMaybeAnd{}) -> TypeInfo PgType.Boolean Nullable Nothing
-    (ELit _ _ ty) -> ty
+    (ELiteral _ _ ty) -> ty
     (ECol _ _ _ ty) -> ty
     (ENot{}) -> TypeInfo PgType.Boolean Nullable Nothing
     (EAnd{}) -> TypeInfo PgType.Boolean Nullable Nothing
@@ -318,17 +319,6 @@ tcExpr env = \cases
             Nothing -> throw env.compileError $ FunctionDoesNotExist p name argsPgTypes
             Just ty -> do
                 return $ EFunction p name tyExprs (TypeInfo ty resNullable Nothing)
-    (ELit p litVal _) -> case litVal of
-        NumericLiteral -> do
-            return $
-                ELit
-                    p
-                    litVal
-                    (TypeInfo PgType.Numeric NonNullable Nothing)
-        TextLiteral _ -> do
-            return $ ELit p litVal (TypeInfo PgType.Unknown NonNullable Nothing) -- FIXME this is 'unknown'
-        (BoolLiteral _) -> do
-            return $ ELit p litVal (TypeInfo PgType.Boolean NonNullable Nothing)
     (ECol p mbAlias colName _) -> do
         fields <- get env.fields
         -- FIXME use alias
@@ -388,6 +378,29 @@ tcExpr env = \cases
             Just (resolvedLhsTy, resolvedRhsTy, resTy) ->
                 return $ EBinOp p tcLhs op tcRhs (TypeInfo resTy nullableRes Nothing)
             Nothing -> throw env.compileError $ OperatorDoesntExist p tyLhs op tyRhs
+    (EUnaryOp p "-" lit@(ELiteral _ (IntegerLiteral val) ()) ()) -> do
+        -- \| Postgres is being smart about integer literals type.
+        -- select pg_typeof(2147483647); -- integer
+        -- select pg_typeof(2147483648); -- bigint
+        -- select pg_typeof(-2147483648); -- integer
+        -- Last select should be (-) unary operator applied to `bigint`
+        -- which would be of type `bigint` but number -2147483648
+        -- is in the range of `integer` type, so the type is `integer`.
+        -- The same thing happens on the boundary between `bigint` and `numeric`.
+        -- We merge operator (-) with integer literal, negating it's sign.
+        -- TODO document this somewhere
+        let minusVal = negate val
+        if
+            | val > 9223372036854775808 ->
+                return $
+                    ELiteral
+                        p
+                        (IntegerLiteral minusVal)
+                        (TypeInfo PgType.Numeric NonNullable Nothing)
+            | val > 2147483648 ->
+                return $ ELiteral p (IntegerLiteral minusVal) (TypeInfo PgType.Bigint NonNullable Nothing)
+            | otherwise ->
+                return $ ELiteral p (IntegerLiteral minusVal) (TypeInfo PgType.Integer NonNullable Nothing)
     (EUnaryOp p op rhs ()) -> do
         tcRhs <- tcExpr env rhs
         let (TypeInfo tyRhs nullableRhs _) = exprType tcRhs
@@ -409,6 +422,25 @@ tcExpr env = \cases
             <$> tcExpr env lhs
             <*> tcExpr env rhs1
             <*> tcExpr env rhs2
+    (ELiteral p litVal _) -> case litVal of
+        NonIntegerNumberLiteral x -> do
+            return $
+                ELiteral
+                    p
+                    litVal
+                    (TypeInfo PgType.Numeric NonNullable Nothing)
+        IntegerLiteral val -> do
+            if
+                | val > 9223372036854775807 ->
+                    return $ ELiteral p litVal (TypeInfo PgType.Numeric NonNullable Nothing)
+                | val > 2147483647 ->
+                    return $ ELiteral p litVal (TypeInfo PgType.Bigint NonNullable Nothing)
+                | otherwise ->
+                    return $ ELiteral p litVal (TypeInfo PgType.Integer NonNullable Nothing)
+        StringLiteral _ -> do
+            return $ ELiteral p litVal (TypeInfo PgType.Unknown NonNullable Nothing)
+        (BoolLiteral _) -> do
+            return $ ELiteral p litVal (TypeInfo PgType.Boolean NonNullable Nothing)
   where
     tyMustBeBoolean
         :: (e :> es)

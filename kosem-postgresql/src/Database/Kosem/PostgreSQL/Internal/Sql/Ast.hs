@@ -60,7 +60,7 @@ data Expr t
     | EParam P HsIdentifier t
     | EParamMaybe P HsIdentifier t
     | EFunction P Identifier [Expr t] t
-    | ELit P LiteralValue t
+    | ELiteral P LiteralValue t
     | ECol P (Maybe Alias) Identifier t
     | EPgCast P (Expr t) P Identifier t
     | -- | expression::type
@@ -77,7 +77,8 @@ data Expr t
     deriving (Show)
 
 data LiteralValue
-    = NumericLiteral
-    | TextLiteral String
+    = IntegerLiteral Integer
+    | NonIntegerNumberLiteral String
+    | StringLiteral String
     | BoolLiteral String
     deriving (Show)

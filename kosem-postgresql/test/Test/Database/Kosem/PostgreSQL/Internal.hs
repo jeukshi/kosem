@@ -285,6 +285,7 @@ spec = around withDB $ do
             length rowsZero `shouldBe` 0
             length rowsOne `shouldBe` 1
 
+    describe "functions" $ do
         it "call function" $ \conn -> do
             let abc = True
                 cba = "cba"
@@ -300,6 +301,21 @@ spec = around withDB $ do
             let row = V.head rows
             row.t `shouldBe` "bbbb"
 
+    describe "numbers" $ do
+        it "positive numbers" $ \conn -> do
+            rows <- execute conn do
+                [Tdb.sql| select 123 num |]
+            let row = V.head rows
+            row.num `shouldBe` 123
+
+        it "negative numbers" $ \conn -> do
+            pendingWith "TODO make it work"
+            rows <- execute conn do
+                [Tdb.sql| select -123 num |]
+            let row = V.head rows
+            row.num `shouldBe` -123
+
+    describe "params" $ do
         it "OverloadedRecordDot identifier (nested)" $ \conn -> do
             let myRec =
                     MkMyRecord

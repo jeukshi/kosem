@@ -27,6 +27,7 @@ defaultDatabaseConfig =
             [ ("text", PgType.Text)
             , ("integer", PgType.Integer)
             , ("bigint", PgType.Bigint)
+            , ("numeric", PgType.Numeric)
             , ("boolean", PgType.Boolean)
             ]
         , typesToHs =
