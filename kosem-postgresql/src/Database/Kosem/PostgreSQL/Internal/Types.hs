@@ -1,14 +1,17 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 
 module Database.Kosem.PostgreSQL.Internal.Types where
 
 import Data.ByteString.Builder (Builder)
 import Data.Coerce (coerce)
+import Data.Int (Int8)
 import Data.List (intersperse)
 import Data.String (IsString)
 import Data.Text (Text)
 import Data.Text qualified as T
 import Database.Kosem.PostgreSQL.Internal.TypCategory (TypCategory)
+import GHC.Records (HasField (..))
 import Language.Haskell.TH (Extension (DuplicateRecordFields), Name)
 import Language.Haskell.TH.Lift (Lift)
 
@@ -39,14 +42,19 @@ data IsPrefered
     deriving (Show, Eq, Lift)
 
 data PgType
-    = Base Identifier Identifier TypCategory IsPrefered
-    | Pseudo Identifier Identifier TypCategory IsPrefered
+    = Base Identifier Identifier TypCategory IsPrefered Int8
+    | Pseudo Identifier Identifier TypCategory IsPrefered Int8
     deriving (Show, Eq, Lift)
+
+instance HasField "len" PgType Int8 where
+    getField :: PgType -> Int8
+    getField (Base _ _ _ _ len) = len
+    getField (Pseudo _ _ _ _ len) = len
 
 pgTypePretty :: PgType -> String
 pgTypePretty = \cases
-    (Base _ identifier _ _) -> identifierPretty identifier
-    (Pseudo _ identifier _ _) -> identifierPretty identifier
+    (Base _ identifier _ _ _) -> identifierPretty identifier
+    (Pseudo _ identifier _ _ _) -> identifierPretty identifier
 
 newtype Identifier = Identifier String
     deriving (Show) via String

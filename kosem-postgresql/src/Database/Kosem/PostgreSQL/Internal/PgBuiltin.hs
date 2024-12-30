@@ -26,6 +26,7 @@ defaultDatabaseConfig =
         { types =
             [ ("text", PgType.Text)
             , ("integer", PgType.Integer)
+            , ("smallint", PgType.Smallint)
             , ("bigint", PgType.Bigint)
             , ("numeric", PgType.Numeric)
             , ("boolean", PgType.Boolean)
@@ -33,6 +34,7 @@ defaultDatabaseConfig =
         , typesToHs =
             [ (PgType.Text, ''Text)
             , (PgType.Integer, ''Int)
+            , (PgType.Smallint, ''Int)
             , (PgType.Bigint, ''Int)
             , (PgType.Boolean, ''Bool)
             ]

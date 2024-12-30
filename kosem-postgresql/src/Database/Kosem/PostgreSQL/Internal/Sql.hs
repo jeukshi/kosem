@@ -127,6 +127,7 @@ paramForTH database p = do
         { cpIdentifier = p.pIdentifier
         , cpHsType = hsType
         , cpIsNullable = p.pNullable
+        , cpLen = p.pPgType.len
         }
 
 getHsType :: Database -> PgType -> Name

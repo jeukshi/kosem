@@ -34,56 +34,56 @@ select oid
 -}
 
 pattern Boolean :: PgType
-pattern Boolean <- Base "bool" "boolean" TypCategory.B Prefered
+pattern Boolean <- Base "bool" "boolean" TypCategory.B Prefered 1
     where
-        Boolean = Base "bool" "boolean" TypCategory.B Prefered
+        Boolean = Base "bool" "boolean" TypCategory.B Prefered 1
 
 pattern Bigint :: PgType
-pattern Bigint <- Base "int8" "bigint" TypCategory.N NotPrefered
+pattern Bigint <- Base "int8" "bigint" TypCategory.N NotPrefered 8
     where
-        Bigint = Base "int8" "bigint" TypCategory.N NotPrefered
+        Bigint = Base "int8" "bigint" TypCategory.N NotPrefered 8
 
 pattern Smallint :: PgType
-pattern Smallint <- Base "int2" "smallint" TypCategory.N NotPrefered
+pattern Smallint <- Base "int2" "smallint" TypCategory.N NotPrefered 2
     where
-        Smallint = Base "int2" "smallint" TypCategory.N NotPrefered
+        Smallint = Base "int2" "smallint" TypCategory.N NotPrefered 2
 
 pattern Integer :: PgType
-pattern Integer <- Base "int4" "integer" TypCategory.N NotPrefered
+pattern Integer <- Base "int4" "integer" TypCategory.N NotPrefered 4
     where
-        Integer = Base "int4" "integer" TypCategory.N NotPrefered
+        Integer = Base "int4" "integer" TypCategory.N NotPrefered 4
 
 pattern Text :: PgType
-pattern Text <- Base "text" "text" TypCategory.S Prefered
+pattern Text <- Base "text" "text" TypCategory.S Prefered (-1)
     where
-        Text = Base "text" "text" TypCategory.S Prefered
+        Text = Base "text" "text" TypCategory.S Prefered (-1)
 
 pattern Real :: PgType
-pattern Real <- Base "float4" "real" TypCategory.N NotPrefered
+pattern Real <- Base "float4" "real" TypCategory.N NotPrefered 4
     where
-        Real = Base "float4" "real" TypCategory.N NotPrefered
+        Real = Base "float4" "real" TypCategory.N NotPrefered 4
 
 pattern DoublePrecision :: PgType
-pattern DoublePrecision <- Base "float8" "double precision" TypCategory.N Prefered
+pattern DoublePrecision <- Base "float8" "double precision" TypCategory.N Prefered 8
     where
-        DoublePrecision = Base "float8" "double precision" TypCategory.N Prefered
+        DoublePrecision = Base "float8" "double precision" TypCategory.N Prefered 8
 
 pattern Unknown :: PgType
-pattern Unknown <- Pseudo "unknown" "unknown" TypCategory.X NotPrefered
+pattern Unknown <- Pseudo "unknown" "unknown" TypCategory.X NotPrefered (-2)
     where
-        Unknown = Pseudo "unknown" "unknown" TypCategory.X NotPrefered
+        Unknown = Pseudo "unknown" "unknown" TypCategory.X NotPrefered (-2)
 
 pattern Character :: PgType
-pattern Character <- Base "bpchar" "character" TypCategory.S NotPrefered
+pattern Character <- Base "bpchar" "character" TypCategory.S NotPrefered (-1)
     where
-        Character = Base "bpchar" "character" TypCategory.S NotPrefered
+        Character = Base "bpchar" "character" TypCategory.S NotPrefered (-1)
 
 pattern CharacterVarying :: PgType
-pattern CharacterVarying <- Base "varchar" "character varying" TypCategory.S NotPrefered
+pattern CharacterVarying <- Base "varchar" "character varying" TypCategory.S NotPrefered (-1)
     where
-        CharacterVarying = Base "varchar" "character varying" TypCategory.S NotPrefered
+        CharacterVarying = Base "varchar" "character varying" TypCategory.S NotPrefered (-1)
 
 pattern Numeric :: PgType
-pattern Numeric <- Base "numeric" "numeric" TypCategory.N NotPrefered
+pattern Numeric <- Base "numeric" "numeric" TypCategory.N NotPrefered (-1)
     where
-        Numeric = Base "numeric" "numeric" TypCategory.N NotPrefered
+        Numeric = Base "numeric" "numeric" TypCategory.N NotPrefered (-1)

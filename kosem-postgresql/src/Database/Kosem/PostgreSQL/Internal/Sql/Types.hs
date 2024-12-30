@@ -6,6 +6,7 @@ module Database.Kosem.PostgreSQL.Internal.Sql.Types where
 
 import Data.Bifunctor (Bifunctor (..))
 import Data.ByteString (ByteString)
+import Data.Int (Int8)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.P (P)
@@ -98,6 +99,7 @@ data CommandParameter = MkCommandParameter
     { cpIdentifier :: HsIdentifier
     , cpHsType :: Name
     , cpIsNullable :: IsNullable
+    , cpLen :: Int8
     }
     deriving (Show)
 

@@ -8,6 +8,7 @@ module Database.Kosem.PostgreSQL.Internal.Sql.TH where
 import Control.Monad (join)
 import Data.Bifunctor (Bifunctor (..), second)
 import Data.ByteString (ByteString)
+import Data.Int (Int8)
 import Data.List (foldl', nub)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.List.NonEmpty qualified as NonEmpty
@@ -16,7 +17,9 @@ import Data.Vector.Fusion.Bundle.Monadic (elements)
 import Database.Kosem.PostgreSQL.Internal.FromField
 import Database.Kosem.PostgreSQL.Internal.Row
 import Database.Kosem.PostgreSQL.Internal.Sql.Types
-import Database.Kosem.PostgreSQL.Internal.ToField (ToField (toField'Internal))
+import Database.Kosem.PostgreSQL.Internal.ToField (
+    ToField (toField'Internal, toFieldWithLen'Internal),
+ )
 import Database.Kosem.PostgreSQL.Internal.Types
 import GHC.Records
 import Language.Haskell.TH
@@ -162,6 +165,9 @@ genPatternMatch f = \cases
 genCommand :: ByteString -> Q Exp
 genCommand bs = [e|bs|]
 
+genInt8 :: Int -> Q Exp
+genInt8 int = [e|int|]
+
 genParamsList :: [CommandParameter] -> Exp
 genParamsList = \cases
     [] -> ConE '[]
@@ -171,17 +177,33 @@ genParamsList = \cases
     genToField param = do
         -- let hsName = mkName (identifierToString param.cpIdentifier.hsIdentifier)
         let idVarE = hsIdentifierToVarE param.cpIdentifier
-        case param.cpIsNullable of
-            NonNullable -> do
-                -- \| toField'Internal @Type variable
+        let appTypeE = case param.cpIsNullable of
+                -- \| @Type
+                NonNullable -> ConT param.cpHsType
+                -- \| @(Maybe Type)
+                Nullable -> AppT (ConT ''Maybe) (ConT param.cpHsType)
+        let lenE = LitE (IntegerL (fromIntegral param.cpLen))
+        if param.cpLen > 0
+            then
                 AppE
-                    (AppTypeE (VarE 'toField'Internal) (ConT param.cpHsType))
-                    idVarE
-            Nullable -> do
-                -- \| toField'Internal @(Maybe Type) variable
-                AppE
-                    ( AppTypeE
-                        (VarE 'toField'Internal)
-                        (AppT (ConT ''Maybe) (ConT param.cpHsType))
+                    ( AppE
+                        (AppTypeE (VarE 'toFieldWithLen'Internal) appTypeE)
+                        lenE
                     )
                     idVarE
+            else
+                AppE
+                    (AppTypeE (VarE 'toField'Internal) appTypeE)
+                    idVarE
+
+{-case param.cpIsNullable of
+    NonNullable -> do
+        -- \| toField'Internal @Type variable
+        AppE
+            (AppTypeE (VarE 'toField'Internal) appTypeE)
+            idVarE
+    Nullable -> do
+        -- \| toField'Internal @(Maybe Type) variable
+        AppE
+            (AppTypeE (VarE 'toField'Internal) appTypeE)
+            idVarE-}
