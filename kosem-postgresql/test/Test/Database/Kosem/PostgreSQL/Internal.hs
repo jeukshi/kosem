@@ -309,7 +309,6 @@ spec = around withDB $ do
             row.num `shouldBe` 123
 
         it "negative numbers" $ \conn -> do
-            pendingWith "TODO make it work"
             rows <- execute conn do
                 [Tdb.sql| select -123 num |]
             let row = V.head rows
