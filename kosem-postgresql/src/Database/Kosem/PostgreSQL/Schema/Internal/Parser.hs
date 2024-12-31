@@ -58,8 +58,8 @@ tableItemP databaseConfig = lexemeS do
     columnName <- identifierS <?> "column name"
     -- FIXME assumes Scalar
     typeName <- identifierS <?> "column data type"
-    let x = filter (\(n, _) -> n == typeName) databaseConfig.types
-    let pgType = head . map snd $ x
+    let x = filter (\ty -> ty.name == typeName || ty.nameSql == typeName) databaseConfig.types
+    let pgType = head x
     Column columnName pgType <$> isNullableP
 
 isNullableP :: Parser IsNullable

@@ -494,13 +494,13 @@ getFunctionTy database functionId argsTy =
 getPgType :: Database -> Identifier -> PgType
 getPgType database identifier = find identifier database.typesL
   where
-    find :: Identifier -> [(Identifier, PgType)] -> PgType
+    find :: Identifier -> [PgType] -> PgType
     find identifier = \cases
         -- TODO proper error
         [] -> error $ "no type: " <> show identifier
-        ((i, t) : xs) ->
-            if i == identifier
-                then t
+        (x : xs) ->
+            if x.name == identifier || x.nameSql == identifier
+                then x
                 else find identifier xs
 
 addFieldsToEnv

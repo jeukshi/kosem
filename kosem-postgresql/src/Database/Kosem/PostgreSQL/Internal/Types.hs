@@ -51,6 +51,16 @@ instance HasField "len" PgType Int8 where
     getField (Base _ _ _ _ len) = len
     getField (Pseudo _ _ _ _ len) = len
 
+instance HasField "name" PgType Identifier where
+    getField :: PgType -> Identifier
+    getField (Base name _ _ _ _) = name
+    getField (Pseudo name _ _ _ _) = name
+
+instance HasField "nameSql" PgType Identifier where
+    getField :: PgType -> Identifier
+    getField (Base _ name _ _ _) = name
+    getField (Pseudo _ name _ _ _) = name
+
 pgTypePretty :: PgType -> String
 pgTypePretty = \cases
     (Base _ identifier _ _ _) -> identifierPretty identifier
@@ -107,7 +117,7 @@ operatorPretty operator = "‘" <> coerce operator <> "’"
 data Database = Database
     { name :: String
     , dbCasts :: [PgCast]
-    , typesL :: [(Identifier, PgType)]
+    , typesL :: [PgType]
     , typesMap :: [(PgType, Name)]
     , binaryOps :: [(Operator, PgType, PgType, PgType)]
     , unaryOps :: [(Operator, PgType, PgType)]

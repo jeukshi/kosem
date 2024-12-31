@@ -13,7 +13,7 @@ import Database.Kosem.PostgreSQL.Internal.Types
 import Language.Haskell.TH (Name)
 
 data DatabaseConfig = DatabaseConfig
-    { types :: [(Identifier, PgType)]
+    { types :: [PgType]
     , typesToHs :: [(PgType, Name)]
     , casts :: [PgCast]
     , binaryOperators :: [(Operator, PgType, PgType, PgType)]
@@ -25,14 +25,14 @@ defaultDatabaseConfig :: DatabaseConfig
 defaultDatabaseConfig =
     DatabaseConfig
         { types =
-            [ ("text", PgType.Text)
-            , ("integer", PgType.Integer)
-            , ("smallint", PgType.Smallint)
-            , ("bigint", PgType.Bigint)
-            , ("numeric", PgType.Numeric)
-            , ("real", PgType.Real)
-            , ("float8", PgType.DoublePrecision)
-            , ("boolean", PgType.Boolean)
+            [ PgType.Text
+            , PgType.Integer
+            , PgType.Smallint
+            , PgType.Bigint
+            , PgType.Numeric
+            , PgType.Real
+            , PgType.DoublePrecision
+            , PgType.Boolean
             ]
         , typesToHs =
             [ (PgType.Text, ''Text)
