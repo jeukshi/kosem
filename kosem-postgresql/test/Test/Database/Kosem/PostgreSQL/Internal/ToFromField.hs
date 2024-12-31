@@ -160,15 +160,15 @@ specIO = around withDB do
             row.dbNum === hsNum
 
         it "select NaN, Infinity, -Infinity 'Float'" \conn -> do
-            let (hsNaN :: Double) = 0 / 0
-            let (hsPosInf :: Double) = 1 / 0
-            let (hsNegInf :: Double) = -1 / 0
+            let (hsNaN :: Float) = 0 / 0
+            let (hsPosInf :: Float) = 1 / 0
+            let (hsNegInf :: Float) = -1 / 0
             rows <-
                 execute
                     conn
-                    [Tdb.sql| select :hsNaN::float8 dbNaN
-                                   , :hsPosInf::float8 dbPosInf
-                                   , :hsNegInf::float8 dbNegInf
+                    [Tdb.sql| select :hsNaN::real dbNaN
+                                   , :hsPosInf::real dbPosInf
+                                   , :hsNegInf::real dbNegInf
                     |]
             let row = V.head rows
             isNaN row.dbNaN `shouldBe` True
@@ -188,15 +188,15 @@ specIO = around withDB do
             row.dbNum === hsNum
 
         it "select NaN, Infinity, -Infinity 'Double'" \conn -> do
-            let (hsNaN :: Float) = 0 / 0
-            let (hsPosInf :: Float) = 1 / 0
-            let (hsNegInf :: Float) = -1 / 0
+            let (hsNaN :: Double) = 0 / 0
+            let (hsPosInf :: Double) = 1 / 0
+            let (hsNegInf :: Double) = -1 / 0
             rows <-
                 execute
                     conn
-                    [Tdb.sql| select :hsNaN::real dbNaN
-                                   , :hsPosInf::real dbPosInf
-                                   , :hsNegInf::real dbNegInf
+                    [Tdb.sql| select :hsNaN::float8 dbNaN
+                                   , :hsPosInf::float8 dbPosInf
+                                   , :hsNegInf::float8 dbNegInf
                     |]
             let row = V.head rows
             isNaN row.dbNaN `shouldBe` True
