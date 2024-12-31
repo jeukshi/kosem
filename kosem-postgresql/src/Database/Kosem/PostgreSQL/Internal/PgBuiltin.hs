@@ -30,6 +30,8 @@ defaultDatabaseConfig =
             , ("smallint", PgType.Smallint)
             , ("bigint", PgType.Bigint)
             , ("numeric", PgType.Numeric)
+            , ("real", PgType.Real)
+            , ("float8", PgType.DoublePrecision)
             , ("boolean", PgType.Boolean)
             ]
         , typesToHs =
@@ -38,6 +40,8 @@ defaultDatabaseConfig =
             , (PgType.Smallint, ''Int)
             , (PgType.Bigint, ''Int)
             , (PgType.Boolean, ''Bool)
+            , (PgType.Real, ''Float)
+            , (PgType.DoublePrecision, ''Double)
             , (PgType.Numeric, ''Scientific)
             ]
         , casts = pgCast

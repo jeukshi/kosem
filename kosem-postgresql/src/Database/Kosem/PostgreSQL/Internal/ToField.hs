@@ -50,6 +50,14 @@ instance ToField Int where
     toFieldWithLen 2 = encodingBytes . int2_int16 . fromIntegral
     toFieldWithLen n = error $ "TODO: not implemented for length: " <> show n
 
+instance ToField Float where
+    toField :: Float -> ByteString
+    toField = encodingBytes . float4
+
+instance ToField Double where
+    toField :: Double -> ByteString
+    toField = encodingBytes . float8
+
 instance ToField Scientific where
     toField :: Scientific -> ByteString
     toField = encodingBytes . numeric

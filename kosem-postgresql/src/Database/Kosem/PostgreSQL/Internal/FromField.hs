@@ -61,6 +61,18 @@ instance FromField Int where
         Right t -> fromIntegral t
     parseFieldWithLen n _ = error $ "TODO: not implemented for length: " <> show n
 
+instance FromField Float where
+    parseField :: ByteString -> Float
+    parseField bs = case valueParser float4 bs of
+        Left e -> error "parse error"
+        Right t -> t
+
+instance FromField Double where
+    parseField :: ByteString -> Double
+    parseField bs = case valueParser float8 bs of
+        Left e -> error "parse error"
+        Right t -> t
+
 instance FromField Scientific where
     parseField bs = case valueParser numeric bs of
         Left e -> error "parse error"

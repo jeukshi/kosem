@@ -149,6 +149,62 @@ specIO = around withDB do
             let row = V.head rows
             row.dbInt === hsInt
 
+        it "select 'Float' as PG 'real'/'float4'" $ \conn -> hedgehog do
+            (hsNum :: Float) <- forAll do
+                Gen.float (Range.linearFrac (-3.40282347e38) 3.40282347e38)
+            rows <- evalIO do
+                execute
+                    conn
+                    [Tdb.sql| select :hsNum::real dbNum |]
+            let row = V.head rows
+            row.dbNum === hsNum
+
+        it "select NaN, Infinity, -Infinity 'Float'" \conn -> do
+            let (hsNaN :: Double) = 0 / 0
+            let (hsPosInf :: Double) = 1 / 0
+            let (hsNegInf :: Double) = -1 / 0
+            rows <-
+                execute
+                    conn
+                    [Tdb.sql| select :hsNaN::float8 dbNaN
+                                   , :hsPosInf::float8 dbPosInf
+                                   , :hsNegInf::float8 dbNegInf
+                    |]
+            let row = V.head rows
+            isNaN row.dbNaN `shouldBe` True
+            isInfinite row.dbPosInf `shouldBe` True
+            row.dbPosInf > 0 `shouldBe` True
+            isInfinite row.dbNegInf `shouldBe` True
+            row.dbNegInf < 0 `shouldBe` True
+
+        it "select 'Double' as PG 'double precision'/'float8'" $ \conn -> hedgehog do
+            (hsNum :: Double) <- forAll do
+                Gen.double (Range.linearFrac (-1.7976931348623157e308) 1.7976931348623157e308)
+            rows <- evalIO do
+                execute
+                    conn
+                    [Tdb.sql| select :hsNum::float8 dbNum |]
+            let row = V.head rows
+            row.dbNum === hsNum
+
+        it "select NaN, Infinity, -Infinity 'Double'" \conn -> do
+            let (hsNaN :: Float) = 0 / 0
+            let (hsPosInf :: Float) = 1 / 0
+            let (hsNegInf :: Float) = -1 / 0
+            rows <-
+                execute
+                    conn
+                    [Tdb.sql| select :hsNaN::real dbNaN
+                                   , :hsPosInf::real dbPosInf
+                                   , :hsNegInf::real dbNegInf
+                    |]
+            let row = V.head rows
+            isNaN row.dbNaN `shouldBe` True
+            isInfinite row.dbPosInf `shouldBe` True
+            row.dbPosInf > 0 `shouldBe` True
+            isInfinite row.dbNegInf `shouldBe` True
+            row.dbNegInf < 0 `shouldBe` True
+
         it "select 'Scientific' as PG 'numeric'" $ \conn -> hedgehog do
             (hsNum :: Scientific) <- forAll do
                 genScientific
