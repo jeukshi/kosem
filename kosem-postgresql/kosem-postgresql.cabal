@@ -55,6 +55,7 @@ library
     , vector
     , ghc
     , template-haskell
+    , scientific
     , th-lift
     , postgresql-binary
     , postgresql-libpq
@@ -110,6 +111,7 @@ test-suite spec
     , hspec-hedgehog
     , hedgehog
     , megaparsec
+    , scientific
     , text
     , bytestring
     , vector

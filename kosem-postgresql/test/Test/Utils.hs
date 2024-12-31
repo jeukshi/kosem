@@ -3,11 +3,15 @@
 module Test.Utils where
 
 import Control.Exception (bracket)
+import Data.Scientific (Scientific, scientific)
 import Data.Text (Text)
 import Data.Void (Void)
 import Database.Kosem.PostgreSQL.Internal.Connection
 import Database.Kosem.PostgreSQL.Internal.ParserUtils
 import Database.Kosem.PostgreSQL.Internal.Types (Database (Database))
+import Hedgehog (MonadGen)
+import Hedgehog.Gen qualified as Gen
+import Hedgehog.Range qualified as Range
 import Test.Hspec.Megaparsec (initialState)
 import Text.Megaparsec
 import Text.Megaparsec.Char qualified as C
@@ -54,3 +58,9 @@ parseInc
     -> s
     -> (State s Void, Either (ParseErrorBundle s Void) a)
 parseInc p s = runParser' p (initialState s)
+
+genScientific :: (MonadGen m) => m Scientific
+genScientific = do
+    i <- Gen.integral (Range.linear (-2147483648) 2147483647)
+    e <- Gen.integral (Range.linear (-100) 100)
+    return $ scientific i e

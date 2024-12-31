@@ -4,6 +4,7 @@ module Test.Database.Kosem.PostgreSQL.Internal.ToFromField where
 
 import Control.Concurrent (threadDelay)
 import Control.Monad.IO.Class (liftIO)
+import Data.Scientific (Scientific, scientific)
 import Data.Text (Text)
 import Data.Vector qualified as V
 import Database.Kosem.PostgreSQL.Internal
@@ -27,7 +28,7 @@ import Test.Hspec.Hedgehog (
     (/==),
     (===),
  )
-import Test.Utils (withDB)
+import Test.Utils (genScientific, withDB)
 
 spec :: SpecWith ()
 spec = do
@@ -147,6 +148,16 @@ specIO = around withDB do
                     [Tdb.sql| select :hsInt::smallint dbInt |]
             let row = V.head rows
             row.dbInt === hsInt
+
+        it "select 'Scientific' as PG 'numeric'" $ \conn -> hedgehog do
+            (hsNum :: Scientific) <- forAll do
+                genScientific
+            rows <- evalIO do
+                execute
+                    conn
+                    [Tdb.sql| select :hsNum::numeric dbNum |]
+            let row = V.head rows
+            row.dbNum === hsNum
 
     describe "'Maybe' instances" do
         it "select 'Maybe Bool'" $ \conn -> do

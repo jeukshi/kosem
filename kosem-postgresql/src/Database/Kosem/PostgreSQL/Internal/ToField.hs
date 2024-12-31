@@ -5,6 +5,7 @@ module Database.Kosem.PostgreSQL.Internal.ToField where
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as ByteString
 import Data.Int (Int8)
+import Data.Scientific
 import Data.Text (Text)
 import Data.Word (Word32)
 import Language.Haskell.TH
@@ -48,6 +49,10 @@ instance ToField Int where
     toFieldWithLen 4 = encodingBytes . int4_int32 . fromIntegral
     toFieldWithLen 2 = encodingBytes . int2_int16 . fromIntegral
     toFieldWithLen n = error $ "TODO: not implemented for length: " <> show n
+
+instance ToField Scientific where
+    toField :: Scientific -> ByteString
+    toField = encodingBytes . numeric
 
 instance (ToField a) => ToField (Maybe a) where
     toField :: (ToField a) => Maybe a -> ByteString

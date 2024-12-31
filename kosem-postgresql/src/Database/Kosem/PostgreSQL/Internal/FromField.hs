@@ -4,6 +4,7 @@ module Database.Kosem.PostgreSQL.Internal.FromField where
 
 import Data.ByteString (ByteString)
 import Data.Int (Int8)
+import Data.Scientific (Scientific)
 import Data.Text (Text)
 import GHC.Exts (Any)
 import GHC.Int (Int16, Int32, Int64)
@@ -59,6 +60,11 @@ instance FromField Int where
         Left e -> error "parse error"
         Right t -> fromIntegral t
     parseFieldWithLen n _ = error $ "TODO: not implemented for length: " <> show n
+
+instance FromField Scientific where
+    parseField bs = case valueParser numeric bs of
+        Left e -> error "parse error"
+        Right t -> t
 
 instance (FromField a) => FromField (Maybe a) where
     parseField :: ByteString -> Maybe a

@@ -5,6 +5,7 @@
 
 module Database.Kosem.PostgreSQL.Internal.PgBuiltin where
 
+import Data.Scientific (Scientific)
 import Data.Text (Text)
 import Database.Kosem.PostgreSQL.Internal.PgType qualified as PgType
 import Database.Kosem.PostgreSQL.Internal.TypCategory qualified as TypCategory
@@ -37,6 +38,7 @@ defaultDatabaseConfig =
             , (PgType.Smallint, ''Int)
             , (PgType.Bigint, ''Int)
             , (PgType.Boolean, ''Bool)
+            , (PgType.Numeric, ''Scientific)
             ]
         , casts = pgCast
         , binaryOperators = pgbinaryOperators
