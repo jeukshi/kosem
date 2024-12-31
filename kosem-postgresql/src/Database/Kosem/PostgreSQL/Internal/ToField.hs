@@ -51,7 +51,7 @@ instance ToField Int where
 
 instance (ToField a) => ToField (Maybe a) where
     toField :: (ToField a) => Maybe a -> ByteString
-    toField = error "unexpected null"
+    toField = error "TODO unexpected null"
 
     toField'Internal :: (ToField a) => Maybe a -> Maybe ByteString
     toField'Internal = fmap toField
